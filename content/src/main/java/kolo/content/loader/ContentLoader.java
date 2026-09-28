@@ -197,12 +197,23 @@ public final class ContentLoader {
                                 return at(
                                         IDEOLOGIES,
                                         subLocation,
-                                        () -> new SubIdeologyDef(subId, sub.name(), subModifiers, sub.tags()));
+                                        () -> new SubIdeologyDef(
+                                                subId,
+                                                sub.name(),
+                                                required("weight", sub.weight()),
+                                                subModifiers,
+                                                sub.tags()));
                             });
                     return at(
                             IDEOLOGIES,
                             location,
-                            () -> new IdeologyDef(id, ideology.name(), modifiers, ideology.tags(), subs));
+                            () -> new IdeologyDef(
+                                    id,
+                                    ideology.name(),
+                                    required("weight", ideology.weight()),
+                                    modifiers,
+                                    ideology.tags(),
+                                    subs));
                 });
     }
 

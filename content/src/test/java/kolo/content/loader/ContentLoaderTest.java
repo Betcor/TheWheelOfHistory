@@ -591,6 +591,30 @@ class ContentLoaderTest {
     }
 
     @Test
+    void ideologyWeightsAreRequiredAndPositive() {
+        assertContentError(
+                Files.valid()
+                        .with(
+                                ContentLoader.IDEOLOGIES,
+                                Files.IDEOLOGIES.replace("демократія\n        weight: 100\n", "демократія\n"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location", "ideologies[0].sub_ideologies[0]",
+                        "cause", "blank_value",
+                        "field", "weight"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.IDEOLOGIES, Files.IDEOLOGIES.replace("weight: 300", "weight: 0"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location", "ideologies[0]",
+                        "cause", "value_out_of_range",
+                        "field", "ideology.democracy.weight"));
+    }
+
+    @Test
     void unknownModifierTargetIsReported() {
         String yaml = Files.IDEOLOGIES.replace("stat:hdi", "stat:happiness");
 

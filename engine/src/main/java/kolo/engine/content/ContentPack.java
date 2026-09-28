@@ -26,6 +26,7 @@ public final class ContentPack {
 
     private final String hash;
     private final SortedMap<IdeologyId, IdeologyDef> ideologies;
+    private final List<IdeologyDef> ideologiesInContentOrder;
     private final SortedMap<SubIdeologyId, IdeologyId> subIdeologyOwners;
     private final SortedMap<DoctrineId, DoctrineDef> doctrines;
     private final SortedMap<ResourceId, ResourceDef> resources;
@@ -40,6 +41,7 @@ public final class ContentPack {
 
     /**
      * @param hash хеш вихідних файлів контенту
+     * @param ideologies ідеології в порядку контенту (порядок секторів колеса ідеології)
      * @param techBranches рівно по одному визначенню на кожну {@link TechBranch}
      * @param developmentLevels рівно по одному визначенню на кожен рівень {@link Development#MIN}..{@link
      *     Development#MAX}
@@ -79,6 +81,7 @@ public final class ContentPack {
             }
         }
         this.ideologies = Collections.unmodifiableSortedMap(ideologyMap);
+        this.ideologiesInContentOrder = List.copyOf(ideologies);
         this.subIdeologyOwners = Collections.unmodifiableSortedMap(owners);
 
         TreeMap<DoctrineId, DoctrineDef> doctrineMap = new TreeMap<>();
@@ -191,6 +194,11 @@ public final class ContentPack {
 
     public SortedMap<IdeologyId, IdeologyDef> ideologies() {
         return ideologies;
+    }
+
+    /** Ідеології в порядку контенту — порядок секторів колеса ідеології. */
+    public List<IdeologyDef> ideologiesInContentOrder() {
+        return ideologiesInContentOrder;
     }
 
     public Optional<IdeologyDef> ideology(IdeologyId id) {

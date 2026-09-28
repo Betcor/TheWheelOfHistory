@@ -11,19 +11,23 @@ final class Files {
             ideologies:
               - id: democracy
                 name: Демократія
+                weight: 300
                 tags: [democratic]
                 modifiers:
                   - { target: "stat:hdi", value: 5 }
                 sub_ideologies:
                   - id: liberal_democracy
                     name: Ліберальна демократія
+                    weight: 100
                     modifiers:
                       - { target: "wheel:economic_cycle", value: 10 }
               - id: totalitarianism
                 name: Тоталітаризм
+                weight: 100
                 sub_ideologies:
                   - id: revanchism
                     name: Реваншизм
+                    weight: 100
                     tags: [revanchism]
             """;
 

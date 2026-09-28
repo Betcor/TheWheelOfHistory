@@ -5,11 +5,14 @@
 #       або wheel:<тип колеса>.
 # Числа — початкові значення для балансу. Ефекти, для яких ще немає систем (наука, армія, торгівля,
 # мобілізація, швидкість рішень), поки що виражені лише тегами.
-# Порядок підкласифікацій — порядок секторів колеса підкласифікації.
+# Колеса генерації (GD §4.1, №5–6): спершу ідеологія, потім підкласифікація серед підкласифікацій
+# обраної ідеології. Ваги — відносні (1..10000), колесо нормалізує їх до 100%.
+# Порядок ідеологій і підкласифікацій — порядок секторів коліс.
 
 ideologies:
   - id: democracy
     name: Демократія
+    weight: 100
     tags: [democratic]
     modifiers:
       - { target: "stat:hdi", value: 5 }
@@ -17,50 +20,60 @@ ideologies:
     sub_ideologies:
       - id: liberal_democracy
         name: Ліберальна демократія
+        weight: 100
         tags: [liberal]
         modifiers:
           - { target: "stat:influence", value: 5 }
       - id: social_democracy
         name: Соціал-демократія
+        weight: 100
         tags: [welfare_state]
         modifiers:
           - { target: "stat:hdi", value: 5 }
       - id: direct_democracy
         name: Пряма демократія
+        weight: 100
         tags: [direct_democracy]
         modifiers:
           - { target: "stat:legitimacy", value: 5 }
       - id: constitutional_monarchy
         name: Конституційна монархія
+        weight: 100
         tags: [monarch]
         modifiers:
           - { target: "stat:stability", value: 5 }
 
   - id: authoritarianism
     name: Авторитаризм
+    weight: 100
     tags: [authoritarian]
     sub_ideologies:
       - id: military_junta
         name: Військова хунта
+        weight: 100
         tags: [junta, militarism]
         modifiers:
           - { target: "stat:legitimacy", value: -10 }
       - id: oligarchy
         name: Олігархія
+        weight: 100
         tags: [oligarchy]
         modifiers:
           - { target: "stat:hdi", value: -5 }
       - id: technocracy
         name: Технократія
+        weight: 100
         tags: [technocracy]
       - id: managed_democracy
         name: «Керована демократія»
+        weight: 100
         tags: [managed_democracy]
         modifiers:
           - { target: "stat:legitimacy", value: 5 }
 
   - id: totalitarianism
     name: Тоталітаризм
+    weight: 100
     tags: [totalitarian]
     modifiers:
       - { target: "stat:hdi", value: -5 }
@@ -68,45 +81,54 @@ ideologies:
     sub_ideologies:
       - id: personality_cult
         name: Культ особи
+        weight: 100
         tags: [personality_cult]
         modifiers:
           - { target: "stat:stability", value: 5 }
       - id: revanchism
         name: Реваншизм
+        weight: 100
         tags: [revanchism]
       - id: militarism
         name: Мілітаризм
+        weight: 100
         tags: [militarism]
         modifiers:
           - { target: "stat:war_weariness", value: -5 }
       - id: isolationism
         name: Ізоляціонізм
+        weight: 100
         tags: [isolationism]
         modifiers:
           - { target: "stat:influence", value: -10 }
 
   - id: monarchy
     name: Монархія
+    weight: 100
     tags: [monarchic, monarch]
     modifiers:
       - { target: "stat:stability", value: 5 }
     sub_ideologies:
       - id: absolute_monarchy
         name: Абсолютна монархія
+        weight: 100
         tags: [absolutism]
       - id: feudal_monarchy
         name: Феодальна монархія
+        weight: 100
         tags: [feudalism]
         modifiers:
           - { target: "stat:hdi", value: -5 }
       - id: hereditary_empire
         name: Спадкова імперія
+        weight: 100
         tags: [empire]
         modifiers:
           - { target: "stat:influence", value: 5 }
 
   - id: theocracy
     name: Теократія
+    weight: 100
     tags: [theocratic]
     modifiers:
       - { target: "stat:stability", value: 10 }
@@ -114,32 +136,39 @@ ideologies:
     sub_ideologies:
       - id: moderate_theocracy
         name: Помірна теократія
+        weight: 100
         tags: [moderate_theocracy]
       - id: fundamentalism
         name: Фундаменталізм
+        weight: 100
         tags: [fundamentalism]
         modifiers:
           - { target: "stat:hdi", value: -5 }
       - id: temple_state
         name: Храмова держава
+        weight: 100
         tags: [temple_state]
         modifiers:
           - { target: "stat:legitimacy", value: 5 }
 
   - id: socialism
     name: Соціалізм
+    weight: 100
     tags: [socialist]
     modifiers:
       - { target: "stat:hdi", value: 5 }
     sub_ideologies:
       - id: planned_economy
         name: Планова економіка
+        weight: 100
         tags: [planned_economy]
       - id: market_socialism
         name: Ринковий соціалізм
+        weight: 100
         tags: [market_socialism]
       - id: council_communism
         name: Комунізм рад
+        weight: 100
         tags: [council_communism]
         modifiers:
           - { target: "stat:legitimacy", value: 5 }
