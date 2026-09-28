@@ -19,6 +19,10 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import kolo.engine.content.BackstoryContent;
+import kolo.engine.content.BackstoryFragmentDef;
+import kolo.engine.content.BackstoryFragmentId;
+import kolo.engine.content.BackstoryText;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
@@ -40,6 +44,7 @@ import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -69,10 +74,11 @@ public final class ContentLoader {
     public static final String NUCLEAR = "nuclear.yaml";
     public static final String PEOPLE = "people.yaml";
     public static final String NAMES = "names.yaml";
+    public static final String BACKSTORY = "backstory.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
     public static final List<String> FILES =
-            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE, NAMES);
+            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE, NAMES, BACKSTORY);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -100,6 +106,8 @@ public final class ContentLoader {
         List<PersonKindDef> kinds = personKinds(people);
         List<TraitDef> traits = traits(people);
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
+        BackstoryContent backstory =
+                backstory(parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, nuclear);
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
         String hash = ContentHash.of(files);
@@ -107,7 +115,17 @@ public final class ContentLoader {
                 "*",
                 "",
                 () -> new ContentPack(
-                        hash, ideologies, doctrines, resources, branches, levels, nuclear, kinds, traits, names));
+                        hash,
+                        ideologies,
+                        doctrines,
+                        resources,
+                        branches,
+                        levels,
+                        nuclear,
+                        kinds,
+                        traits,
+                        names,
+                        backstory));
     }
 
     // ---- Файли ----
@@ -382,6 +400,62 @@ public final class ContentLoader {
         return at(NAMES, "", () -> new NameContent(paradigms, styles, forms));
     }
 
+    /**
+     * @param ideologies уже завантажені ідеології й ядерні статуси: їхні мітки — джерела міток в умовах фрагментів
+     */
+    private static BackstoryContent backstory(
+            ContentYaml.BackstoryFile yaml, List<IdeologyDef> ideologies, List<NuclearStatusDef> nuclear) {
+        TreeSet<BackstoryFragmentId> ids = new TreeSet<>();
+        List<BackstoryFragmentDef> fragments = list(
+                BACKSTORY, "fragments", nonEmpty(BACKSTORY, "fragments", yaml.fragments()), (location, fragment) -> {
+                    BackstoryFragmentId id =
+                            at(BACKSTORY, location, () -> unique(ids, new BackstoryFragmentId(fragment.id())));
+                    List<ModifierDef> modifiers = modifiers(BACKSTORY, location, fragment.modifiers());
+                    return at(BACKSTORY, location, () -> fragment(id, fragment, modifiers));
+                });
+        BackstoryContent content = at(BACKSTORY, "", () -> new BackstoryContent(yaml.generationTags(), fragments));
+
+        // Мітки в умовах мають джерело; перевіряється тут, щоб помилка вказувала на фрагмент.
+        TreeSet<String> known = new TreeSet<>(content.producedTags());
+        for (IdeologyDef ideology : ideologies) {
+            known.addAll(ideology.tags());
+            ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
+        }
+        nuclear.forEach(status -> known.addAll(status.tags()));
+        for (int i = 0; i < fragments.size(); i++) {
+            for (String tag : fragments.get(i).referencedTags()) {
+                if (!known.contains(tag)) {
+                    throw invalid(BACKSTORY, "fragments[" + i + "]", unknown("tag", tag));
+                }
+            }
+        }
+        return content;
+    }
+
+    private static BackstoryFragmentDef fragment(
+            BackstoryFragmentId id, ContentYaml.Fragment fragment, List<ModifierDef> modifiers) {
+        if (fragment.quality() == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "quality"));
+        }
+        if (fragment.years() == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "years"));
+        }
+        String field = "backstory." + id;
+        return new BackstoryFragmentDef(
+                id,
+                fragment.weight(),
+                fragment.quality(),
+                fragment.years().from(),
+                fragment.years().to(),
+                new TagCondition(fragment.requires(), fragment.requiresAny(), fragment.excludes()),
+                new TreeMap<>(fragment.weightTags()),
+                fragment.neighbor(),
+                fragment.adds(),
+                fragment.duration(),
+                modifiers,
+                new BackstoryText(field + ".text", fragment.text()));
+    }
+
     private static GrammaticalGender gender(String key) {
         return ContentKeys.parse("gender", GrammaticalGender.values(), GrammaticalGender::key, key);
     }
@@ -540,6 +614,10 @@ public final class ContentLoader {
         for (CoercionInputShape shape :
                 List.of(CoercionInputShape.Integer, CoercionInputShape.Float, CoercionInputShape.Boolean)) {
             mapper.coercionConfigFor(LogicalType.Textual).setCoercion(shape, CoercionAction.Fail);
+        }
+        for (CoercionInputShape shape :
+                List.of(CoercionInputShape.String, CoercionInputShape.Integer, CoercionInputShape.Float)) {
+            mapper.coercionConfigFor(LogicalType.Boolean).setCoercion(shape, CoercionAction.Fail);
         }
         return mapper;
     }

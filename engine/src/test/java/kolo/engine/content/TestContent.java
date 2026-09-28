@@ -2,6 +2,8 @@ package kolo.engine.content;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalGender;
@@ -125,6 +127,28 @@ final class TestContent {
         return new NameContent(List.of(mascHard()), List.of(style("northern")), List.of(republic(ids, List.of())));
     }
 
+    /** Фрагмент без умов, мало що дає; тести замінюють потрібні поля. */
+    static BackstoryFragmentDef fragment(String id, TagCondition condition, List<String> adds) {
+        return new BackstoryFragmentDef(
+                new BackstoryFragmentId(id),
+                100,
+                50,
+                1950,
+                1960,
+                condition,
+                new TreeMap<>(),
+                false,
+                adds,
+                0,
+                List.of(new ModifierDef(ModifierTarget.stat(Stat.STABILITY), -3)),
+                new BackstoryText("text", "У {year} році в {country.locative} сталася подія."));
+    }
+
+    /** Один фрагмент без умов і без словника міток. */
+    static BackstoryContent backstory() {
+        return new BackstoryContent(Map.of(), List.of(fragment("civil_war", TagCondition.NONE, List.of("civil_war"))));
+    }
+
     static ContentPack pack(List<IdeologyDef> ideologies) {
         return new ContentPack(
                 HASH,
@@ -136,6 +160,7 @@ final class TestContent {
                 nuclearStatuses(),
                 personKinds(),
                 traits(),
-                names(ideologies));
+                names(ideologies),
+                backstory());
     }
 }

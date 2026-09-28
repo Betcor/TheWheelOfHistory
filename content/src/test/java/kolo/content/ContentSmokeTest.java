@@ -2,7 +2,10 @@ package kolo.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+import java.util.Set;
 import kolo.content.loader.ContentLoader;
+import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.generation.name.CountryNames;
@@ -24,6 +27,7 @@ class ContentSmokeTest {
         assertThat(pack.nuclearStatuses()).isNotEmpty();
         assertThat(pack.traits()).isNotEmpty();
         assertThat(pack.names().stateForms()).isNotEmpty();
+        assertThat(pack.backstory().fragments()).isNotEmpty();
         assertThat(pack.hash()).matches("[0-9a-f]{64}");
         // Повторне завантаження — той самий хеш: клієнт і сервер з однаковими файлами зійдуться.
         assertThat(ContentLoader.loadBundled().hash()).isEqualTo(pack.hash());
@@ -36,5 +40,18 @@ class ContentSmokeTest {
         LocalizedName name = CountryNames.generate(Rng.of(42), pack, new SubIdeologyId("liberal_democracy"));
 
         assertThat(name.fullName().nominative()).endsWith(" " + name.shortName().nominative());
+    }
+
+    @Test
+    void bundledContentTellsABackstory() {
+        ContentPack pack = ContentLoader.loadBundled();
+        LocalizedName name = CountryNames.generate(Rng.of(42), pack, new SubIdeologyId("revanchism"));
+
+        BackstoryFragmentDef fragment = pack.backstory()
+                .available(Set.of("totalitarian", "revanchism"), false)
+                .getFirst();
+
+        assertThat(fragment.text().render(name, Optional.empty(), fragment.yearTo()))
+                .isNotBlank();
     }
 }

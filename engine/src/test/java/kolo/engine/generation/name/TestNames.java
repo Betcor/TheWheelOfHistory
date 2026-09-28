@@ -2,6 +2,12 @@ package kolo.engine.generation.name;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import kolo.engine.content.BackstoryContent;
+import kolo.engine.content.BackstoryFragmentDef;
+import kolo.engine.content.BackstoryFragmentId;
+import kolo.engine.content.BackstoryText;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
@@ -22,6 +28,7 @@ import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -142,6 +149,25 @@ final class TestNames {
                 new NameContent(
                         List.of(MASC_HARD, FEM_IYA),
                         List.of(NORTHERN, SOUTHERN),
-                        List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM)));
+                        List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM)),
+                backstory());
+    }
+
+    private static BackstoryContent backstory() {
+        return new BackstoryContent(
+                Map.of(),
+                List.of(new BackstoryFragmentDef(
+                        new BackstoryFragmentId("civil_war"),
+                        100,
+                        15,
+                        1946,
+                        1966,
+                        TagCondition.NONE,
+                        new TreeMap<>(),
+                        false,
+                        List.of(),
+                        0,
+                        List.of(),
+                        new BackstoryText("text", "Громадянська війна {year} року."))));
     }
 }

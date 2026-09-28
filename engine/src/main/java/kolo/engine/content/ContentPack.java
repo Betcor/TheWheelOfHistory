@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.Function;
 import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
@@ -36,6 +37,7 @@ public final class ContentPack {
     private final SortedMap<PersonKind, PersonKindDef> personKinds;
     private final SortedMap<TraitId, TraitDef> traits;
     private final NameContent names;
+    private final BackstoryContent backstory;
 
     /**
      * @param hash хеш вихідних файлів контенту
@@ -46,10 +48,13 @@ public final class ContentPack {
      * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
+     * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
+     *     підкласифікацію, ядерний статус, фрагмент або словник міток коліс генерації
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
-     *     підкласифікацію або підкласифікації не доступна жодна форма
+     *     підкласифікацію, підкласифікації не доступна жодна форма або фрагмент передісторії залежить від мітки без
+     *     джерела
      */
     public ContentPack(
             String hash,
@@ -61,7 +66,8 @@ public final class ContentPack {
             List<NuclearStatusDef> nuclearStatuses,
             List<PersonKindDef> personKinds,
             List<TraitDef> traits,
-            NameContent names) {
+            NameContent names,
+            BackstoryContent backstory) {
         this.hash = Checks.notBlank("content.hash", hash);
 
         TreeMap<IdeologyId, IdeologyDef> ideologyMap = new TreeMap<>();
@@ -157,6 +163,21 @@ public final class ContentPack {
             if (stateFormsFor(sub).isEmpty()) {
                 throw new ValidationException(
                         ErrorCode.MISSING_DEFINITION, ErrorDetails.of("field", "state_forms", "value", sub));
+            }
+        }
+
+        this.backstory = Objects.requireNonNull(backstory, "backstory");
+        TreeSet<String> known = new TreeSet<>(backstory.producedTags());
+        for (IdeologyDef ideology : ideologyMap.values()) {
+            known.addAll(ideology.tags());
+            ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
+        }
+        nuclearMap.values().forEach(status -> known.addAll(status.tags()));
+        for (BackstoryFragmentDef fragment : backstory.fragments().values()) {
+            for (String tag : fragment.referencedTags()) {
+                if (!known.contains(tag)) {
+                    throw unknown("backstory." + fragment.id() + ".tags", tag);
+                }
             }
         }
     }
@@ -282,6 +303,11 @@ public final class ContentPack {
         return names.stateForms().values().stream()
                 .filter(form -> form.appliesTo(ideology, subIdeology))
                 .toList();
+    }
+
+    /** Передісторія: фрагменти й словник міток коліс генерації. */
+    public BackstoryContent backstory() {
+        return backstory;
     }
 
     private static ValidationException unknown(String field, Object value) {

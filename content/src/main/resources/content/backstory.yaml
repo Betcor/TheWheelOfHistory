@@ -1,0 +1,599 @@
+# Передісторія (GD §4.7): фрагменти подій до 1970 року.
+#
+# Колесо передісторії обирає 2–4 фрагменти поспіль серед доступних; мітки з adds одного фрагмента
+# змінюють умови й ваги наступних. Скільки фрагментів і як не повторювати їх — ланцюжок коліс генерації.
+#
+# Поля фрагмента:
+#   weight       — базова вага (1..10000), відносна: колесо нормалізує ваги доступних фрагментів;
+#   quality      — наскільки фрагмент добрий для держави, 0..100 (≥ 85 дуже добре, ≤ 15 дуже погано — стріки);
+#   years        — у які роки могла статися подія (1900..1969);
+#   requires     — мітки держави, які мають бути всі;
+#   requires_any — з яких міток має бути хоча б одна;
+#   excludes     — мітки, яких не має бути;
+#   weight_tags  — добавки до ваги за мітки держави (можуть бути від'ємні);
+#   neighbor     — фрагмент пов'язує державу з сусідом і доступний, лише коли сусід є;
+#   adds         — мітки, які фрагмент дає державі;
+#   duration     — скільки років діють модифікатори з 1970 року; без поля — постійно;
+#   modifiers    — ефекти (ціль stat:<показник> або wheel:<тип колеса>);
+#   text         — шаблон тексту.
+#
+# Змінні тексту: {year}; {country}, {neighbor} — коротка назва, {country_full}, {neighbor_full} — повна;
+# відмінок через крапку: {neighbor.instrumental}. Без відмінка — називний.
+# Рід назви шаблон не знає, тож підмет речення — «країна», а назва стоїть у непрямих відмінках.
+# Прийменник «в/у» перед назвою залежить від її першої літери — його краще уникати («в Віланорії»).
+#
+# Мітки в умовах і вагах мають джерело: ідеологію чи підкласифікацію (ideologies.yaml), ядерний статус
+# (nuclear.yaml), adds якогось фрагмента або generation_tags нижче.
+#
+# Ефекти, для яких ще немає систем (casus belli за стару ворожнечу, перевага у війні за втрачені землі,
+# діаспора, секретність ядерної програми), поки що виражені лише мітками.
+
+# Мітки, які дадуть колеса генерації (GD §4.1). Колеса ще не описані в контенті; коли з'являться,
+# вони мають давати саме ці мітки.
+generation_tags:
+  coastal: Держава має вихід до моря (колесо географії).
+  mountainous: Переважає гірський рельєф (колесо географії).
+  small_country: Мала площа (колесо розміру).
+  poor: ВВП на душу нижчий за медіану світу (колесо ВВП).
+  rich: ВВП на душу значно вищий за медіану світу (колесо ВВП).
+  large_army: Під зброєю не менше 3% населення (колесо розміру армії).
+  small_army: Під зброєю менше 0,5% населення (колесо розміру армії).
+  backward: Хоча б одна галузь на рівні −2 або нижче (колесо розвиненості).
+  advanced: Хоча б одна галузь на рівні +1 або вище (колесо розвиненості).
+  has_oil: Є родовище нафти (колесо ресурсів).
+
+fragments:
+
+  # ---- Походження держави ----
+
+  - id: colonial_past
+    weight: 120
+    quality: 30
+    years: { from: 1900, to: 1955 }
+    excludes: [empire]
+    weight_tags: { poor: 100 }
+    adds: [colonial_past]
+    modifiers:
+      - { target: "stat:hdi", value: -3 }
+    text: >-
+      До середини століття землі {country.genitive} були колонією заморської імперії. Кордони, прокладені чужими
+      картографами, досі сперечаються з річками й горами.
+
+  - id: independence_war
+    weight: 80
+    quality: 70
+    years: { from: 1945, to: 1965 }
+    weight_tags: { colonial_past: 300, occupied_past: 150 }
+    adds: [independence_war]
+    modifiers:
+      - { target: "stat:legitimacy", value: 5 }
+      - { target: "stat:stability", value: 3 }
+    text: >-
+      У {year} році після кривавої визвольної війни країна здобула незалежність. Ветерани тих років досі щовесни
+      збираються на площах {country.genitive}.
+
+  - id: founding_father
+    weight: 120
+    quality: 80
+    years: { from: 1945, to: 1966 }
+    requires: [independence_war]
+    weight_tags: { personality_cult: 200 }
+    adds: [founding_father]
+    modifiers:
+      - { target: "stat:legitimacy", value: 8 }
+    text: >-
+      Лідер визвольної боротьби в {year} році став першим главою держави. Його портрет висить у кожній школі
+      {country.genitive}, а слово досі важить більше за закон.
+
+  - id: old_dynasty
+    weight: 150
+    quality: 70
+    years: { from: 1945, to: 1968 }
+    requires_any: [monarchic, monarch]
+    adds: [old_dynasty]
+    modifiers:
+      - { target: "stat:legitimacy", value: 10 }
+      - { target: "stat:stability", value: 3 }
+    text: >-
+      Правлячий дім {country.genitive} веде родовід від середньовічних князів. На коронацію {year} року зійшлася
+      половина країни.
+
+  - id: revolution_past
+    weight: 80
+    quality: 55
+    years: { from: 1917, to: 1965 }
+    excludes: [monarchic]
+    weight_tags: { socialist: 300, council_communism: 200, totalitarian: 100 }
+    adds: [revolution_past]
+    modifiers:
+      - { target: "stat:legitimacy", value: 5 }
+      - { target: "stat:stability", value: -2 }
+    text: >-
+      Революція {year} року скинула старий порядок. Нова влада обіцяла рівність і хліб — і досі нагадує, що саме
+      вона їх принесла.
+
+  # ---- Внутрішні потрясіння ----
+
+  - id: civil_war
+    weight: 100
+    quality: 15
+    years: { from: 1946, to: 1966 }
+    weight_tags: { junta: 100, totalitarian: 100, poor: 50, revolution_past: 150 }
+    adds: [civil_war]
+    duration: 15
+    modifiers:
+      - { target: "stat:stability", value: -5 }
+    text: >-
+      У {year} році країну розколола громадянська війна. Переможці переписали підручники, але в родинах
+      {country.genitive} пам'ятають обидві сторони.
+
+  - id: reconciliation
+    weight: 100
+    quality: 60
+    years: { from: 1956, to: 1969 }
+    requires: [civil_war]
+    excludes: [purges]
+    weight_tags: { democratic: 150 }
+    adds: [reconciliation]
+    modifiers:
+      - { target: "stat:stability", value: 5 }
+      - { target: "stat:legitimacy", value: 3 }
+    text: >-
+      У {year} році уряд оголосив амністію учасникам громадянської війни. Колишні вороги сіли за один стіл — не
+      всі щиро.
+
+  - id: coup_past
+    weight: 80
+    quality: 20
+    years: { from: 1945, to: 1968 }
+    weight_tags: { junta: 300, authoritarian: 100, large_army: 100, civil_war: 100 }
+    adds: [coup_past]
+    modifiers:
+      - { target: "stat:legitimacy", value: -5 }
+    text: >-
+      У {year} році армія вивела танки на вулиці столиці. Відтоді жоден уряд {country.genitive} не забуває
+      спитати думки генералів.
+
+  - id: failed_countercoup
+    weight: 80
+    quality: 25
+    years: { from: 1950, to: 1969 }
+    requires: [coup_past]
+    adds: [failed_countercoup]
+    duration: 10
+    modifiers:
+      - { target: "stat:legitimacy", value: -3 }
+      - { target: "stat:stability", value: 2 }
+    text: >-
+      Спроба контрперевороту {year} року провалилася за одну ніч. Показові суди над змовниками транслювали
+      по радіо на всю країну.
+
+  - id: purges
+    weight: 80
+    quality: 10
+    years: { from: 1930, to: 1962 }
+    requires_any: [totalitarian, socialist]
+    weight_tags: { personality_cult: 200, civil_war: 150 }
+    adds: [purges]
+    modifiers:
+      - { target: "stat:hdi", value: -5 }
+      - { target: "stat:stability", value: 2 }
+    text: >-
+      Чистки {year} року знищили ціле покоління офіцерів, інженерів і вчителів {country.genitive}. Про них мовчать,
+      але пам'ятають.
+
+  - id: student_protests
+    weight: 60
+    quality: 45
+    years: { from: 1960, to: 1969 }
+    requires_any: [democratic, managed_democracy, oligarchy, technocracy]
+    weight_tags: { liberal: 100, cultural_golden_age: 100 }
+    adds: [student_protests]
+    duration: 5
+    modifiers:
+      - { target: "stat:legitimacy", value: -3 }
+      - { target: "stat:stability", value: -2 }
+    text: >-
+      Студентські протести {year} року почалися з вимоги дешевших гуртожитків, а закінчилися відставкою уряду.
+
+  - id: land_reform
+    weight: 70
+    quality: 65
+    years: { from: 1920, to: 1966 }
+    excludes: [feudalism]
+    weight_tags: { socialist: 150, democratic: 50, revolution_past: 150 }
+    adds: [land_reform]
+    modifiers:
+      - { target: "stat:stability", value: 3 }
+      - { target: "stat:legitimacy", value: 3 }
+    text: >-
+      Земельна реформа {year} року роздала селянам маєтки старої знаті. Влада здобула вдячність села — і ворогів
+      серед колишніх власників.
+
+  # ---- Економіка ----
+
+  - id: industrialization
+    weight: 100
+    quality: 75
+    years: { from: 1930, to: 1962 }
+    weight_tags: { socialist: 200, planned_economy: 100, totalitarian: 100, backward: -80 }
+    adds: [industrialized]
+    modifiers:
+      - { target: "stat:hdi", value: 3 }
+    text: >-
+      У {year} році уряд оголосив прискорену індустріалізацію: за десятиліття {country.accusative} вкрили заводи,
+      шахти й робітничі міста.
+
+  - id: pollution
+    weight: 60
+    quality: 30
+    years: { from: 1950, to: 1969 }
+    requires: [industrialized]
+    adds: [pollution]
+    modifiers:
+      - { target: "stat:hdi", value: -3 }
+    text: >-
+      Ціною індустріалізації стали отруєні річки й задимлені міста. Від {year} року лікарі {country.genitive} марно
+      б'ють на сполох.
+
+  - id: economic_miracle
+    weight: 60
+    quality: 90
+    years: { from: 1948, to: 1962 }
+    excludes: [poor, famine]
+    weight_tags: { liberal: 150, market_socialism: 100, technocracy: 100, rich: 150 }
+    adds: [economic_miracle]
+    modifiers:
+      - { target: "stat:stability", value: 5 }
+      - { target: "stat:hdi", value: 3 }
+    text: >-
+      Після {year} року країна пережила «економічне диво»: за п'ятнадцять років доходи зросли втричі, а на вулицях
+      {country.genitive} з'явилися перші телевізори й автомобілі.
+
+  - id: famine
+    weight: 60
+    quality: 5
+    years: { from: 1920, to: 1962 }
+    excludes: [rich]
+    weight_tags: { poor: 150, planned_economy: 100, feudalism: 100, civil_war: 100 }
+    adds: [famine]
+    duration: 20
+    modifiers:
+      - { target: "stat:stability", value: -3 }
+      - { target: "stat:hdi", value: -3 }
+    text: >-
+      Голод {year} року забрав сотні тисяч життів. Відтоді в кожному селі {country.genitive} стоїть пам'ятник, а зерно
+      в державних коморах рахують ретельніше за золото.
+
+  - id: hyperinflation
+    weight: 60
+    quality: 10
+    years: { from: 1920, to: 1968 }
+    excludes: [rich]
+    weight_tags: { lost_war: 150, poor: 100, oligarchy: 100 }
+    adds: [hyperinflation]
+    duration: 10
+    modifiers:
+      - { target: "stat:stability", value: -3 }
+      - { target: "stat:legitimacy", value: -3 }
+    text: >-
+      У {year} році гроші знецінювалися щодня: платню видавали двічі на день, а хліб купували валізами купюр.
+      Недовіра до банків лишилася надовго.
+
+  - id: oil_boom
+    weight: 150
+    quality: 80
+    years: { from: 1930, to: 1966 }
+    requires: [has_oil]
+    adds: [oil_boom]
+    modifiers:
+      - { target: "stat:stability", value: 3 }
+    text: >-
+      Нафту знайшли в {year} році. Відтоді бюджет {country.genitive} живе ціною барелю, а в столиці виростають нові
+      квартали.
+
+  - id: trade_hub
+    weight: 80
+    quality: 80
+    years: { from: 1900, to: 1965 }
+    requires: [coastal]
+    excludes: [isolationism, isolation_past]
+    weight_tags: { rich: 100, liberal: 100 }
+    adds: [trade_hub]
+    modifiers:
+      - { target: "stat:influence", value: 5 }
+    text: >-
+      Ще з {year} року порти {country.genitive} стали перехрестям морських шляхів: сюди везуть усе, а звідси — ще
+      більше.
+
+  - id: stagnation
+    weight: 100
+    quality: 20
+    years: { from: 1930, to: 1968 }
+    requires: [backward]
+    weight_tags: { feudalism: 200, isolationism: 100 }
+    adds: [stagnation]
+    modifiers:
+      - { target: "stat:hdi", value: -3 }
+    text: >-
+      Поки світ будував заводи, країна жила за звичаями дідів: перша залізниця дісталася столиці {country.genitive}
+      лише в {year} році.
+
+  - id: emigration
+    weight: 70
+    quality: 30
+    years: { from: 1945, to: 1966 }
+    weight_tags: { poor: 150, famine: 200, civil_war: 150, purges: 100 }
+    adds: [emigration, diaspora]
+    modifiers:
+      - { target: "stat:hdi", value: -2 }
+      - { target: "stat:influence", value: 3 }
+    text: >-
+      Після {year} року мільйони людей виїхали з країни в пошуках кращого життя. Діаспора {country.genitive}
+      розкидана по всьому світу й досі надсилає гроші додому.
+
+  # ---- Суспільство й культура ----
+
+  - id: religious_revival
+    weight: 60
+    quality: 50
+    years: { from: 1950, to: 1968 }
+    excludes: [secular_reforms]
+    weight_tags: { theocratic: 300, fundamentalism: 200 }
+    adds: [religious_revival]
+    modifiers:
+      - { target: "stat:stability", value: 3 }
+      - { target: "stat:legitimacy", value: 3 }
+    text: >-
+      Від {year} року країну охопило релігійне піднесення: храми, закриті десятиліттями, знову заповнилися, а
+      проповідники стали впливовішими за міністрів.
+
+  - id: secular_reforms
+    weight: 60
+    quality: 60
+    years: { from: 1920, to: 1966 }
+    excludes: [theocratic, religious_revival]
+    weight_tags: { socialist: 100, technocracy: 100, liberal: 50 }
+    adds: [secular_reforms]
+    duration: 10
+    modifiers:
+      - { target: "stat:hdi", value: 3 }
+      - { target: "stat:legitimacy", value: -3 }
+    text: >-
+      Реформи {year} року відокремили церкву від держави: школи стали світськими, а духовенство втратило землі й
+      голос у раді.
+
+  - id: cultural_golden_age
+    weight: 60
+    quality: 85
+    years: { from: 1955, to: 1965 }
+    excludes: [purges, isolationism]
+    weight_tags: { liberal: 100, welfare_state: 100, economic_miracle: 100 }
+    adds: [cultural_golden_age]
+    modifiers:
+      - { target: "stat:influence", value: 5 }
+      - { target: "stat:hdi", value: 2 }
+    text: >-
+      Із {year} року для {country.genitive} настала доба розквіту культури: фільми, романи й пісні тих років знають
+      далеко за кордоном.
+
+  - id: science_prestige
+    weight: 50
+    quality: 80
+    years: { from: 1950, to: 1969 }
+    excludes: [backward]
+    weight_tags: { advanced: 200, technocracy: 200 }
+    adds: [science_prestige]
+    modifiers:
+      - { target: "stat:influence", value: 3 }
+      - { target: "stat:hdi", value: 2 }
+    text: >-
+      Відкриття, зроблене в лабораторіях {country.genitive} у {year} році, принесло країні першу міжнародну наукову
+      премію.
+
+  - id: natural_disaster
+    weight: 50
+    quality: 25
+    years: { from: 1946, to: 1968 }
+    weight_tags: { mountainous: 200 }
+    adds: [natural_disaster]
+    duration: 10
+    modifiers:
+      - { target: "stat:stability", value: 2 }
+      - { target: "stat:hdi", value: -2 }
+    text: >-
+      Землетрус {year} року зруйнував кілька міст. Відбудова згуртувала країну, але борги за неї ще не сплачено.
+
+  - id: isolation_past
+    weight: 50
+    quality: 35
+    years: { from: 1945, to: 1965 }
+    excludes: [trade_hub]
+    weight_tags: { isolationism: 400 }
+    adds: [isolation_past]
+    modifiers:
+      - { target: "stat:influence", value: -5 }
+      - { target: "stat:stability", value: 3 }
+    text: >-
+      У {year} році уряд закрив кордони для іноземців. Відтоді виросло покоління громадян {country.genitive}, яке
+      ніколи не бачило чужинця.
+
+  - id: peace_mediator
+    weight: 40
+    quality: 85
+    years: { from: 1946, to: 1969 }
+    excludes: [isolation_past, isolationism, militarism]
+    weight_tags: { small_country: 100, democratic: 100 }
+    adds: [peace_mediator]
+    modifiers:
+      - { target: "stat:influence", value: 8 }
+    text: >-
+      У {year} році саме в столиці {country.genitive} підписали мир між двома далекими державами. Відтоді дипломати
+      країни мають славу чесних посередників.
+
+  # ---- Війни й окупація ----
+
+  - id: partisan_tradition
+    weight: 60
+    quality: 50
+    years: { from: 1938, to: 1945 }
+    weight_tags: { mountainous: 150, small_country: 100 }
+    adds: [partisan_tradition, occupied_past]
+    modifiers:
+      - { target: "stat:stability", value: 2 }
+      - { target: "stat:war_weariness", value: -5 }
+    text: >-
+      Під час окупації, що почалася в {year} році, ліси й гори стали домом для партизанів. Традиція опору — частина
+      виховання кожного школяра {country.genitive}.
+
+  - id: lost_war
+    weight: 80
+    quality: 10
+    years: { from: 1945, to: 1966 }
+    neighbor: true
+    excludes: [won_war]
+    weight_tags: { revanchism: 400, militarism: 150, large_army: 100 }
+    adds: [lost_war, lost_territories]
+    duration: 10
+    modifiers:
+      - { target: "stat:stability", value: -5 }
+    text: >-
+      У {year} році країна програла війну {neighbor.dative} й поступилася прикордонними провінціями. Карти зі
+      старими кордонами досі висять у школах.
+
+  - id: reparations
+    weight: 150
+    quality: 5
+    years: { from: 1946, to: 1968 }
+    requires: [lost_war]
+    adds: [reparations]
+    duration: 10
+    modifiers:
+      - { target: "stat:stability", value: -3 }
+      - { target: "stat:hdi", value: -3 }
+    text: >-
+      Після поразки країна роками виплачувала контрибуції. Заводи {country.genitive} працювали на чужу казну, а
+      податки зростали щороку.
+
+  - id: revanchist_mood
+    weight: 150
+    quality: 35
+    years: { from: 1950, to: 1969 }
+    requires: [lost_territories]
+    weight_tags: { revanchism: 300 }
+    adds: [revanchist_mood]
+    modifiers:
+      - { target: "stat:stability", value: 3 }
+      - { target: "stat:war_weariness", value: -10 }
+    text: >-
+      Відтоді як кордон пересунули, газети {country.genitive} щодня нагадують про втрачені землі. Народ жадає
+      реваншу.
+
+  - id: won_war
+    weight: 60
+    quality: 85
+    years: { from: 1945, to: 1966 }
+    neighbor: true
+    excludes: [lost_war]
+    weight_tags: { militarism: 200, large_army: 150 }
+    adds: [won_war]
+    modifiers:
+      - { target: "stat:legitimacy", value: 5 }
+      - { target: "stat:influence", value: 3 }
+    text: >-
+      Перемога над {neighbor.instrumental} у {year} році принесла країні нові землі й славу. Ветерани тієї кампанії
+      досі сидять в уряді й генштабі.
+
+  - id: occupation_by_neighbor
+    weight: 50
+    quality: 10
+    years: { from: 1938, to: 1960 }
+    neighbor: true
+    excludes: [won_war]
+    weight_tags: { small_country: 150, small_army: 100 }
+    adds: [occupied_past]
+    duration: 10
+    modifiers:
+      - { target: "stat:stability", value: -3 }
+    text: >-
+      У {year} році війська {neighbor.genitive} на кілька років окупували країну. Колаборантів засудили, але образа
+      лишилася.
+
+  - id: old_feud
+    weight: 60
+    quality: 30
+    years: { from: 1900, to: 1960 }
+    neighbor: true
+    excludes: [old_friendship]
+    weight_tags: { revanchism: 150, lost_war: 200, occupied_past: 150 }
+    adds: [old_feud]
+    modifiers:
+      - { target: "stat:influence", value: -2 }
+    text: >-
+      Ворожнеча з {neighbor.instrumental} старша за будь-кого з живих: прикордонні сутички тривають від {year} року, і
+      жодна сторона не визнає чужої правди.
+
+  - id: border_dispute
+    weight: 70
+    quality: 30
+    years: { from: 1920, to: 1968 }
+    neighbor: true
+    weight_tags: { mountainous: 100, lost_war: 100 }
+    adds: [border_dispute]
+    text: >-
+      Спірна долина на кордоні з {neighbor.instrumental} від {year} року тричі змінювала власника. Обидві столиці
+      вважають її своєю.
+
+  - id: refugees
+    weight: 50
+    quality: 35
+    years: { from: 1945, to: 1968 }
+    neighbor: true
+    adds: [refugees]
+    duration: 10
+    modifiers:
+      - { target: "stat:stability", value: -3 }
+      - { target: "stat:hdi", value: -2 }
+    text: >-
+      Після заворушень {year} року з {neighbor.genitive} через кордон рушили сотні тисяч біженців. Табори давно
+      стали передмістями.
+
+  - id: old_friendship
+    weight: 60
+    quality: 70
+    years: { from: 1920, to: 1966 }
+    neighbor: true
+    excludes: [old_feud, lost_war, won_war, border_dispute, occupied_past, isolationism]
+    adds: [old_friendship]
+    modifiers:
+      - { target: "stat:influence", value: 3 }
+    text: >-
+      Договір про дружбу з {neighbor.instrumental}, підписаний у {year} році, пережив уже кілька урядів по обидва
+      боки кордону.
+
+  # ---- Ядерна зброя ----
+
+  - id: nuclear_secrets
+    weight: 200
+    quality: 60
+    years: { from: 1950, to: 1966 }
+    requires_any: [nuclear_program, nuclear_power]
+    adds: [nuclear_secrets]
+    modifiers:
+      - { target: "stat:influence", value: 3 }
+    text: >-
+      Секретний ядерний проєкт стартував у {year} році. Про нього знають лише кілька десятків людей — і розвідки
+      всього світу.
+
+  - id: nuclear_test
+    weight: 300
+    quality: 85
+    years: { from: 1955, to: 1969 }
+    requires: [nuclear_power]
+    adds: [nuclear_test]
+    modifiers:
+      - { target: "stat:influence", value: 10 }
+      - { target: "stat:legitimacy", value: 3 }
+    text: >-
+      Випробування {year} року підняло над полігоном грибоподібну хмару й відчинило країні двері до найзакритішого
+      клубу світу.

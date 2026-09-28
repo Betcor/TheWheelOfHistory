@@ -131,6 +131,32 @@ final class Files {
                   vocative: Державо {root}
             """;
 
+    static final String BACKSTORY = """
+            generation_tags:
+              large_army: Велика армія.
+            fragments:
+              - id: lost_war
+                weight: 80
+                quality: 10
+                years: { from: 1945, to: 1966 }
+                neighbor: true
+                weight_tags: { revanchism: 400, large_army: 100 }
+                adds: [lost_war]
+                duration: 10
+                modifiers:
+                  - { target: "stat:stability", value: -5 }
+                text: >-
+                  У {year} році країна програла війну {neighbor.dative}.
+              - id: reparations
+                weight: 150
+                quality: 5
+                years: { from: 1946, to: 1968 }
+                requires: [lost_war]
+                requires_any: [revanchism, democratic]
+                excludes: [nuclear_power]
+                text: Контрибуції задушили економіку {country.genitive}.
+            """;
+
     private final TreeMap<String, String> files = new TreeMap<>();
 
     private Files() {
@@ -141,6 +167,7 @@ final class Files {
         files.put(ContentLoader.NUCLEAR, NUCLEAR);
         files.put(ContentLoader.PEOPLE, PEOPLE);
         files.put(ContentLoader.NAMES, NAMES);
+        files.put(ContentLoader.BACKSTORY, BACKSTORY);
     }
 
     static Files valid() {

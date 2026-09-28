@@ -7,6 +7,9 @@ import static org.assertj.core.api.Assertions.entry;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import kolo.engine.content.BackstoryContent;
+import kolo.engine.content.BackstoryFragmentDef;
+import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
@@ -15,6 +18,7 @@ import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.TagCondition;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.error.ContentException;
@@ -186,6 +190,107 @@ class ContentLoaderTest {
         assertNamesError(
                 Files.NAMES.replaceAll("(?m)^    endings: .*\n", ""),
                 Map.of("location", "paradigms[0]", "cause", "blank_value", "field", "endings"));
+    }
+
+    @Test
+    void loadsBackstory() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        BackstoryContent backstory = pack.backstory();
+        assertThat(backstory.generationTags()).containsExactly(entry("large_army", "Велика армія."));
+        BackstoryFragmentDef lostWar =
+                backstory.fragment(new BackstoryFragmentId("lost_war")).orElseThrow();
+        assertThat(lostWar.weight()).isEqualTo(80);
+        assertThat(lostWar.quality()).isEqualTo(10);
+        assertThat(lostWar.yearFrom()).isEqualTo(1945);
+        assertThat(lostWar.yearTo()).isEqualTo(1966);
+        assertThat(lostWar.neighbor()).isTrue();
+        assertThat(lostWar.weightTags()).containsExactly(entry("large_army", 100), entry("revanchism", 400));
+        assertThat(lostWar.adds()).containsExactly("lost_war");
+        assertThat(lostWar.durationYears()).isEqualTo(10);
+        assertThat(lostWar.modifiers()).containsExactly(new ModifierDef(ModifierTarget.stat(Stat.STABILITY), -5));
+        assertThat(lostWar.text().template()).isEqualTo("У {year} році країна програла війну {neighbor.dative}.");
+
+        BackstoryFragmentDef reparations =
+                backstory.fragment(new BackstoryFragmentId("reparations")).orElseThrow();
+        assertThat(reparations.condition())
+                .isEqualTo(new TagCondition(
+                        List.of("lost_war"), List.of("revanchism", "democratic"), List.of("nuclear_power")));
+        // Без полів: без сусіда, модифікатори постійні, добавок до ваги немає.
+        assertThat(reparations.neighbor()).isFalse();
+        assertThat(reparations.durationYears()).isZero();
+        assertThat(reparations.weightTags()).isEmpty();
+    }
+
+    @Test
+    void invalidBackstoryIsReportedAtItsPosition() {
+        assertBackstoryError(
+                Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_wars]"),
+                Map.of(
+                        "file", "backstory.yaml",
+                        "location", "fragments[1]",
+                        "cause", "unknown_reference",
+                        "value", "lost_wars"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("{neighbor.dative}", "{neighbour.dative}"),
+                Map.of("location", "fragments[0]", "cause", "invalid_template", "value", "{neighbour.dative}"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("    neighbor: true\n", ""),
+                Map.of("location", "fragments[0]", "cause", "invalid_template", "field", "backstory.lost_war.text"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("    quality: 5\n", ""),
+                Map.of("location", "fragments[1]", "cause", "blank_value", "field", "quality"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("    years: { from: 1946, to: 1968 }\n", ""),
+                Map.of("location", "fragments[1]", "cause", "blank_value", "field", "years"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("to: 1968", "to: 1970"),
+                Map.of(
+                        "location",
+                        "fragments[1]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "backstory.reparations.years.to"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("excludes: [nuclear_power]", "excludes: [lost_war]"),
+                Map.of("location", "fragments[1]", "cause", "duplicate_id", "value", "lost_war"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("id: reparations", "id: lost_war"),
+                Map.of("location", "fragments[1]", "cause", "duplicate_id", "value", "lost_war"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("value: -5", "value: 500"),
+                Map.of("location", "fragments[0].modifiers[0]", "cause", "value_out_of_range"));
+        assertBackstoryError(
+                Files.BACKSTORY.replace("large_army: Велика армія.", "large_army: \"\""),
+                Map.of("location", "", "cause", "blank_value", "field", "generation_tags.large_army"));
+        assertBackstoryError(
+                Files.BACKSTORY.substring(0, Files.BACKSTORY.indexOf("fragments:")),
+                Map.of("location", "fragments", "cause", "empty_collection"));
+    }
+
+    @Test
+    void backstoryFlagsAndNumbersAreStrict() {
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, Files.BACKSTORY.replace("neighbor: true", "neighbor: \"yes\""))
+                        .source(),
+                ErrorCode.CONTENT_MALFORMED,
+                Map.of("file", "backstory.yaml"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, Files.BACKSTORY.replace("neighbor: true", "neighbor: 1"))
+                        .source(),
+                ErrorCode.CONTENT_MALFORMED,
+                Map.of("file", "backstory.yaml"));
+        assertContentError(
+                Files.valid()
+                        .with(
+                                ContentLoader.BACKSTORY,
+                                Files.BACKSTORY.replace("revanchism: 400", "revanchism: \"400\""))
+                        .source(),
+                ErrorCode.CONTENT_MALFORMED,
+                Map.of("file", "backstory.yaml", "location", "fragments[0].weight_tags.revanchism"));
     }
 
     @Test
@@ -405,6 +510,12 @@ class ContentLoaderTest {
                                 .source())
                         .hash())
                 .isNotEqualTo(hash);
+    }
+
+    private static void assertBackstoryError(String backstory, Map<String, ?> expected) {
+        assertThat(backstory).isNotEqualTo(Files.BACKSTORY);
+        assertContentError(
+                Files.valid().with(ContentLoader.BACKSTORY, backstory).source(), ErrorCode.INVALID_CONTENT, expected);
     }
 
     private static void assertNamesError(String names, Map<String, ?> expected) {
