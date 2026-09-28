@@ -1,0 +1,274 @@
+# Назви держав (GD §4.9): [форма державності] + [корінь].
+#
+# Корінь = початок + (вставка) + кінцівка + закінчення відмінка. Частини — малими українськими літерами,
+# першу літеру генератор робить великою. Щоб будь-яке поєднання читалося:
+#   - початок закінчується приголосною («вел»);
+#   - вставка починається з голосної й закінчується приголосною («ім»);
+#   - кінцівка починається з голосної («ор»).
+# «вел» + «ім» + «ор» → «Велімор», «Веліморові»… Вставка додається з імовірністю middle_chance_bp.
+#
+# Парадигма — закінчення кореня за відмінками; корінь при цьому не змінюється. Тому кінцівки жіночого
+# роду на г/к/х (Африка → Африці) і на шиплячі (-жа, -ча, -ша) тут не вживаються; fem_iya — лише після «і».
+# Відмінки: nominative, genitive, dative, accusative, instrumental, locative (без прийменника), vocative.
+#
+# Форма державності: корінь стоїть як прикладка в називному, відмінюється лише форма
+# («Народної Республіки Велор»). gender — рід повної назви, з ним узгоджуються дієслова в хроніці.
+# Форма доступна державі, якщо її ідеологія є в ideologies або підкласифікація — в sub_ideologies.
+# Кожній підкласифікації доступна хоча б одна форма.
+#
+# Стиль, частини й форма обираються рівноймовірно: назва не впливає на ігровий процес.
+
+paradigms:
+  # Велор, Велору, Велору, Велор, Велором, Велорі, Велоре
+  - id: masc_hard
+    gender: masculine
+    endings: { nominative: "", genitive: у, dative: у, accusative: "", instrumental: ом, locative: і, vocative: е }
+  # Кардель, Карделю, Карделю, Кардель, Карделем, Карделі, Карделю
+  - id: masc_soft
+    gender: masculine
+    endings: { nominative: ь, genitive: ю, dative: ю, accusative: ь, instrumental: ем, locative: і, vocative: ю }
+  # Салай, Салаю, Салаю, Салай, Салаєм, Салаї, Салаю
+  - id: masc_j
+    gender: masculine
+    endings: { nominative: й, genitive: ю, dative: ю, accusative: й, instrumental: єм, locative: ї, vocative: ю }
+  # Торова, Торови, Торові, Торову, Торовою, Торові, Торово
+  - id: fem_hard
+    gender: feminine
+    endings: { nominative: а, genitive: и, dative: і, accusative: у, instrumental: ою, locative: і, vocative: о }
+  # Гарія, Гарії, Гарії, Гарію, Гарією, Гарії, Гаріє
+  - id: fem_iya
+    gender: feminine
+    endings: { nominative: я, genitive: ї, dative: ї, accusative: ю, instrumental: єю, locative: ї, vocative: є }
+
+styles:
+  - id: northern
+    name: Північний
+    middle_chance_bp: 3000
+    starts: [вел, тор, гар, брен, кар, дров, стер, хальм, ульв, снор, грім, вард]
+    middles: [ен, ар, ім, ол]
+    finals:
+      - { text: ор, paradigm: masc_hard }
+      - { text: ар, paradigm: masc_hard }
+      - { text: ен, paradigm: masc_hard }
+      - { text: ін, paradigm: masc_hard }
+      - { text: ад, paradigm: masc_hard }
+      - { text: ел, paradigm: masc_soft }
+      - { text: ов, paradigm: fem_hard }
+      - { text: і, paradigm: fem_iya }
+  - id: southern
+    name: Південний
+    middle_chance_bp: 4000
+    starts: [сал, мар, кас, тал, ран, лув, сев, нар, ам, фел, дор, віл]
+    middles: [ер, ан, ил, ур, ев]
+    finals:
+      - { text: ан, paradigm: masc_hard }
+      - { text: ес, paradigm: masc_hard }
+      - { text: ір, paradigm: masc_hard }
+      - { text: а, paradigm: masc_j }
+      - { text: ін, paradigm: fem_hard }
+      - { text: ар, paradigm: fem_hard }
+      - { text: і, paradigm: fem_iya }
+      - { text: орі, paradigm: fem_iya }
+  - id: eastern
+    name: Східний
+    middle_chance_bp: 3500
+    starts: [кай, тем, ор, бат, сар, жал, тул, бек, ер, суг, мун, кар]
+    middles: [ир, ат, ул, ен]
+    finals:
+      - { text: ат, paradigm: masc_hard }
+      - { text: ун, paradigm: masc_hard }
+      - { text: ан, paradigm: masc_hard }
+      - { text: ем, paradigm: masc_hard }
+      - { text: е, paradigm: masc_j }
+      - { text: ин, paradigm: fem_hard }
+      - { text: ані, paradigm: fem_iya }
+
+state_forms:
+  - id: republic
+    gender: feminine
+    sub_ideologies: [liberal_democracy, social_democracy, oligarchy, technocracy, managed_democracy, military_junta]
+    forms:
+      nominative: Республіка {root}
+      genitive: Республіки {root}
+      dative: Республіці {root}
+      accusative: Республіку {root}
+      instrumental: Республікою {root}
+      locative: Республіці {root}
+      vocative: Республіко {root}
+  - id: federal_republic
+    gender: feminine
+    sub_ideologies: [liberal_democracy, social_democracy, managed_democracy]
+    forms:
+      nominative: Федеративна Республіка {root}
+      genitive: Федеративної Республіки {root}
+      dative: Федеративній Республіці {root}
+      accusative: Федеративну Республіку {root}
+      instrumental: Федеративною Республікою {root}
+      locative: Федеративній Республіці {root}
+      vocative: Федеративна Республіко {root}
+  - id: commonwealth
+    gender: feminine
+    sub_ideologies: [direct_democracy]
+    forms:
+      nominative: Співдружність {root}
+      genitive: Співдружності {root}
+      dative: Співдружності {root}
+      accusative: Співдружність {root}
+      instrumental: Співдружністю {root}
+      locative: Співдружності {root}
+      vocative: Співдружносте {root}
+  - id: united_provinces
+    gender: plural
+    sub_ideologies: [liberal_democracy, direct_democracy]
+    forms:
+      nominative: Об'єднані Провінції {root}
+      genitive: Об'єднаних Провінцій {root}
+      dative: Об'єднаним Провінціям {root}
+      accusative: Об'єднані Провінції {root}
+      instrumental: Об'єднаними Провінціями {root}
+      locative: Об'єднаних Провінціях {root}
+      vocative: Об'єднані Провінції {root}
+  - id: kingdom
+    gender: neuter
+    sub_ideologies: [constitutional_monarchy, absolute_monarchy, feudal_monarchy]
+    forms:
+      nominative: Королівство {root}
+      genitive: Королівства {root}
+      dative: Королівству {root}
+      accusative: Королівство {root}
+      instrumental: Королівством {root}
+      locative: Королівстві {root}
+      vocative: Королівство {root}
+  - id: grand_duchy
+    gender: neuter
+    sub_ideologies: [feudal_monarchy]
+    forms:
+      nominative: Велике Князівство {root}
+      genitive: Великого Князівства {root}
+      dative: Великому Князівству {root}
+      accusative: Велике Князівство {root}
+      instrumental: Великим Князівством {root}
+      locative: Великому Князівстві {root}
+      vocative: Велике Князівство {root}
+  - id: tsardom
+    gender: neuter
+    sub_ideologies: [absolute_monarchy, hereditary_empire]
+    forms:
+      nominative: Царство {root}
+      genitive: Царства {root}
+      dative: Царству {root}
+      accusative: Царство {root}
+      instrumental: Царством {root}
+      locative: Царстві {root}
+      vocative: Царство {root}
+  - id: empire
+    gender: feminine
+    sub_ideologies: [hereditary_empire]
+    forms:
+      nominative: Імперія {root}
+      genitive: Імперії {root}
+      dative: Імперії {root}
+      accusative: Імперію {root}
+      instrumental: Імперією {root}
+      locative: Імперії {root}
+      vocative: Імперіє {root}
+  - id: holy_state
+    gender: feminine
+    ideologies: [theocracy]
+    forms:
+      nominative: Священна Держава {root}
+      genitive: Священної Держави {root}
+      dative: Священній Державі {root}
+      accusative: Священну Державу {root}
+      instrumental: Священною Державою {root}
+      locative: Священній Державі {root}
+      vocative: Священна Державо {root}
+  - id: theocratic_republic
+    gender: feminine
+    sub_ideologies: [moderate_theocracy]
+    forms:
+      nominative: Теократична Республіка {root}
+      genitive: Теократичної Республіки {root}
+      dative: Теократичній Республіці {root}
+      accusative: Теократичну Республіку {root}
+      instrumental: Теократичною Республікою {root}
+      locative: Теократичній Республіці {root}
+      vocative: Теократична Республіко {root}
+  - id: temple_state
+    gender: feminine
+    sub_ideologies: [temple_state]
+    forms:
+      nominative: Храмова Держава {root}
+      genitive: Храмової Держави {root}
+      dative: Храмовій Державі {root}
+      accusative: Храмову Державу {root}
+      instrumental: Храмовою Державою {root}
+      locative: Храмовій Державі {root}
+      vocative: Храмова Державо {root}
+  - id: peoples_republic
+    gender: feminine
+    sub_ideologies: [planned_economy, personality_cult]
+    forms:
+      nominative: Народна Республіка {root}
+      genitive: Народної Республіки {root}
+      dative: Народній Республіці {root}
+      accusative: Народну Республіку {root}
+      instrumental: Народною Республікою {root}
+      locative: Народній Республіці {root}
+      vocative: Народна Республіко {root}
+  - id: socialist_republic
+    gender: feminine
+    sub_ideologies: [planned_economy, market_socialism]
+    forms:
+      nominative: Соціалістична Республіка {root}
+      genitive: Соціалістичної Республіки {root}
+      dative: Соціалістичній Республіці {root}
+      accusative: Соціалістичну Республіку {root}
+      instrumental: Соціалістичною Республікою {root}
+      locative: Соціалістичній Республіці {root}
+      vocative: Соціалістична Республіко {root}
+  - id: union_of_councils
+    gender: masculine
+    sub_ideologies: [council_communism]
+    forms:
+      nominative: Союз Рад {root}
+      genitive: Союзу Рад {root}
+      dative: Союзу Рад {root}
+      accusative: Союз Рад {root}
+      instrumental: Союзом Рад {root}
+      locative: Союзі Рад {root}
+      vocative: Союзе Рад {root}
+  - id: state
+    gender: feminine
+    ideologies: [totalitarianism]
+    sub_ideologies: [military_junta]
+    forms:
+      nominative: Держава {root}
+      genitive: Держави {root}
+      dative: Державі {root}
+      accusative: Державу {root}
+      instrumental: Державою {root}
+      locative: Державі {root}
+      vocative: Державо {root}
+  - id: great_state
+    gender: feminine
+    sub_ideologies: [revanchism, militarism]
+    forms:
+      nominative: Велика Держава {root}
+      genitive: Великої Держави {root}
+      dative: Великій Державі {root}
+      accusative: Велику Державу {root}
+      instrumental: Великою Державою {root}
+      locative: Великій Державі {root}
+      vocative: Велика Державо {root}
+  - id: national_state
+    gender: feminine
+    sub_ideologies: [military_junta, isolationism]
+    forms:
+      nominative: Національна Держава {root}
+      genitive: Національної Держави {root}
+      dative: Національній Державі {root}
+      accusative: Національну Державу {root}
+      instrumental: Національною Державою {root}
+      locative: Національній Державі {root}
+      vocative: Національна Державо {root}

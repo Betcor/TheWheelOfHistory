@@ -148,6 +148,9 @@ class BundledContentIntegrationTest {
         assertThat(fromDisk.nuclearStatuses()).isEqualTo(PACK.nuclearStatuses());
         assertThat(fromDisk.personKinds()).isEqualTo(PACK.personKinds());
         assertThat(fromDisk.traits()).isEqualTo(PACK.traits());
+        assertThat(fromDisk.names().paradigms()).isEqualTo(PACK.names().paradigms());
+        assertThat(fromDisk.names().styles()).isEqualTo(PACK.names().styles());
+        assertThat(fromDisk.names().stateForms()).isEqualTo(PACK.names().stateForms());
     }
 
     private static boolean hasThreeCompatible(List<TraitDef> traits) {
