@@ -13,10 +13,13 @@ import kolo.engine.content.IdeologyId;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.TraitDef;
+import kolo.engine.content.TraitId;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.PersonKind;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
 import kolo.engine.wheel.WheelKind;
@@ -50,6 +53,72 @@ class ContentLoaderTest {
         assertThat(pack.developmentLevel(-3).name()).isEqualTo("Глибоке відставання");
         assertThat(pack.nuclearStatus(NuclearStatus.ARSENAL).tags()).containsExactly("nuclear_power");
         assertThat(pack.nuclearStatus(NuclearStatus.NONE).tags()).isEmpty();
+    }
+
+    @Test
+    void loadsPersonKindsAndTraits() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.personKind(PersonKind.GENERAL).tags()).containsExactly("military");
+        assertThat(pack.personKind(PersonKind.PRETENDER).name()).isEqualTo("Диктатор-претендент");
+        TraitDef genius = pack.trait(new TraitId("genius")).orElseThrow();
+        assertThat(genius.kinds()).containsExactly(PersonKind.SCIENTIST);
+        assertThat(genius.tags()).isEmpty();
+        assertThat(pack.trait(new TraitId("loyal")).orElseThrow().kinds())
+                .as("без kinds — будь-який тип")
+                .isEmpty();
+        assertThat(pack.compatible(new TraitId("treacherous"), new TraitId("loyal")))
+                .isFalse();
+    }
+
+    @Test
+    void invalidPeopleContentIsReportedAtItsPosition() {
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.PEOPLE, Files.PEOPLE.replace("kinds: [scientist]", "kinds: [wizard]"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "file", "people.yaml",
+                        "location", "traits[2].kinds[0]",
+                        "cause", "unknown_reference",
+                        "field", "trait.kinds",
+                        "value", "wizard"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.PEOPLE, Files.PEOPLE.replace("[treacherous]", "[coward]"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "traits[0].incompatible[0]", "cause", "unknown_reference", "value", "coward"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.PEOPLE, Files.PEOPLE.replace("[treacherous]", "[loyal]"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "traits[0]", "cause", "self_reference"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.PEOPLE, Files.PEOPLE.replaceAll("(?m)^  - \\{ id: artist,.*\n", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "kinds", "cause", "missing_definition", "value", "artist"));
+    }
+
+    @Test
+    void everyPersonKindNeedsSomeTrait() {
+        String onlyScientists = Files.PEOPLE.substring(0, Files.PEOPLE.indexOf("traits:"))
+                + "traits:\n  - { id: genius, name: Геній, kinds: [scientist] }\n";
+
+        assertContentError(
+                Files.valid().with(ContentLoader.PEOPLE, onlyScientists).source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("file", "people.yaml", "location", "traits", "cause", "missing_definition", "value", "general"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.PEOPLE, Files.PEOPLE.substring(0, Files.PEOPLE.indexOf("traits:")))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "traits", "cause", "empty_collection"));
     }
 
     @Test

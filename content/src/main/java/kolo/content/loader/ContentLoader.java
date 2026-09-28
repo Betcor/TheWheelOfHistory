@@ -27,17 +27,21 @@ import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.NuclearStatusDef;
+import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TraitDef;
+import kolo.engine.content.TraitId;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
 import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
 
 /**
@@ -54,9 +58,10 @@ public final class ContentLoader {
     public static final String RESOURCES = "resources.yaml";
     public static final String DEVELOPMENT = "development.yaml";
     public static final String NUCLEAR = "nuclear.yaml";
+    public static final String PEOPLE = "people.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
-    public static final List<String> FILES = List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR);
+    public static final List<String> FILES = List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -80,10 +85,17 @@ public final class ContentLoader {
         List<TechBranchDef> branches = techBranches(development);
         List<DevelopmentLevelDef> levels = developmentLevels(development);
         List<NuclearStatusDef> nuclear = nuclearStatuses(parse(files, NUCLEAR, ContentYaml.NuclearFile.class));
+        ContentYaml.PeopleFile people = parse(files, PEOPLE, ContentYaml.PeopleFile.class);
+        List<PersonKindDef> kinds = personKinds(people);
+        List<TraitDef> traits = traits(people);
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
         String hash = ContentHash.of(files);
-        return at("*", "", () -> new ContentPack(hash, ideologies, doctrines, resources, branches, levels, nuclear));
+        return at(
+                "*",
+                "",
+                () -> new ContentPack(
+                        hash, ideologies, doctrines, resources, branches, levels, nuclear, kinds, traits));
     }
 
     // ---- Файли ----
@@ -216,6 +228,67 @@ public final class ContentLoader {
         });
         complete(NUCLEAR, "statuses", seen, List.of(NuclearStatus.values()), NuclearStatus::key);
         return statuses;
+    }
+
+    private static List<PersonKindDef> personKinds(ContentYaml.PeopleFile yaml) {
+        TreeSet<PersonKind> seen = new TreeSet<>();
+        List<PersonKindDef> kinds = list(PEOPLE, "kinds", yaml.kinds(), (location, kind) -> {
+            PersonKind key =
+                    at(PEOPLE, location, () -> unique(seen, personKind("person_kind", kind.id()), PersonKind::key));
+            return at(PEOPLE, location, () -> new PersonKindDef(key, kind.name(), kind.description(), kind.tags()));
+        });
+        complete(PEOPLE, "kinds", seen, List.of(PersonKind.values()), PersonKind::key);
+        return kinds;
+    }
+
+    private static List<TraitDef> traits(ContentYaml.PeopleFile yaml) {
+        TreeSet<TraitId> ids = new TreeSet<>();
+        List<TraitDef> traits = list(PEOPLE, "traits", nonEmpty(PEOPLE, "traits", yaml.traits()), (location, trait) -> {
+            TraitId id = at(PEOPLE, location, () -> unique(ids, new TraitId(trait.id())));
+            List<PersonKind> kinds = list(
+                    PEOPLE,
+                    location + ".kinds",
+                    trait.kinds(),
+                    (kindLocation, kind) -> at(PEOPLE, kindLocation, () -> personKind("trait.kinds", kind)));
+            List<TraitId> incompatible = list(
+                    PEOPLE,
+                    location + ".incompatible",
+                    trait.incompatible(),
+                    (otherLocation, other) -> at(PEOPLE, otherLocation, () -> new TraitId(other)));
+            List<ModifierDef> modifiers = modifiers(PEOPLE, location, trait.modifiers());
+            return at(
+                    PEOPLE,
+                    location,
+                    () -> new TraitDef(id, trait.name(), kinds, modifiers, trait.tags(), incompatible));
+        });
+        // Посилання між рисами — в межах файлу, тож місце помилки відоме точно.
+        for (int i = 0; i < traits.size(); i++) {
+            List<TraitId> incompatible = traits.get(i).incompatible();
+            for (int j = 0; j < incompatible.size(); j++) {
+                if (!ids.contains(incompatible.get(j))) {
+                    throw invalid(
+                            PEOPLE,
+                            "traits[" + i + "].incompatible[" + j + "]",
+                            new ValidationException(
+                                    ErrorCode.UNKNOWN_REFERENCE,
+                                    ErrorDetails.of("field", "trait", "value", incompatible.get(j))));
+                }
+            }
+        }
+        for (PersonKind kind : PersonKind.values()) {
+            if (traits.stream().noneMatch(trait -> trait.allows(kind))) {
+                throw invalid(
+                        PEOPLE,
+                        "traits",
+                        new ValidationException(
+                                ErrorCode.MISSING_DEFINITION, ErrorDetails.of("field", "traits", "value", kind.key())));
+            }
+        }
+        return traits;
+    }
+
+    private static PersonKind personKind(String field, String key) {
+        return ContentKeys.parse(field, PersonKind.values(), PersonKind::key, key);
     }
 
     private static List<ModifierDef> modifiers(String file, String owner, List<ContentYaml.Modifier> yaml) {

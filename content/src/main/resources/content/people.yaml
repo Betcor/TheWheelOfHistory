@@ -1,0 +1,182 @@
+# Відомі люди (GD §12.3): типи постатей і їхні риси.
+#
+# Кожен тип обов'язковий. Вік, колеса здоров'я й появи постатей, посади — система людей;
+# кількість постатей на старті (1–3, GD §4.8) — ланцюжок коліс генерації.
+#
+# Риси: kinds — кому доступна риса (без kinds — будь-якому типу); incompatible — з якими рисами
+# не поєднується в одній постаті (досить указати з одного боку). Кожному типу доступна хоча б одна риса.
+# Теги positive / negative — баф чи дебаф; решта тегів — сфера дії риси.
+# Числові ефекти рис з'являться разом із системами людей, війни, науки й дипломатії; поки що риси
+# описані назвою й тегами.
+
+kinds:
+  - id: scientist
+    name: Вчений
+    description: Прискорює дослідження; може очолити НДІ.
+    tags: [science]
+  - id: general
+    name: Генерал
+    description: Командує сухопутним фронтом.
+    tags: [military, land]
+  - id: admiral
+    name: Адмірал
+    description: Командує флотом.
+    tags: [military, naval]
+  - id: diplomat
+    name: Дипломат
+    description: Веде переговори й представляє державу у Світовій Раді.
+    tags: [diplomacy]
+  - id: magnate
+    name: Магнат
+    description: Власник великого капіталу; впливає на економіку й політику.
+    tags: [economy]
+  - id: prophet
+    name: Пророк
+    description: Проповідник, за яким іде частина народу.
+    tags: [religion]
+  - id: dissident
+    name: Дисидент
+    description: Голос опозиції; може очолити заворушення.
+    tags: [opposition]
+  - id: artist
+    name: Митець
+    description: Письменник, музикант чи художник, що формує культуру доби.
+    tags: [culture]
+  - id: pretender
+    name: Диктатор-претендент
+    description: Прагне влади й чекає нагоди для перевороту.
+    tags: [coup_risk]
+
+traits:
+  # ---- Для будь-якого типу ----
+  - id: charismatic
+    name: Харизматичний
+    tags: [positive, charisma]
+  - id: loyal
+    name: Відданий
+    tags: [positive, loyalty]
+    incompatible: [treacherous]
+  - id: treacherous
+    name: Підступний
+    tags: [negative, betrayal_risk]
+  - id: incorruptible
+    name: Непідкупний
+    tags: [positive]
+    incompatible: [corrupt]
+  - id: corrupt
+    name: Корумпований
+    tags: [negative, corruption]
+  - id: robust
+    name: Міцного здоров'я
+    tags: [positive, health]
+    incompatible: [sickly]
+  - id: sickly
+    name: Хворобливий
+    tags: [negative, health]
+  - id: ambitious
+    name: Амбітний
+    tags: [ambition]
+
+  # ---- Вчені ----
+  - id: genius
+    name: Геній
+    kinds: [scientist]
+    tags: [positive, science]
+  - id: practical_engineer
+    name: Інженер-практик
+    kinds: [scientist]
+    tags: [positive, science, construction]
+  - id: nuclear_physicist
+    name: Фізик-ядерник
+    kinds: [scientist]
+    tags: [science, nuclear]
+  - id: dogmatic
+    name: Догматик
+    kinds: [scientist, prophet]
+    tags: [negative]
+
+  # ---- Воєначальники ----
+  - id: brilliant_tactician
+    name: Блискучий тактик
+    kinds: [general, admiral]
+    tags: [positive, military]
+  - id: logistician
+    name: Логіст
+    kinds: [general, admiral]
+    tags: [positive, military, supply]
+  - id: cautious
+    name: Обережний
+    kinds: [general, admiral]
+    tags: [military, defensive]
+    incompatible: [reckless]
+  - id: reckless
+    name: Безрозсудний
+    kinds: [general, admiral]
+    tags: [negative, military, offensive]
+  - id: old_school
+    name: Стара школа
+    kinds: [general, admiral]
+    tags: [negative, military]
+  - id: guerrilla_leader
+    name: Ватажок партизанів
+    kinds: [general, dissident]
+    tags: [military, guerrilla]
+
+  # ---- Дипломати ----
+  - id: negotiator
+    name: Майстер переговорів
+    kinds: [diplomat]
+    tags: [positive, diplomacy]
+  - id: hawk
+    name: Яструб
+    kinds: [diplomat, general, pretender]
+    tags: [diplomacy, aggression]
+    incompatible: [negotiator]
+
+  # ---- Магнати ----
+  - id: industrialist
+    name: Промисловець
+    kinds: [magnate]
+    tags: [positive, economy, construction]
+  - id: speculator
+    name: Спекулянт
+    kinds: [magnate]
+    tags: [economy, risk]
+
+  # ---- Пророки ----
+  - id: fiery_preacher
+    name: Полум'яний проповідник
+    kinds: [prophet]
+    tags: [religion, fervor]
+  - id: mystic
+    name: Містик
+    kinds: [prophet]
+    tags: [religion]
+
+  # ---- Дисиденти й митці ----
+  - id: voice_of_freedom
+    name: Голос свободи
+    kinds: [dissident, artist]
+    tags: [opposition]
+  - id: underground_organizer
+    name: Організатор підпілля
+    kinds: [dissident]
+    tags: [opposition, unrest]
+  - id: national_poet
+    name: Народний поет
+    kinds: [artist]
+    tags: [positive, culture]
+  - id: avant_gardist
+    name: Авангардист
+    kinds: [artist]
+    tags: [culture]
+
+  # ---- Претенденти ----
+  - id: strongman
+    name: Сильна рука
+    kinds: [pretender, general]
+    tags: [coup_risk, authoritarian]
+  - id: populist
+    name: Популіст
+    kinds: [pretender, dissident]
+    tags: [populism]

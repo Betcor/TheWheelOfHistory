@@ -11,6 +11,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
 import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,42 @@ class DefinitionsTest {
         assertFails(
                 () -> new NuclearStatusDef(NuclearStatus.ARSENAL, "Арсенал", List.of("NuclearPower")),
                 ErrorCode.INVALID_KEY_FORMAT);
+    }
+
+    @Test
+    void personKindNeedsNameAndDescription() {
+        assertThat(new PersonKindDef(PersonKind.GENERAL, "Генерал", "Командує фронтом.", List.of("military")).tags())
+                .containsExactly("military");
+        assertFails(
+                () -> new PersonKindDef(PersonKind.GENERAL, " ", "Командує фронтом.", List.of()),
+                ErrorCode.BLANK_VALUE);
+        assertFails(() -> new PersonKindDef(PersonKind.GENERAL, "Генерал", "", List.of()), ErrorCode.BLANK_VALUE);
+    }
+
+    @Test
+    void traitWithoutKindsSuitsEveryone() {
+        TraitDef charismatic = TestContent.trait("charismatic", List.of());
+        TraitDef genius = TestContent.trait("genius", List.of(PersonKind.SCIENTIST));
+
+        for (PersonKind kind : PersonKind.values()) {
+            assertThat(charismatic.allows(kind)).isTrue();
+            assertThat(genius.allows(kind)).isEqualTo(kind == PersonKind.SCIENTIST);
+        }
+    }
+
+    @Test
+    void traitRejectsRepeatsAndSelfIncompatibility() {
+        assertFails(() -> TestContent.trait("loyal", List.of(), "loyal"), ErrorCode.SELF_REFERENCE);
+        assertFails(() -> TestContent.trait("loyal", List.of(), "corrupt", "corrupt"), ErrorCode.DUPLICATE_ID);
+        assertThatThrownBy(() -> TestContent.trait("genius", List.of(PersonKind.SCIENTIST, PersonKind.SCIENTIST)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "trait.genius.kinds"), entry("value", "scientist"));
+                });
+        assertFails(
+                () -> new TraitDef(new TraitId("genius"), "", List.of(), List.of(), List.of(), List.of()),
+                ErrorCode.BLANK_VALUE);
     }
 
     @Test

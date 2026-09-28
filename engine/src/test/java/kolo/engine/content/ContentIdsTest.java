@@ -17,7 +17,8 @@ class ContentIdsTest {
             () -> new IdeologyId("Democracy"),
             () -> new SubIdeologyId("liberal-democracy"),
             () -> new DoctrineId(""),
-            () -> new ResourceId(null)
+            () -> new ResourceId(null),
+            () -> new TraitId("Brave")
         }) {
             assertThatThrownBy(invalid::run)
                     .isInstanceOfSatisfying(

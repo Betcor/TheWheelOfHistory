@@ -69,6 +69,30 @@ final class Files {
                 tags: [nuclear_power]
             """;
 
+    static final String PEOPLE = """
+            kinds:
+              - { id: scientist, name: Вчений, description: Прискорює дослідження. }
+              - { id: general, name: Генерал, description: Командує фронтом., tags: [military] }
+              - { id: admiral, name: Адмірал, description: Командує флотом. }
+              - { id: diplomat, name: Дипломат, description: Веде переговори. }
+              - { id: magnate, name: Магнат, description: Власник капіталу. }
+              - { id: prophet, name: Пророк, description: Проповідник. }
+              - { id: dissident, name: Дисидент, description: Голос опозиції. }
+              - { id: artist, name: Митець, description: Формує культуру. }
+              - { id: pretender, name: Диктатор-претендент, description: Прагне влади. }
+            traits:
+              - id: loyal
+                name: Відданий
+                tags: [positive]
+                incompatible: [treacherous]
+              - id: treacherous
+                name: Підступний
+                tags: [negative]
+              - id: genius
+                name: Геній
+                kinds: [scientist]
+            """;
+
     private final TreeMap<String, String> files = new TreeMap<>();
 
     private Files() {
@@ -77,6 +101,7 @@ final class Files {
         files.put(ContentLoader.RESOURCES, RESOURCES);
         files.put(ContentLoader.DEVELOPMENT, DEVELOPMENT);
         files.put(ContentLoader.NUCLEAR, NUCLEAR);
+        files.put(ContentLoader.PEOPLE, PEOPLE);
     }
 
     static Files valid() {

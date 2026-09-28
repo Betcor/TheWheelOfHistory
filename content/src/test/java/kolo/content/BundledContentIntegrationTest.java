@@ -17,6 +17,7 @@ import kolo.engine.content.ModifierDef;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TraitDef;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.modifier.ModifierSource;
 import kolo.engine.modifier.Modifiers;
@@ -24,6 +25,7 @@ import kolo.engine.modifier.SourceKind;
 import kolo.engine.state.CountryStats;
 import kolo.engine.state.Development;
 import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.PersonKind;
 import kolo.engine.state.Stat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -88,6 +90,20 @@ class BundledContentIntegrationTest {
     }
 
     @Test
+    void peopleMatchDesign() {
+        // GD §12.3: у постаті 1–3 риси, тож кожному типу доступно щонайменше три сумісні між собою риси.
+        assertThat(PACK.personKinds().keySet()).containsExactly(PersonKind.values());
+        for (PersonKind kind : PersonKind.values()) {
+            List<TraitDef> available = PACK.traitsFor(kind);
+            assertThat(hasThreeCompatible(available)).as(kind.key()).isTrue();
+        }
+        // Баф чи дебаф — не обидва водночас.
+        assertThat(PACK.traits().values())
+                .noneMatch(trait ->
+                        trait.tags().contains("positive") && trait.tags().contains("negative"));
+    }
+
+    @Test
     void everyIdeologyCombinationKeepsStatsInBounds() {
         CountryStats middle = new CountryStats(1_000_000, 50, 50, 50, 50, 50, 100);
         CountryStats extreme = new CountryStats(0, 0, 100, 0, 100, 0, 0);
@@ -130,6 +146,23 @@ class BundledContentIntegrationTest {
         assertThat(fromDisk.techBranches()).isEqualTo(PACK.techBranches());
         assertThat(fromDisk.developmentLevels()).isEqualTo(PACK.developmentLevels());
         assertThat(fromDisk.nuclearStatuses()).isEqualTo(PACK.nuclearStatuses());
+        assertThat(fromDisk.personKinds()).isEqualTo(PACK.personKinds());
+        assertThat(fromDisk.traits()).isEqualTo(PACK.traits());
+    }
+
+    private static boolean hasThreeCompatible(List<TraitDef> traits) {
+        for (int i = 0; i < traits.size(); i++) {
+            for (int j = i + 1; j < traits.size(); j++) {
+                for (int k = j + 1; k < traits.size(); k++) {
+                    if (PACK.compatible(traits.get(i).id(), traits.get(j).id())
+                            && PACK.compatible(traits.get(i).id(), traits.get(k).id())
+                            && PACK.compatible(traits.get(j).id(), traits.get(k).id())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static List<String> subIds(String ideology) {
