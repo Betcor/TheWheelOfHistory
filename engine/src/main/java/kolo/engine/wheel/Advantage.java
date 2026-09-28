@@ -1,6 +1,7 @@
 package kolo.engine.wheel;
 
 import java.util.List;
+import kolo.engine.error.Checks;
 
 /**
  * Перевага колеса: сума внесків, обмежена {@code [−100, 100]}, разом із поясненнями.
@@ -17,9 +18,7 @@ public record Advantage(int value, List<AppliedModifier> modifiers) {
     public static final Advantage NONE = new Advantage(0, List.of());
 
     public Advantage {
-        if (value < MIN || value > MAX) {
-            throw new IllegalArgumentException("перевага поза −100..100: " + value);
-        }
+        Checks.inRange("advantage", value, MIN, MAX);
         modifiers = List.copyOf(modifiers);
     }
 

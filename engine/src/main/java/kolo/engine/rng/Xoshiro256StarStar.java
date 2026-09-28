@@ -1,5 +1,9 @@
 package kolo.engine.rng;
 
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
+import kolo.engine.error.ValidationException;
+
 /**
  * xoshiro256** (Blackman, Vigna; public domain).
  *
@@ -25,7 +29,7 @@ final class Xoshiro256StarStar {
     /** Прямо задає стан; лише для перевірки проти еталонних векторів. */
     Xoshiro256StarStar(long s0, long s1, long s2, long s3) {
         if ((s0 | s1 | s2 | s3) == 0) {
-            throw new IllegalArgumentException("Стан xoshiro256** не може бути нульовим");
+            throw new ValidationException(ErrorCode.VALUE_OUT_OF_RANGE, ErrorDetails.of("field", "state", "value", 0));
         }
         this.s0 = s0;
         this.s1 = s1;

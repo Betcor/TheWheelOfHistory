@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-/** Навмисні порушення детермінізму — по одному на кожне правило. Лише для тестів правил. */
+/** Навмисні порушення правил рушія (детермінізм, помилки) — по одному на кожне правило. Лише для тестів правил. */
 public final class Violations {
 
     private Violations() {}
@@ -70,6 +70,15 @@ public final class Violations {
     public static final class UsesJavaTime {
         public static java.time.Year year() {
             return java.time.Year.of(1970);
+        }
+    }
+
+    public static final class ThrowsIllegalArgument {
+        public static int check(int value) {
+            if (value < 0) {
+                throw new IllegalArgumentException("від'ємне: " + value);
+            }
+            return value;
         }
     }
 }

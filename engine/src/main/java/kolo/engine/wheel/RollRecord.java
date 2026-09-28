@@ -2,6 +2,10 @@ package kolo.engine.wheel;
 
 import java.util.List;
 import java.util.Objects;
+import kolo.engine.error.Checks;
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
+import kolo.engine.error.ValidationException;
 import kolo.engine.state.Season;
 
 /**
@@ -31,14 +35,11 @@ public record RollRecord(
         Objects.requireNonNull(kind, "kind");
         sectors = List.copyOf(sectors);
         modifiers = List.copyOf(modifiers);
-        if (roll < 0 || roll >= Wheel.TOTAL_BP) {
-            throw new IllegalArgumentException("кидок поза 0..9999: " + roll);
-        }
-        if (turn < 0) {
-            throw new IllegalArgumentException("хід від'ємний: " + turn);
-        }
+        Checks.inRange("roll", roll, 0, Wheel.TOTAL_BP - 1);
+        Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
         if (find(sectors, resultSectorId) == null) {
-            throw new IllegalArgumentException("сектора " + resultSectorId + " немає в записі");
+            throw new ValidationException(
+                    ErrorCode.UNKNOWN_REFERENCE, ErrorDetails.of("field", "result_sector_id", "value", resultSectorId));
         }
     }
 

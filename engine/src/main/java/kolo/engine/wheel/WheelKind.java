@@ -8,7 +8,7 @@ package kolo.engine.wheel;
 public record WheelKind(String id) implements Comparable<WheelKind> {
 
     public WheelKind {
-        Ids.requireSnakeCase(id, "тип колеса");
+        Ids.requireSnakeCase("wheel_kind", id);
     }
 
     @Override

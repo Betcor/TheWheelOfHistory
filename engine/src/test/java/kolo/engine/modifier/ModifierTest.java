@@ -4,6 +4,7 @@ import static kolo.engine.modifier.TestModifiers.onStat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import kolo.engine.error.ValidationException;
 import kolo.engine.state.Stat;
 import org.junit.jupiter.api.Test;
 
@@ -32,16 +33,16 @@ class ModifierTest {
         ModifierTarget target = ModifierTarget.stat(Stat.HDI);
 
         assertThatThrownBy(() -> new Modifier(" ", source, target, 1, null, "modifier.x"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new Modifier("m", null, target, 1, null, "modifier.x"))
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new Modifier("m", source, null, 1, null, "modifier.x"))
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new Modifier("m", source, target, 1, -1, "modifier.x"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new Modifier("m", source, target, 1, null, ""))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ModifierSource(SourceKind.TECH, "")).isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> new ModifierSource(SourceKind.TECH, "")).isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> ModifierTarget.stat(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> ModifierTarget.wheel(null)).isInstanceOf(NullPointerException.class);
     }
