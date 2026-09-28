@@ -17,21 +17,28 @@ import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.ModifierDef;
+import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.TechBranchDef;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
+import kolo.engine.state.Development;
+import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.TechBranch;
 
 /**
  * Читає YAML-файли контенту й збирає з них {@link ContentPack}.
@@ -45,9 +52,11 @@ public final class ContentLoader {
     public static final String IDEOLOGIES = "ideologies.yaml";
     public static final String DOCTRINES = "doctrines.yaml";
     public static final String RESOURCES = "resources.yaml";
+    public static final String DEVELOPMENT = "development.yaml";
+    public static final String NUCLEAR = "nuclear.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
-    public static final List<String> FILES = List.of(IDEOLOGIES, DOCTRINES, RESOURCES);
+    public static final List<String> FILES = List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -67,10 +76,14 @@ public final class ContentLoader {
         List<IdeologyDef> ideologies = ideologies(parse(files, IDEOLOGIES, ContentYaml.IdeologiesFile.class));
         List<DoctrineDef> doctrines = doctrines(parse(files, DOCTRINES, ContentYaml.DoctrinesFile.class));
         List<ResourceDef> resources = resources(parse(files, RESOURCES, ContentYaml.ResourcesFile.class));
+        ContentYaml.DevelopmentFile development = parse(files, DEVELOPMENT, ContentYaml.DevelopmentFile.class);
+        List<TechBranchDef> branches = techBranches(development);
+        List<DevelopmentLevelDef> levels = developmentLevels(development);
+        List<NuclearStatusDef> nuclear = nuclearStatuses(parse(files, NUCLEAR, ContentYaml.NuclearFile.class));
 
-        // Повтори й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
+        // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
         String hash = ContentHash.of(files);
-        return at("*", "", () -> new ContentPack(hash, ideologies, doctrines, resources));
+        return at("*", "", () -> new ContentPack(hash, ideologies, doctrines, resources, branches, levels, nuclear));
     }
 
     // ---- Файли ----
@@ -158,6 +171,53 @@ public final class ContentLoader {
                 });
     }
 
+    private static List<TechBranchDef> techBranches(ContentYaml.DevelopmentFile yaml) {
+        TreeSet<TechBranch> seen = new TreeSet<>();
+        List<TechBranchDef> branches = list(DEVELOPMENT, "branches", yaml.branches(), (location, branch) -> {
+            TechBranch key = at(
+                    DEVELOPMENT,
+                    location,
+                    () -> unique(
+                            seen,
+                            ContentKeys.parse("tech_branch", TechBranch.values(), TechBranch::key, branch.id()),
+                            TechBranch::key));
+            return at(DEVELOPMENT, location, () -> new TechBranchDef(key, branch.name()));
+        });
+        complete(DEVELOPMENT, "branches", seen, List.of(TechBranch.values()), TechBranch::key);
+        return branches;
+    }
+
+    private static List<DevelopmentLevelDef> developmentLevels(ContentYaml.DevelopmentFile yaml) {
+        TreeSet<Integer> seen = new TreeSet<>();
+        List<DevelopmentLevelDef> levels = list(DEVELOPMENT, "levels", yaml.levels(), (location, level) -> {
+            DevelopmentLevelDef def = at(
+                    DEVELOPMENT,
+                    location,
+                    () -> new DevelopmentLevelDef(level.level(), level.name(), level.description()));
+            at(DEVELOPMENT, location, () -> unique(seen, def.level(), value -> value));
+            return def;
+        });
+        complete(DEVELOPMENT, "levels", seen, Development.levels(), value -> value);
+        return levels;
+    }
+
+    private static List<NuclearStatusDef> nuclearStatuses(ContentYaml.NuclearFile yaml) {
+        TreeSet<NuclearStatus> seen = new TreeSet<>();
+        List<NuclearStatusDef> statuses = list(NUCLEAR, "statuses", yaml.statuses(), (location, status) -> {
+            NuclearStatus key = at(
+                    NUCLEAR,
+                    location,
+                    () -> unique(
+                            seen,
+                            ContentKeys.parse(
+                                    "nuclear_status", NuclearStatus.values(), NuclearStatus::key, status.id()),
+                            NuclearStatus::key));
+            return at(NUCLEAR, location, () -> new NuclearStatusDef(key, status.name(), status.tags()));
+        });
+        complete(NUCLEAR, "statuses", seen, List.of(NuclearStatus.values()), NuclearStatus::key);
+        return statuses;
+    }
+
     private static List<ModifierDef> modifiers(String file, String owner, List<ContentYaml.Modifier> yaml) {
         return list(
                 file,
@@ -201,10 +261,31 @@ public final class ContentLoader {
     }
 
     private static <K extends Comparable<K>> K unique(TreeSet<K> seen, K id) {
+        return unique(seen, id, key -> key);
+    }
+
+    /** @param display як показати ключ у подробицях помилки: ключ контенту, а не ім'я константи enum */
+    private static <K extends Comparable<K>> K unique(TreeSet<K> seen, K id, Function<K, Object> display) {
         if (!seen.add(id)) {
-            throw new ValidationException(ErrorCode.DUPLICATE_ID, ErrorDetails.of("field", "id", "value", id));
+            throw new ValidationException(
+                    ErrorCode.DUPLICATE_ID, ErrorDetails.of("field", "id", "value", display.apply(id)));
         }
         return id;
+    }
+
+    /** Кожне значення з {@code expected} визначено у файлі; пропуск прив'язується до списку {@code field}. */
+    private static <K extends Comparable<K>> void complete(
+            String file, String field, TreeSet<K> seen, List<K> expected, Function<K, Object> display) {
+        for (K key : expected) {
+            if (!seen.contains(key)) {
+                throw invalid(
+                        file,
+                        field,
+                        new ValidationException(
+                                ErrorCode.MISSING_DEFINITION,
+                                ErrorDetails.of("field", field, "value", display.apply(key))));
+            }
+        }
     }
 
     // ---- Помилки ----

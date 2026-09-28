@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
+import kolo.engine.state.Development;
+import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.TechBranch;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +47,24 @@ class DefinitionsTest {
         assertFails(
                 () -> new DoctrineDef(new DoctrineId("armored"), null, List.of(), List.of()), ErrorCode.BLANK_VALUE);
         assertFails(() -> new ResourceDef(new ResourceId("iron"), "", List.of()), ErrorCode.BLANK_VALUE);
+    }
+
+    @Test
+    void developmentLevelIsWithinDesignRange() {
+        assertThat(new DevelopmentLevelDef(-3, "Глибоке відставання", "Лише базові технології.").level())
+                .isEqualTo(Development.MIN);
+        assertFails(() -> new DevelopmentLevelDef(-4, "Нижче дна", "—"), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new DevelopmentLevelDef(3, "Понад лідера", "—"), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new DevelopmentLevelDef(0, "Світовий рівень", " "), ErrorCode.BLANK_VALUE);
+    }
+
+    @Test
+    void branchAndNuclearStatusNeedNames() {
+        assertFails(() -> new TechBranchDef(TechBranch.SOCIETY, ""), ErrorCode.BLANK_VALUE);
+        assertFails(() -> new NuclearStatusDef(NuclearStatus.ARSENAL, null, List.of()), ErrorCode.BLANK_VALUE);
+        assertFails(
+                () -> new NuclearStatusDef(NuclearStatus.ARSENAL, "Арсенал", List.of("NuclearPower")),
+                ErrorCode.INVALID_KEY_FORMAT);
     }
 
     @Test
