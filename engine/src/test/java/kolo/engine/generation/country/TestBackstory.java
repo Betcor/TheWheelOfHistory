@@ -141,6 +141,21 @@ final class TestBackstory {
 
     /** Мінімальний валідний пакет з цими фрагментами й кількістю фрагментів передісторії. */
     static ContentPack pack(List<BackstoryFragmentDef> fragments, CountRange count) {
+        return pack(
+                List.of(new IdeologyDef(
+                        new IdeologyId("democracy"),
+                        "Демократія",
+                        100,
+                        List.of(),
+                        List.of("democratic"),
+                        List.of(new SubIdeologyDef(
+                                new SubIdeologyId("liberal_democracy"), "Ліберальна", 100, List.of(), List.of())))),
+                fragments,
+                count);
+    }
+
+    /** Мінімальний валідний пакет з цими ідеологіями; форма державності доступна кожній. */
+    static ContentPack pack(List<IdeologyDef> ideologies, List<BackstoryFragmentDef> fragments, CountRange count) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -174,18 +189,12 @@ final class TestBackstory {
                         "Республікою {root}",
                         "Республіці {root}",
                         "Республіко {root}"),
-                List.of(new IdeologyId("democracy")),
+                ideologies.stream().map(IdeologyDef::id).toList(),
                 List.of());
 
         return new ContentPack(
                 "0".repeat(64),
-                List.of(new IdeologyDef(
-                        new IdeologyId("democracy"),
-                        "Демократія",
-                        List.of(),
-                        List.of("democratic"),
-                        List.of(new SubIdeologyDef(
-                                new SubIdeologyId("liberal_democracy"), "Ліберальна", List.of(), List.of())))),
+                ideologies,
                 List.of(new DoctrineDef(new DoctrineId("armored"), "Бронетанкова", List.of(), List.of())),
                 List.of(new ResourceDef(new ResourceId("iron"), "Залізо", List.of())),
                 Arrays.stream(TechBranch.values())

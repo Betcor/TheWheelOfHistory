@@ -21,7 +21,7 @@ class DefinitionsTest {
     @Test
     void ideologyNeedsAtLeastOneSubIdeology() {
         assertFails(
-                () -> new IdeologyDef(new IdeologyId("democracy"), "Демократія", List.of(), List.of(), List.of()),
+                () -> new IdeologyDef(new IdeologyId("democracy"), "Демократія", 100, List.of(), List.of(), List.of()),
                 ErrorCode.EMPTY_COLLECTION);
     }
 
@@ -43,7 +43,7 @@ class DefinitionsTest {
     @Test
     void namesAreRequired() {
         assertFails(
-                () -> new SubIdeologyDef(new SubIdeologyId("revanchism"), " ", List.of(), List.of()),
+                () -> new SubIdeologyDef(new SubIdeologyId("revanchism"), " ", 100, List.of(), List.of()),
                 ErrorCode.BLANK_VALUE);
         assertFails(
                 () -> new DoctrineDef(new DoctrineId("armored"), null, List.of(), List.of()), ErrorCode.BLANK_VALUE);

@@ -22,6 +22,7 @@ final class ContentYaml {
     record Ideology(
             String id,
             String name,
+            Integer weight,
             List<String> tags,
             List<Modifier> modifiers,
             @JsonProperty("sub_ideologies") List<SubIdeology> subIdeologies) {
@@ -32,7 +33,7 @@ final class ContentYaml {
         }
     }
 
-    record SubIdeology(String id, String name, List<String> tags, List<Modifier> modifiers) {
+    record SubIdeology(String id, String name, Integer weight, List<String> tags, List<Modifier> modifiers) {
         SubIdeology {
             tags = orEmpty(tags);
             modifiers = orEmpty(modifiers);

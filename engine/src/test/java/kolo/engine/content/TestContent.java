@@ -21,7 +21,7 @@ final class TestContent {
     private TestContent() {}
 
     static SubIdeologyDef sub(String id) {
-        return new SubIdeologyDef(new SubIdeologyId(id), "Підкласифікація " + id, List.of(), List.of());
+        return new SubIdeologyDef(new SubIdeologyId(id), "Підкласифікація " + id, 100, List.of(), List.of());
     }
 
     static IdeologyDef ideology(String id, String... subIds) {
@@ -29,6 +29,7 @@ final class TestContent {
         return new IdeologyDef(
                 new IdeologyId(id),
                 "Ідеологія " + id,
+                100,
                 List.of(new ModifierDef(ModifierTarget.stat(Stat.HDI), 5)),
                 List.of(id),
                 subs);

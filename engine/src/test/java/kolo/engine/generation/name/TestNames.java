@@ -154,11 +154,12 @@ final class TestNames {
         return new IdeologyDef(
                 new IdeologyId(id),
                 "Ідеологія " + id,
+                100,
                 List.of(),
                 List.of(),
                 Arrays.stream(subs)
                         .map(sub -> new SubIdeologyDef(
-                                new SubIdeologyId(sub), "Підкласифікація " + sub, List.of(), List.of()))
+                                new SubIdeologyId(sub), "Підкласифікація " + sub, 100, List.of(), List.of()))
                         .toList());
     }
 
