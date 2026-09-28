@@ -35,6 +35,11 @@ public enum ErrorCode {
      * немає рівно одного {@code {root}}. Подробиці: {@code field}, {@code value}.
      */
     INVALID_NAME_FORMAT(ValidationException.class),
+    /**
+     * Шаблон тексту має неприпустимий формат: невідома змінна чи відмінок, незакрита дужка, змінна, якої не дозволяє
+     * визначення. Подробиці: {@code field}, {@code value}.
+     */
+    INVALID_TEMPLATE(ValidationException.class),
     /** Сума ваг колеса нульова. */
     WHEEL_ZERO_WEIGHT(ValidationException.class),
     /** Критичних секторів більше, ніж вміщує мінімум 1% кожному. Подробиці: {@code count}, {@code max}. */

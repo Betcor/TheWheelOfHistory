@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.entry;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
@@ -42,7 +43,8 @@ class ContentPackTest {
                 nuclearStatuses().reversed(),
                 personKinds().reversed(),
                 traits(),
-                names(List.of(ideology("socialism", "planned_economy"), ideology("democracy", "liberal_democracy"))));
+                names(List.of(ideology("socialism", "planned_economy"), ideology("democracy", "liberal_democracy"))),
+                TestContent.backstory());
 
         assertThat(pack.hash()).isEqualTo(HASH);
         assertThat(pack.ideologies().keySet()).extracting(IdeologyId::value).containsExactly("democracy", "socialism");
@@ -84,7 +86,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(ideologies)),
+                        names(ideologies),
+                        TestContent.backstory()),
                 "tech_branches",
                 "energy_science");
         assertMissing(
@@ -98,7 +101,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(ideologies)),
+                        names(ideologies),
+                        TestContent.backstory()),
                 "development_levels",
                 -3);
         assertMissing(
@@ -112,7 +116,8 @@ class ContentPackTest {
                         List.of(new NuclearStatusDef(NuclearStatus.NONE, "Немає", List.of())),
                         personKinds(),
                         traits(),
-                        names(ideologies)),
+                        names(ideologies),
+                        TestContent.backstory()),
                 "nuclear_statuses",
                 "program");
     }
@@ -132,7 +137,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(List.of(ideology("democracy", "a")))))
+                        names(List.of(ideology("democracy", "a"))),
+                        TestContent.backstory()))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
                     assertThat(e.details())
@@ -181,7 +187,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(List.of(ideology("democracy", "a")))))
+                        names(List.of(ideology("democracy", "a"))),
+                        TestContent.backstory()))
                 .isInstanceOf(ValidationException.class);
     }
 
@@ -202,7 +209,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(ideologies)),
+                        names(ideologies),
+                        TestContent.backstory()),
                 "ideologies");
         assertEmpty(
                 () -> new ContentPack(
@@ -215,7 +223,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(ideologies)),
+                        names(ideologies),
+                        TestContent.backstory()),
                 "doctrines");
         assertEmpty(
                 () -> new ContentPack(
@@ -228,7 +237,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(ideologies)),
+                        names(ideologies),
+                        TestContent.backstory()),
                 "resources");
         assertThatThrownBy(() -> new ContentPack(
                         " ",
@@ -240,7 +250,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds(),
                         traits(),
-                        names(ideologies)))
+                        names(ideologies),
+                        TestContent.backstory()))
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BLANK_VALUE));
     }
@@ -322,7 +333,8 @@ class ContentPackTest {
                         nuclearStatuses(),
                         personKinds().subList(0, PersonKind.values().length - 1),
                         traits(),
-                        names(List.of(ideology("democracy", "a")))),
+                        names(List.of(ideology("democracy", "a"))),
+                        TestContent.backstory()),
                 "person_kinds",
                 "pretender");
     }
@@ -372,6 +384,47 @@ class ContentPackTest {
         assertMissing(() -> withNames(ideologies, List.of(republic)), "state_forms", "absolute_monarchy");
     }
 
+    @Test
+    void backstoryTagsNeedASource() {
+        // Джерела: мітка ідеології (democracy), ядерного статусу, словника коліс генерації й іншого фрагмента.
+        List<NuclearStatusDef> statuses = List.of(
+                new NuclearStatusDef(NuclearStatus.NONE, "Немає", List.of()),
+                new NuclearStatusDef(NuclearStatus.PROGRAM, "Програма", List.of("nuclear_program")),
+                new NuclearStatusDef(NuclearStatus.ARSENAL, "Арсенал", List.of("nuclear_power")));
+        BackstoryFragmentDef lostWar = TestContent.fragment("lost_war", TagCondition.NONE, List.of("lost_war"));
+        BackstoryFragmentDef reparations = TestContent.fragment(
+                "reparations",
+                new TagCondition(List.of("lost_war"), List.of("democracy", "poor"), List.of("nuclear_power")),
+                List.of());
+
+        ContentPack pack = withBackstory(
+                statuses, new BackstoryContent(Map.of("poor", "Бідна країна."), List.of(lostWar, reparations)));
+
+        assertThat(pack.backstory().fragments()).hasSize(2);
+        assertThatThrownBy(() -> withBackstory(statuses, new BackstoryContent(Map.of(), List.of(lostWar, reparations))))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "backstory.reparations.tags"), entry("value", "poor"));
+                });
+    }
+
+    private static ContentPack withBackstory(List<NuclearStatusDef> statuses, BackstoryContent backstory) {
+        List<IdeologyDef> ideologies = List.of(ideology("democracy", "a"));
+        return new ContentPack(
+                HASH,
+                ideologies,
+                List.of(doctrine("armored")),
+                List.of(resource("iron")),
+                branches(),
+                levels(),
+                statuses,
+                personKinds(),
+                traits(),
+                names(ideologies),
+                backstory);
+    }
+
     private static StateFormDef form(String id, List<IdeologyId> ideologies, List<SubIdeologyId> subIdeologies) {
         return new StateFormDef(
                 new StateFormId(id),
@@ -393,7 +446,8 @@ class ContentPackTest {
                 nuclearStatuses(),
                 personKinds(),
                 traits(),
-                new NameContent(List.of(TestContent.mascHard()), List.of(TestContent.style("northern")), forms));
+                new NameContent(List.of(TestContent.mascHard()), List.of(TestContent.style("northern")), forms),
+                TestContent.backstory());
     }
 
     private static ContentPack withTraits(List<TraitDef> traits) {
@@ -407,7 +461,8 @@ class ContentPackTest {
                 nuclearStatuses(),
                 personKinds(),
                 traits,
-                names(List.of(ideology("democracy", "a"))));
+                names(List.of(ideology("democracy", "a"))),
+                TestContent.backstory());
     }
 
     private static void assertMissing(Runnable create, String field, Object value) {

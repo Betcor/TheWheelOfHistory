@@ -3,6 +3,7 @@ package kolo.content.loader;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Структура YAML-файлів контенту. Лише форма даних: значення перевіряють конструктори моделі рушія. Відсутні
@@ -164,6 +165,49 @@ final class ContentYaml {
             subIdeologies = orEmpty(subIdeologies);
         }
     }
+
+    /** @param generationTags мітка → коли її дає колесо генерації */
+    record BackstoryFile(
+            @JsonProperty("generation_tags") Map<String, String> generationTags, List<Fragment> fragments) {
+        BackstoryFile {
+            generationTags = generationTags == null ? Map.of() : generationTags;
+            fragments = orEmpty(fragments);
+        }
+    }
+
+    /**
+     * @param quality обов'язкова: пропуск не повинен тихо ставати нулем
+     * @param weightTags мітка → добавка до ваги
+     * @param neighbor без поля — фрагмент без сусіда
+     * @param duration роки дії модифікаторів; без поля — постійно
+     */
+    record Fragment(
+            String id,
+            int weight,
+            Integer quality,
+            Years years,
+            List<String> requires,
+            @JsonProperty("requires_any") List<String> requiresAny,
+            List<String> excludes,
+            @JsonProperty("weight_tags") Map<String, Integer> weightTags,
+            Boolean neighbor,
+            List<String> adds,
+            Integer duration,
+            List<Modifier> modifiers,
+            String text) {
+        Fragment {
+            requires = orEmpty(requires);
+            requiresAny = orEmpty(requiresAny);
+            excludes = orEmpty(excludes);
+            weightTags = weightTags == null ? Map.of() : weightTags;
+            adds = orEmpty(adds);
+            neighbor = neighbor != null && neighbor;
+            duration = duration == null ? 0 : duration;
+            modifiers = orEmpty(modifiers);
+        }
+    }
+
+    record Years(int from, int to) {}
 
     /** По рядку на відмінок; порядок полів — порядок {@link kolo.engine.state.GrammaticalCase}. */
     record Cases(
