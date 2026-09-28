@@ -36,6 +36,11 @@ public enum ErrorCode {
      */
     INVALID_NAME_FORMAT(ValidationException.class),
     /**
+     * Парадигма відмінювання не того роду, якого вимагає місце посилання (напр. жіноча парадигма в кінцівці чоловічого
+     * імені). Подробиці: {@code field}, {@code value} (id парадигми), {@code expected} (ключ роду).
+     */
+    NAME_GENDER_MISMATCH(ValidationException.class),
+    /**
      * Шаблон тексту має неприпустимий формат: невідома змінна чи відмінок, незакрита дужка, змінна, якої не дозволяє
      * визначення. Подробиці: {@code field}, {@code value}.
      */

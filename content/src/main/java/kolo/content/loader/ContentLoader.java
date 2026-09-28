@@ -34,16 +34,19 @@ import kolo.engine.content.NameContent;
 import kolo.engine.content.NameFinalDef;
 import kolo.engine.content.NameParadigmDef;
 import kolo.engine.content.NameParadigmId;
+import kolo.engine.content.NamePartsDef;
 import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
+import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TraitDef;
@@ -397,7 +400,110 @@ public final class ContentLoader {
                 }
             }
         }
-        return at(NAMES, "", () -> new NameContent(paradigms, styles, forms));
+        List<PersonNameStyleDef> personStyles = personStyles(yaml, paradigms, styleIds);
+        return at(NAMES, "", () -> new NameContent(paradigms, styles, forms, personStyles));
+    }
+
+    /**
+     * @param paradigms уже прочитані парадигми з того самого файлу
+     * @param styleIds id стилів назв держав: кожному відповідає рівно один стиль імен
+     */
+    private static List<PersonNameStyleDef> personStyles(
+            ContentYaml.NamesFile yaml, List<NameParadigmDef> paradigms, TreeSet<NameStyleId> styleIds) {
+        TreeMap<NameParadigmId, GrammaticalGender> genders = new TreeMap<>();
+        paradigms.forEach(paradigm -> genders.put(paradigm.id(), paradigm.gender()));
+        // Посилання в межах файлу: місце помилки відоме точно.
+        ParadigmRef ref = (location, value, expected) -> {
+            NameParadigmId id = at(NAMES, location, () -> new NameParadigmId(value));
+            GrammaticalGender gender = genders.get(id);
+            if (gender == null) {
+                throw invalid(NAMES, location, unknown("paradigm", id));
+            }
+            if (gender != expected) {
+                throw invalid(
+                        NAMES,
+                        location,
+                        new ValidationException(
+                                ErrorCode.NAME_GENDER_MISMATCH,
+                                ErrorDetails.of("field", "paradigm", "value", id, "expected", expected.key())));
+            }
+            return id;
+        };
+
+        TreeSet<NameStyleId> ids = new TreeSet<>();
+        List<PersonNameStyleDef> styles = list(
+                NAMES, "person_styles", nonEmpty(NAMES, "person_styles", yaml.personStyles()), (location, style) -> {
+                    NameStyleId id = at(NAMES, location, () -> unique(ids, new NameStyleId(style.id())));
+                    if (!styleIds.contains(id)) {
+                        throw invalid(NAMES, location + ".id", unknown("name_style", id));
+                    }
+                    ContentYaml.GivenNames given = required(NAMES, location, "given_names", style.givenNames());
+                    ContentYaml.Surnames surnames = required(NAMES, location, "surnames", style.surnames());
+                    String givenLocation = location + ".given_names";
+                    NamePartsDef givenParts = at(
+                            NAMES,
+                            givenLocation,
+                            () -> new NamePartsDef(given.starts(), given.middles(), given.middleChanceBp()));
+                    List<NameFinalDef> male =
+                            list(NAMES, givenLocation + ".male", given.male(), (finalLocation, nameFinal) -> {
+                                NameParadigmId paradigm = ref.resolve(
+                                        finalLocation + ".paradigm", nameFinal.paradigm(), GrammaticalGender.MASCULINE);
+                                return at(NAMES, finalLocation, () -> new NameFinalDef(nameFinal.text(), paradigm));
+                            });
+                    List<NameFinalDef> female =
+                            list(NAMES, givenLocation + ".female", given.female(), (finalLocation, nameFinal) -> {
+                                NameParadigmId paradigm = ref.resolve(
+                                        finalLocation + ".paradigm", nameFinal.paradigm(), GrammaticalGender.FEMININE);
+                                return at(NAMES, finalLocation, () -> new NameFinalDef(nameFinal.text(), paradigm));
+                            });
+                    String surnameLocation = location + ".surnames";
+                    NamePartsDef surnameParts = at(
+                            NAMES,
+                            surnameLocation,
+                            () -> new NamePartsDef(surnames.starts(), surnames.middles(), surnames.middleChanceBp()));
+                    List<SurnameFinalDef> surnameFinals = list(
+                            NAMES, surnameLocation + ".finals", surnames.finals(), (finalLocation, surnameFinal) -> {
+                                NameParadigmId maleParadigm = ref.resolve(
+                                        finalLocation + ".male", surnameFinal.male(), GrammaticalGender.MASCULINE);
+                                NameParadigmId femaleParadigm = ref.resolve(
+                                        finalLocation + ".female", surnameFinal.female(), GrammaticalGender.FEMININE);
+                                return at(
+                                        NAMES,
+                                        finalLocation,
+                                        () -> new SurnameFinalDef(surnameFinal.text(), maleParadigm, femaleParadigm));
+                            });
+                    return at(
+                            NAMES,
+                            location,
+                            () -> new PersonNameStyleDef(id, givenParts, male, female, surnameParts, surnameFinals));
+                });
+        for (NameStyleId style : styleIds) {
+            if (!ids.contains(style)) {
+                throw invalid(
+                        NAMES,
+                        "person_styles",
+                        new ValidationException(
+                                ErrorCode.MISSING_DEFINITION,
+                                ErrorDetails.of("field", "person_styles", "value", style)));
+            }
+        }
+        return styles;
+    }
+
+    @FunctionalInterface
+    private interface ParadigmRef {
+        NameParadigmId resolve(String location, String value, GrammaticalGender expected);
+    }
+
+    /** Обов'язковий вкладений блок: без нього — {@link ErrorCode#BLANK_VALUE} з місцем блоку. */
+    private static <T> T required(String file, String owner, String field, T value) {
+        if (value == null) {
+            throw invalid(
+                    file,
+                    owner + "." + field,
+                    new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", field)));
+        }
+        return value;
     }
 
     /**

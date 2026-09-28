@@ -5,12 +5,14 @@ import static kolo.engine.generation.name.TestNames.KINGDOM;
 import static kolo.engine.generation.name.TestNames.MASC_HARD;
 import static kolo.engine.generation.name.TestNames.PACK;
 import static kolo.engine.generation.name.TestNames.REPUBLIC;
+import static kolo.engine.generation.name.TestNames.SOUTHERN;
 import static kolo.engine.generation.name.TestNames.UNITED_PROVINCES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.TreeSet;
 import kolo.engine.content.NameFinalDef;
+import kolo.engine.content.NameStyleId;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.error.ErrorCode;
@@ -83,6 +85,21 @@ class CountryNamesTest {
         // Північний: 3 початки × (без вставки + 2 вставки) × 2 кінцівки; південний: 2 початки × 1 кінцівка.
         assertThat(roots).hasSize(3 * 3 * 2 + 2);
         assertThat(roots).contains("Велор", "Велімор", "Торенія", "Гарія", "Салан", "Маран");
+    }
+
+    @Test
+    void givenStyleIsUsedForTheRoot() {
+        TreeSet<String> roots = new TreeSet<>();
+        for (long seed = 0; seed < 200; seed++) {
+            roots.add(CountryNames.generate(Rng.of(seed), PACK, LIBERAL, SOUTHERN.id())
+                    .shortName()
+                    .nominative());
+        }
+
+        assertThat(roots).containsExactly("Маран", "Салан");
+        assertThatThrownBy(() -> CountryNames.generate(Rng.of(1), PACK, LIBERAL, new NameStyleId("eastern")))
+                .isInstanceOfSatisfying(
+                        ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE));
     }
 
     @Test

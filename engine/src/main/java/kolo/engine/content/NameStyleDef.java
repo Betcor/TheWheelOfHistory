@@ -30,8 +30,8 @@ public record NameStyleDef(
         Objects.requireNonNull(id, "id");
         String field = "name_style." + id;
         Checks.notBlank(field + ".name", name);
-        starts = parts(field + ".starts", starts, false, true);
-        middles = parts(field + ".middles", middles, true, true);
+        starts = NameText.parts(field + ".starts", starts, false);
+        middles = NameText.parts(field + ".middles", middles, true);
         Checks.inRange(field + ".middle_chance_bp", middleChanceBp, 0, Fixed.BP_SCALE);
         if (middleChanceBp > 0 && middles.isEmpty()) {
             throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", field + ".middles"));
@@ -48,21 +48,5 @@ public record NameStyleDef(
             // Та сама кінцівка з іншою парадигмою дала б корінь із двома наборами форм.
             Defs.unique(field + ".finals", seenFinals, nameFinal.text());
         }
-    }
-
-    /**
-     * @param vowelStart частина має починатися з голосної
-     * @param consonantEnd частина має закінчуватися не голосною
-     */
-    private static List<String> parts(String field, List<String> parts, boolean vowelStart, boolean consonantEnd) {
-        TreeSet<String> seen = new TreeSet<>();
-        for (String part : parts) {
-            NameText.part(field, part);
-            if ((vowelStart && !NameText.startsWithVowel(part)) || (consonantEnd && NameText.endsWithVowel(part))) {
-                throw NameText.invalid(field, part);
-            }
-            Defs.unique(field, seen, part);
-        }
-        return List.copyOf(parts);
     }
 }

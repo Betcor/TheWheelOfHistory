@@ -18,16 +18,19 @@ import kolo.engine.content.NameContent;
 import kolo.engine.content.NameFinalDef;
 import kolo.engine.content.NameParadigmDef;
 import kolo.engine.content.NameParadigmId;
+import kolo.engine.content.NamePartsDef;
 import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
+import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TraitDef;
@@ -38,13 +41,22 @@ import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
 
-/** Контент для тестів генератора назв: дві ідеології, два стилі, три форми державності. */
+/** Контент для тестів генераторів назв та імен: дві ідеології, два стилі, три форми державності. */
 final class TestNames {
 
     static final NameParadigmDef MASC_HARD = new NameParadigmDef(
             new NameParadigmId("masc_hard"), GrammaticalGender.MASCULINE, List.of("", "у", "у", "", "ом", "і", "е"));
     static final NameParadigmDef FEM_IYA = new NameParadigmDef(
             new NameParadigmId("fem_iya"), GrammaticalGender.FEMININE, List.of("я", "ї", "ї", "ю", "єю", "ї", "є"));
+
+    static final NameParadigmDef PERSON_MASC = new NameParadigmDef(
+            new NameParadigmId("person_masc_hard"),
+            GrammaticalGender.MASCULINE,
+            List.of("", "а", "ові", "а", "ом", "ові", "е"));
+    static final NameParadigmDef FEM_HARD = new NameParadigmDef(
+            new NameParadigmId("fem_hard"), GrammaticalGender.FEMININE, List.of("а", "и", "і", "у", "ою", "і", "о"));
+    static final NameParadigmDef FIXED_FEM = new NameParadigmDef(
+            new NameParadigmId("fixed_fem"), GrammaticalGender.FEMININE, List.of("", "", "", "", "", "", ""));
 
     static final NameStyleDef NORTHERN = new NameStyleDef(
             new NameStyleId("northern"),
@@ -60,6 +72,23 @@ final class TestNames {
             List.of(),
             0,
             List.of(new NameFinalDef("ан", MASC_HARD.id())));
+
+    /** Велор / Веларор; Велена / Велія; прізвища Торвер / Гальмер (жіночі не відмінюються). */
+    static final PersonNameStyleDef NORTHERN_PEOPLE = new PersonNameStyleDef(
+            NORTHERN.id(),
+            new NamePartsDef(List.of("вел", "тор"), List.of("ар"), 5000),
+            List.of(new NameFinalDef("ор", PERSON_MASC.id())),
+            List.of(new NameFinalDef("ен", FEM_HARD.id()), new NameFinalDef("і", FEM_IYA.id())),
+            new NamePartsDef(List.of("торв", "гальм"), List.of(), 0),
+            List.of(new SurnameFinalDef("ер", PERSON_MASC.id(), FIXED_FEM.id())));
+    /** Салан / Саліна Марес. */
+    static final PersonNameStyleDef SOUTHERN_PEOPLE = new PersonNameStyleDef(
+            SOUTHERN.id(),
+            new NamePartsDef(List.of("сал"), List.of(), 0),
+            List.of(new NameFinalDef("ан", PERSON_MASC.id())),
+            List.of(new NameFinalDef("ін", FEM_HARD.id())),
+            new NamePartsDef(List.of("мар"), List.of(), 0),
+            List.of(new SurnameFinalDef("ес", PERSON_MASC.id(), FIXED_FEM.id())));
 
     static final StateFormDef REPUBLIC = form(
             "republic",
@@ -147,9 +176,10 @@ final class TestNames {
                         .toList(),
                 List.of(new TraitDef(new TraitId("loyal"), "Відданий", List.of(), List.of(), List.of(), List.of())),
                 new NameContent(
-                        List.of(MASC_HARD, FEM_IYA),
+                        List.of(MASC_HARD, FEM_IYA, PERSON_MASC, FEM_HARD, FIXED_FEM),
                         List.of(NORTHERN, SOUTHERN),
-                        List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM)),
+                        List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM),
+                        List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE)),
                 backstory());
     }
 
