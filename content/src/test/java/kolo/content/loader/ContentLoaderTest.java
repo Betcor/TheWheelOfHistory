@@ -11,6 +11,8 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.ModifierDef;
+import kolo.engine.content.NameStyleDef;
+import kolo.engine.content.NameStyleId;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.TraitDef;
@@ -18,6 +20,8 @@ import kolo.engine.content.TraitId;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.modifier.ModifierTarget;
+import kolo.engine.state.GrammaticalCase;
+import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.Stat;
@@ -119,6 +123,69 @@ class ContentLoaderTest {
                         .source(),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "traits", "cause", "empty_collection"));
+    }
+
+    @Test
+    void loadsNames() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        NameStyleDef northern = pack.names().style(new NameStyleId("northern")).orElseThrow();
+        assertThat(northern.starts()).containsExactly("вел", "тор");
+        assertThat(northern.middleChanceBp()).isEqualTo(3000);
+        assertThat(pack.names().paradigm(northern.finals().getFirst()).gender()).isEqualTo(GrammaticalGender.MASCULINE);
+        assertThat(pack.names().paradigm(northern.finals().getFirst()).ending(GrammaticalCase.NOMINATIVE))
+                .isEmpty();
+        assertThat(pack.stateFormsFor(new SubIdeologyId("revanchism")))
+                .extracting(form -> form.id().value())
+                .containsExactly("state");
+        assertThat(pack.stateFormsFor(new SubIdeologyId("liberal_democracy"))
+                        .getFirst()
+                        .render(GrammaticalCase.GENITIVE, "Велор"))
+                .isEqualTo("Республіки Велор");
+    }
+
+    @Test
+    void invalidNamesAreReportedAtTheirPosition() {
+        assertNamesError(
+                Files.NAMES.replace("paradigm: masc_hard", "paradigm: masc_soft"),
+                Map.of(
+                        "file", "names.yaml",
+                        "location", "styles[0].finals[0].paradigm",
+                        "cause", "unknown_reference",
+                        "value", "masc_soft"));
+        assertNamesError(
+                Files.NAMES.replace("ideologies: [democracy]", "ideologies: [theocracy]"),
+                Map.of("location", "state_forms[0].ideologies[0]", "cause", "unknown_reference", "value", "theocracy"));
+        assertNamesError(
+                Files.NAMES.replace("sub_ideologies: [revanchism]", "sub_ideologies: [militarism]"),
+                Map.of(
+                        "location",
+                        "state_forms[1].sub_ideologies[0]",
+                        "cause",
+                        "unknown_reference",
+                        "value",
+                        "militarism"));
+        assertNamesError(
+                Files.NAMES.replace("sub_ideologies: [revanchism]", "ideologies: [democracy]"),
+                Map.of("location", "state_forms", "cause", "missing_definition", "value", "revanchism"));
+        assertNamesError(
+                Files.NAMES.replace("starts: [вел, тор]", "starts: [веле, тор]"),
+                Map.of("location", "styles[0]", "cause", "invalid_name_format", "value", "веле"));
+        assertNamesError(
+                Files.NAMES.replace("      vocative: Державо {root}\n", ""),
+                Map.of(
+                        "location",
+                        "state_forms[1]",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "state_form.state.templates.vocative"));
+        assertNamesError(
+                Files.NAMES.replace("gender: masculine", "gender: male"),
+                Map.of("location", "paradigms[0]", "cause", "unknown_reference", "value", "male"));
+        assertNamesError(
+                Files.NAMES.replaceAll("(?m)^    endings: .*\n", ""),
+                Map.of("location", "paradigms[0]", "cause", "blank_value", "field", "endings"));
     }
 
     @Test
@@ -338,6 +405,12 @@ class ContentLoaderTest {
                                 .source())
                         .hash())
                 .isNotEqualTo(hash);
+    }
+
+    private static void assertNamesError(String names, Map<String, ?> expected) {
+        assertThat(names).isNotEqualTo(Files.NAMES);
+        assertContentError(
+                Files.valid().with(ContentLoader.NAMES, names).source(), ErrorCode.INVALID_CONTENT, expected);
     }
 
     private static void assertContentError(ContentSource source, ErrorCode code, Map<String, ?> expected) {

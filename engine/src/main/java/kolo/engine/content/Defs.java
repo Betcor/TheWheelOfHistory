@@ -1,6 +1,7 @@
 package kolo.engine.content;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.TreeSet;
 import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
@@ -28,6 +29,14 @@ final class Defs {
     static <K extends Comparable<K>> void unique(String field, TreeSet<K> seen, K id) {
         if (!seen.add(id)) {
             throw new ValidationException(ErrorCode.DUPLICATE_ID, ErrorDetails.of("field", field, "value", id));
+        }
+    }
+
+    /** Жоден ключ у {@code ids} не повторюється. */
+    static <K extends Comparable<K>> void uniqueAll(String field, List<K> ids) {
+        TreeSet<K> seen = new TreeSet<>();
+        for (K id : ids) {
+            unique(field, seen, Objects.requireNonNull(id, field));
         }
     }
 }

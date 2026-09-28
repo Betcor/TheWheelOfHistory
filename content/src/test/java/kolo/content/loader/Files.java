@@ -93,6 +93,44 @@ final class Files {
                 kinds: [scientist]
             """;
 
+    static final String NAMES = """
+            paradigms:
+              - id: masc_hard
+                gender: masculine
+                endings: { nominative: "", genitive: у, dative: у, accusative: "", instrumental: ом, locative: і, vocative: е }
+            styles:
+              - id: northern
+                name: Північний
+                middle_chance_bp: 3000
+                starts: [вел, тор]
+                middles: [ім]
+                finals:
+                  - { text: ор, paradigm: masc_hard }
+            state_forms:
+              - id: republic
+                gender: feminine
+                ideologies: [democracy]
+                forms:
+                  nominative: Республіка {root}
+                  genitive: Республіки {root}
+                  dative: Республіці {root}
+                  accusative: Республіку {root}
+                  instrumental: Республікою {root}
+                  locative: Республіці {root}
+                  vocative: Республіко {root}
+              - id: state
+                gender: feminine
+                sub_ideologies: [revanchism]
+                forms:
+                  nominative: Держава {root}
+                  genitive: Держави {root}
+                  dative: Державі {root}
+                  accusative: Державу {root}
+                  instrumental: Державою {root}
+                  locative: Державі {root}
+                  vocative: Державо {root}
+            """;
+
     private final TreeMap<String, String> files = new TreeMap<>();
 
     private Files() {
@@ -102,6 +140,7 @@ final class Files {
         files.put(ContentLoader.DEVELOPMENT, DEVELOPMENT);
         files.put(ContentLoader.NUCLEAR, NUCLEAR);
         files.put(ContentLoader.PEOPLE, PEOPLE);
+        files.put(ContentLoader.NAMES, NAMES);
     }
 
     static Files valid() {

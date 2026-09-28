@@ -26,10 +26,18 @@ import kolo.engine.content.DoctrineId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.ModifierDef;
+import kolo.engine.content.NameContent;
+import kolo.engine.content.NameFinalDef;
+import kolo.engine.content.NameParadigmDef;
+import kolo.engine.content.NameParadigmId;
+import kolo.engine.content.NameStyleDef;
+import kolo.engine.content.NameStyleId;
 import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.StateFormDef;
+import kolo.engine.content.StateFormId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.TechBranchDef;
@@ -40,6 +48,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
+import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
@@ -59,9 +68,11 @@ public final class ContentLoader {
     public static final String DEVELOPMENT = "development.yaml";
     public static final String NUCLEAR = "nuclear.yaml";
     public static final String PEOPLE = "people.yaml";
+    public static final String NAMES = "names.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
-    public static final List<String> FILES = List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE);
+    public static final List<String> FILES =
+            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE, NAMES);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -88,6 +99,7 @@ public final class ContentLoader {
         ContentYaml.PeopleFile people = parse(files, PEOPLE, ContentYaml.PeopleFile.class);
         List<PersonKindDef> kinds = personKinds(people);
         List<TraitDef> traits = traits(people);
+        NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
         String hash = ContentHash.of(files);
@@ -95,7 +107,7 @@ public final class ContentLoader {
                 "*",
                 "",
                 () -> new ContentPack(
-                        hash, ideologies, doctrines, resources, branches, levels, nuclear, kinds, traits));
+                        hash, ideologies, doctrines, resources, branches, levels, nuclear, kinds, traits, names));
     }
 
     // ---- Файли ----
@@ -285,6 +297,104 @@ public final class ContentLoader {
             }
         }
         return traits;
+    }
+
+    /** @param ideologies уже завантажені ідеології: форми державності посилаються на них */
+    private static NameContent names(ContentYaml.NamesFile yaml, List<IdeologyDef> ideologies) {
+        TreeSet<NameParadigmId> paradigmIds = new TreeSet<>();
+        List<NameParadigmDef> paradigms =
+                list(NAMES, "paradigms", nonEmpty(NAMES, "paradigms", yaml.paradigms()), (location, paradigm) -> {
+                    NameParadigmId id =
+                            at(NAMES, location, () -> unique(paradigmIds, new NameParadigmId(paradigm.id())));
+                    return at(
+                            NAMES,
+                            location,
+                            () -> new NameParadigmDef(
+                                    id, gender(paradigm.gender()), cases("endings", paradigm.endings())));
+                });
+
+        TreeSet<NameStyleId> styleIds = new TreeSet<>();
+        List<NameStyleDef> styles =
+                list(NAMES, "styles", nonEmpty(NAMES, "styles", yaml.styles()), (location, style) -> {
+                    NameStyleId id = at(NAMES, location, () -> unique(styleIds, new NameStyleId(style.id())));
+                    List<NameFinalDef> finals =
+                            list(NAMES, location + ".finals", style.finals(), (finalLocation, nameFinal) -> {
+                                NameParadigmId paradigm =
+                                        at(NAMES, finalLocation, () -> new NameParadigmId(nameFinal.paradigm()));
+                                // Посилання в межах файлу: місце помилки відоме точно.
+                                if (!paradigmIds.contains(paradigm)) {
+                                    throw invalid(NAMES, finalLocation + ".paradigm", unknown("paradigm", paradigm));
+                                }
+                                return at(NAMES, finalLocation, () -> new NameFinalDef(nameFinal.text(), paradigm));
+                            });
+                    return at(
+                            NAMES,
+                            location,
+                            () -> new NameStyleDef(
+                                    id, style.name(), style.starts(), style.middles(), style.middleChanceBp(), finals));
+                });
+
+        TreeSet<IdeologyId> knownIdeologies = new TreeSet<>();
+        TreeSet<SubIdeologyId> knownSubs = new TreeSet<>();
+        for (IdeologyDef ideology : ideologies) {
+            knownIdeologies.add(ideology.id());
+            ideology.subIdeologies().forEach(sub -> knownSubs.add(sub.id()));
+        }
+        TreeSet<StateFormId> formIds = new TreeSet<>();
+        List<StateFormDef> forms =
+                list(NAMES, "state_forms", nonEmpty(NAMES, "state_forms", yaml.stateForms()), (location, form) -> {
+                    StateFormId id = at(NAMES, location, () -> unique(formIds, new StateFormId(form.id())));
+                    List<IdeologyId> formIdeologies =
+                            list(NAMES, location + ".ideologies", form.ideologies(), (itemLocation, value) -> {
+                                IdeologyId ideology = at(NAMES, itemLocation, () -> new IdeologyId(value));
+                                if (!knownIdeologies.contains(ideology)) {
+                                    throw invalid(NAMES, itemLocation, unknown("ideology", ideology));
+                                }
+                                return ideology;
+                            });
+                    List<SubIdeologyId> formSubs =
+                            list(NAMES, location + ".sub_ideologies", form.subIdeologies(), (itemLocation, value) -> {
+                                SubIdeologyId sub = at(NAMES, itemLocation, () -> new SubIdeologyId(value));
+                                if (!knownSubs.contains(sub)) {
+                                    throw invalid(NAMES, itemLocation, unknown("sub_ideology", sub));
+                                }
+                                return sub;
+                            });
+                    return at(
+                            NAMES,
+                            location,
+                            () -> new StateFormDef(
+                                    id, gender(form.gender()), cases("forms", form.forms()), formIdeologies, formSubs));
+                });
+        // Кожній підкласифікації — хоча б одна форма; перевіряється тут, щоб помилка вказувала на names.yaml.
+        for (IdeologyDef ideology : ideologies) {
+            for (SubIdeologyDef sub : ideology.subIdeologies()) {
+                if (forms.stream().noneMatch(form -> form.appliesTo(ideology.id(), sub.id()))) {
+                    throw invalid(
+                            NAMES,
+                            "state_forms",
+                            new ValidationException(
+                                    ErrorCode.MISSING_DEFINITION,
+                                    ErrorDetails.of("field", "state_forms", "value", sub.id())));
+                }
+            }
+        }
+        return at(NAMES, "", () -> new NameContent(paradigms, styles, forms));
+    }
+
+    private static GrammaticalGender gender(String key) {
+        return ContentKeys.parse("gender", GrammaticalGender.values(), GrammaticalGender::key, key);
+    }
+
+    private static List<String> cases(String field, ContentYaml.Cases cases) {
+        if (cases == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", field));
+        }
+        return cases.inOrder();
+    }
+
+    private static ValidationException unknown(String field, Object value) {
+        return new ValidationException(ErrorCode.UNKNOWN_REFERENCE, ErrorDetails.of("field", field, "value", value));
     }
 
     private static PersonKind personKind(String field, String key) {

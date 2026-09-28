@@ -6,6 +6,7 @@ import static kolo.engine.content.TestContent.doctrine;
 import static kolo.engine.content.TestContent.ideology;
 import static kolo.engine.content.TestContent.level;
 import static kolo.engine.content.TestContent.levels;
+import static kolo.engine.content.TestContent.names;
 import static kolo.engine.content.TestContent.nuclearStatuses;
 import static kolo.engine.content.TestContent.pack;
 import static kolo.engine.content.TestContent.personKinds;
@@ -21,6 +22,7 @@ import java.util.List;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
+import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
@@ -39,7 +41,8 @@ class ContentPackTest {
                 levels().reversed(),
                 nuclearStatuses().reversed(),
                 personKinds().reversed(),
-                traits());
+                traits(),
+                names(List.of(ideology("socialism", "planned_economy"), ideology("democracy", "liberal_democracy"))));
 
         assertThat(pack.hash()).isEqualTo(HASH);
         assertThat(pack.ideologies().keySet()).extracting(IdeologyId::value).containsExactly("democracy", "socialism");
@@ -80,7 +83,8 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()),
+                        traits(),
+                        names(ideologies)),
                 "tech_branches",
                 "energy_science");
         assertMissing(
@@ -93,7 +97,8 @@ class ContentPackTest {
                         levels().subList(1, 6),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()),
+                        traits(),
+                        names(ideologies)),
                 "development_levels",
                 -3);
         assertMissing(
@@ -106,7 +111,8 @@ class ContentPackTest {
                         levels(),
                         List.of(new NuclearStatusDef(NuclearStatus.NONE, "Немає", List.of())),
                         personKinds(),
-                        traits()),
+                        traits(),
+                        names(ideologies)),
                 "nuclear_statuses",
                 "program");
     }
@@ -125,7 +131,8 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()))
+                        traits(),
+                        names(List.of(ideology("democracy", "a")))))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
                     assertThat(e.details())
@@ -173,7 +180,8 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()))
+                        traits(),
+                        names(List.of(ideology("democracy", "a")))))
                 .isInstanceOf(ValidationException.class);
     }
 
@@ -193,7 +201,8 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()),
+                        traits(),
+                        names(ideologies)),
                 "ideologies");
         assertEmpty(
                 () -> new ContentPack(
@@ -205,7 +214,8 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()),
+                        traits(),
+                        names(ideologies)),
                 "doctrines");
         assertEmpty(
                 () -> new ContentPack(
@@ -217,7 +227,8 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()),
+                        traits(),
+                        names(ideologies)),
                 "resources");
         assertThatThrownBy(() -> new ContentPack(
                         " ",
@@ -228,7 +239,8 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds(),
-                        traits()))
+                        traits(),
+                        names(ideologies)))
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BLANK_VALUE));
     }
@@ -309,9 +321,79 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         personKinds().subList(0, PersonKind.values().length - 1),
-                        traits()),
+                        traits(),
+                        names(List.of(ideology("democracy", "a")))),
                 "person_kinds",
                 "pretender");
+    }
+
+    @Test
+    void findsStateFormsForSubIdeology() {
+        List<IdeologyDef> ideologies =
+                List.of(ideology("democracy", "liberal_democracy"), ideology("monarchy", "absolute_monarchy"));
+        StateFormDef republic = TestContent.republic(List.of(new IdeologyId("democracy")), List.of());
+        StateFormDef kingdom = form("kingdom", List.of(), List.of(new SubIdeologyId("absolute_monarchy")));
+        ContentPack pack = withNames(ideologies, List.of(republic, kingdom));
+
+        assertThat(pack.stateFormsFor(new SubIdeologyId("liberal_democracy"))).containsExactly(republic);
+        assertThat(pack.stateFormsFor(new SubIdeologyId("absolute_monarchy"))).containsExactly(kingdom);
+        assertThat(pack.names().stateForms()).hasSize(2);
+        assertThatThrownBy(() -> pack.stateFormsFor(new SubIdeologyId("revanchism")))
+                .isInstanceOfSatisfying(
+                        ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE));
+    }
+
+    @Test
+    void stateFormsReferenceKnownIdeologiesAndCoverEverySubIdeology() {
+        List<IdeologyDef> ideologies =
+                List.of(ideology("democracy", "liberal_democracy"), ideology("monarchy", "absolute_monarchy"));
+        StateFormDef republic = TestContent.republic(List.of(new IdeologyId("democracy")), List.of());
+
+        assertThatThrownBy(() -> withNames(
+                        ideologies,
+                        List.of(republic, form("kingdom", List.of(new IdeologyId("theocracy")), List.of()))))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(
+                                    entry("field", "state_form.kingdom.ideologies"), entry("value", "theocracy"));
+                });
+        assertThatThrownBy(() -> withNames(
+                        ideologies,
+                        List.of(republic, form("kingdom", List.of(), List.of(new SubIdeologyId("feudal_monarchy"))))))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(
+                                    entry("field", "state_form.kingdom.sub_ideologies"),
+                                    entry("value", "feudal_monarchy"));
+                });
+        // Без форми для монархії генератор не склав би їй повну назву.
+        assertMissing(() -> withNames(ideologies, List.of(republic)), "state_forms", "absolute_monarchy");
+    }
+
+    private static StateFormDef form(String id, List<IdeologyId> ideologies, List<SubIdeologyId> subIdeologies) {
+        return new StateFormDef(
+                new StateFormId(id),
+                GrammaticalGender.NEUTER,
+                TestContent.republic(List.of(new IdeologyId("democracy")), List.of())
+                        .templates(),
+                ideologies,
+                subIdeologies);
+    }
+
+    private static ContentPack withNames(List<IdeologyDef> ideologies, List<StateFormDef> forms) {
+        return new ContentPack(
+                HASH,
+                ideologies,
+                List.of(doctrine("armored")),
+                List.of(resource("iron")),
+                branches(),
+                levels(),
+                nuclearStatuses(),
+                personKinds(),
+                traits(),
+                new NameContent(List.of(TestContent.mascHard()), List.of(TestContent.style("northern")), forms));
     }
 
     private static ContentPack withTraits(List<TraitDef> traits) {
@@ -324,7 +406,8 @@ class ContentPackTest {
                 levels(),
                 nuclearStatuses(),
                 personKinds(),
-                traits);
+                traits,
+                names(List.of(ideology("democracy", "a"))));
     }
 
     private static void assertMissing(Runnable create, String field, Object value) {

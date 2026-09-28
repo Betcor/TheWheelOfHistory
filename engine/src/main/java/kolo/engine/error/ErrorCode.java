@@ -30,6 +30,11 @@ public enum ErrorCode {
     MISSING_DEFINITION(ValidationException.class),
     /** Об'єкт посилається сам на себе там, де це безглуздо (напр. риса несумісна сама з собою). Подробиці: {@code field}. */
     SELF_REFERENCE(ValidationException.class),
+    /**
+     * Частина назви чи шаблон назви має неприпустимий формат: не ті літери, недозволений стик голосних і приголосних,
+     * немає рівно одного {@code {root}}. Подробиці: {@code field}, {@code value}.
+     */
+    INVALID_NAME_FORMAT(ValidationException.class),
     /** Сума ваг колеса нульова. */
     WHEEL_ZERO_WEIGHT(ValidationException.class),
     /** Критичних секторів більше, ніж вміщує мінімум 1% кожному. Подробиці: {@code count}, {@code max}. */

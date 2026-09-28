@@ -35,6 +35,7 @@ public final class ContentPack {
     private final SortedMap<NuclearStatus, NuclearStatusDef> nuclearStatuses;
     private final SortedMap<PersonKind, PersonKindDef> personKinds;
     private final SortedMap<TraitId, TraitDef> traits;
+    private final NameContent names;
 
     /**
      * @param hash хеш вихідних файлів контенту
@@ -44,9 +45,11 @@ public final class ContentPack {
      * @param nuclearStatuses рівно по одному визначенню на кожен {@link NuclearStatus}
      * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
+     * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
-     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, риса посилається на невідому рису
-     *     або типу постаті не доступна жодна риса
+     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, риса посилається на невідому рису,
+     *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
+     *     підкласифікацію або підкласифікації не доступна жодна форма
      */
     public ContentPack(
             String hash,
@@ -57,7 +60,8 @@ public final class ContentPack {
             List<DevelopmentLevelDef> developmentLevels,
             List<NuclearStatusDef> nuclearStatuses,
             List<PersonKindDef> personKinds,
-            List<TraitDef> traits) {
+            List<TraitDef> traits,
+            NameContent names) {
         this.hash = Checks.notBlank("content.hash", hash);
 
         TreeMap<IdeologyId, IdeologyDef> ideologyMap = new TreeMap<>();
@@ -134,6 +138,27 @@ public final class ContentPack {
             }
         }
         this.traits = Collections.unmodifiableSortedMap(traitMap);
+
+        this.names = Objects.requireNonNull(names, "names");
+        for (StateFormDef form : names.stateForms().values()) {
+            for (IdeologyId ideology : form.ideologies()) {
+                if (!ideologyMap.containsKey(ideology)) {
+                    throw unknown("state_form." + form.id() + ".ideologies", ideology);
+                }
+            }
+            for (SubIdeologyId sub : form.subIdeologies()) {
+                if (!owners.containsKey(sub)) {
+                    throw unknown("state_form." + form.id() + ".sub_ideologies", sub);
+                }
+            }
+        }
+        // Інакше генератор не зможе скласти повну назву державі з цією підкласифікацією.
+        for (SubIdeologyId sub : owners.keySet()) {
+            if (stateFormsFor(sub).isEmpty()) {
+                throw new ValidationException(
+                        ErrorCode.MISSING_DEFINITION, ErrorDetails.of("field", "state_forms", "value", sub));
+            }
+        }
     }
 
     /** Хеш вихідних файлів контенту: однаковий на всіх машинах для однакових файлів. */
@@ -237,6 +262,30 @@ public final class ContentPack {
         return !a.equals(b)
                 && !first.incompatible().contains(b)
                 && !second.incompatible().contains(a);
+    }
+
+    /** Назви держав: стилі коренів, парадигми відмінювання, форми державності. */
+    public NameContent names() {
+        return names;
+    }
+
+    /**
+     * Форми державності, доступні підкласифікації, за id; хоча б одна.
+     *
+     * @throws ValidationException з {@link ErrorCode#UNKNOWN_REFERENCE}, якщо підкласифікації немає в контенті
+     */
+    public List<StateFormDef> stateFormsFor(SubIdeologyId subIdeology) {
+        IdeologyId ideology = subIdeologyOwners.get(Objects.requireNonNull(subIdeology, "subIdeology"));
+        if (ideology == null) {
+            throw unknown("sub_ideology", subIdeology);
+        }
+        return names.stateForms().values().stream()
+                .filter(form -> form.appliesTo(ideology, subIdeology))
+                .toList();
+    }
+
+    private static ValidationException unknown(String field, Object value) {
+        return new ValidationException(ErrorCode.UNKNOWN_REFERENCE, ErrorDetails.of("field", field, "value", value));
     }
 
     private TraitDef known(TraitId id) {

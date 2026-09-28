@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.state.Development;
+import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.Stat;
@@ -83,6 +84,47 @@ final class TestContent {
         return List.of(trait("charismatic", List.of()));
     }
 
+    /** «Велор, Велору, Велору, Велор, Велором, Велорі, Велоре». */
+    static NameParadigmDef mascHard() {
+        return new NameParadigmDef(
+                new NameParadigmId("masc_hard"),
+                GrammaticalGender.MASCULINE,
+                List.of("", "у", "у", "", "ом", "і", "е"));
+    }
+
+    static NameStyleDef style(String id) {
+        return new NameStyleDef(
+                new NameStyleId(id),
+                "Стиль " + id,
+                List.of("вел", "тор"),
+                List.of("ім"),
+                5000,
+                List.of(new NameFinalDef("ор", new NameParadigmId("masc_hard"))));
+    }
+
+    /** «Республіка {root}» у всіх відмінках. */
+    static StateFormDef republic(List<IdeologyId> ideologies, List<SubIdeologyId> subIdeologies) {
+        return new StateFormDef(
+                new StateFormId("republic"),
+                GrammaticalGender.FEMININE,
+                List.of(
+                        "Республіка {root}",
+                        "Республіки {root}",
+                        "Республіці {root}",
+                        "Республіку {root}",
+                        "Республікою {root}",
+                        "Республіці {root}",
+                        "Республіко {root}"),
+                ideologies,
+                subIdeologies);
+    }
+
+    /** Назви з однією формою державності, доступною всім ідеологіям. */
+    static NameContent names(List<IdeologyDef> ideologies) {
+        List<IdeologyId> ids = ideologies.stream().map(IdeologyDef::id).toList();
+        return new NameContent(List.of(mascHard()), List.of(style("northern")), List.of(republic(ids, List.of())));
+    }
+
     static ContentPack pack(List<IdeologyDef> ideologies) {
         return new ContentPack(
                 HASH,
@@ -93,6 +135,7 @@ final class TestContent {
                 levels(),
                 nuclearStatuses(),
                 personKinds(),
-                traits());
+                traits(),
+                names(ideologies));
     }
 }
