@@ -1,0 +1,145 @@
+# Ідеології та підкласифікації (GD §4.2).
+#
+# Модифікатори — постійні, діють на державу з цією ідеологією й підкласифікацією.
+# Ціль: stat:<показник> (stability, hdi, influence, legitimacy, war_weariness, gdp, science)
+#       або wheel:<тип колеса>.
+# Числа — початкові значення для балансу. Ефекти, для яких ще немає систем (наука, армія, торгівля,
+# мобілізація, швидкість рішень), поки що виражені лише тегами.
+# Порядок підкласифікацій — порядок секторів колеса підкласифікації.
+
+ideologies:
+  - id: democracy
+    name: Демократія
+    tags: [democratic]
+    modifiers:
+      - { target: "stat:hdi", value: 5 }
+      - { target: "stat:legitimacy", value: 10 }
+    sub_ideologies:
+      - id: liberal_democracy
+        name: Ліберальна демократія
+        tags: [liberal]
+        modifiers:
+          - { target: "stat:influence", value: 5 }
+      - id: social_democracy
+        name: Соціал-демократія
+        tags: [welfare_state]
+        modifiers:
+          - { target: "stat:hdi", value: 5 }
+      - id: direct_democracy
+        name: Пряма демократія
+        tags: [direct_democracy]
+        modifiers:
+          - { target: "stat:legitimacy", value: 5 }
+      - id: constitutional_monarchy
+        name: Конституційна монархія
+        tags: [monarch]
+        modifiers:
+          - { target: "stat:stability", value: 5 }
+
+  - id: authoritarianism
+    name: Авторитаризм
+    tags: [authoritarian]
+    sub_ideologies:
+      - id: military_junta
+        name: Військова хунта
+        tags: [junta, militarism]
+        modifiers:
+          - { target: "stat:legitimacy", value: -10 }
+      - id: oligarchy
+        name: Олігархія
+        tags: [oligarchy]
+        modifiers:
+          - { target: "stat:hdi", value: -5 }
+      - id: technocracy
+        name: Технократія
+        tags: [technocracy]
+      - id: managed_democracy
+        name: «Керована демократія»
+        tags: [managed_democracy]
+        modifiers:
+          - { target: "stat:legitimacy", value: 5 }
+
+  - id: totalitarianism
+    name: Тоталітаризм
+    tags: [totalitarian]
+    modifiers:
+      - { target: "stat:hdi", value: -5 }
+      - { target: "stat:war_weariness", value: -10 }
+    sub_ideologies:
+      - id: personality_cult
+        name: Культ особи
+        tags: [personality_cult]
+        modifiers:
+          - { target: "stat:stability", value: 5 }
+      - id: revanchism
+        name: Реваншизм
+        tags: [revanchism]
+      - id: militarism
+        name: Мілітаризм
+        tags: [militarism]
+        modifiers:
+          - { target: "stat:war_weariness", value: -5 }
+      - id: isolationism
+        name: Ізоляціонізм
+        tags: [isolationism]
+        modifiers:
+          - { target: "stat:influence", value: -10 }
+
+  - id: monarchy
+    name: Монархія
+    tags: [monarchic, monarch]
+    modifiers:
+      - { target: "stat:stability", value: 5 }
+    sub_ideologies:
+      - id: absolute_monarchy
+        name: Абсолютна монархія
+        tags: [absolutism]
+      - id: feudal_monarchy
+        name: Феодальна монархія
+        tags: [feudalism]
+        modifiers:
+          - { target: "stat:hdi", value: -5 }
+      - id: hereditary_empire
+        name: Спадкова імперія
+        tags: [empire]
+        modifiers:
+          - { target: "stat:influence", value: 5 }
+
+  - id: theocracy
+    name: Теократія
+    tags: [theocratic]
+    modifiers:
+      - { target: "stat:stability", value: 10 }
+      - { target: "stat:influence", value: 5 }
+    sub_ideologies:
+      - id: moderate_theocracy
+        name: Помірна теократія
+        tags: [moderate_theocracy]
+      - id: fundamentalism
+        name: Фундаменталізм
+        tags: [fundamentalism]
+        modifiers:
+          - { target: "stat:hdi", value: -5 }
+      - id: temple_state
+        name: Храмова держава
+        tags: [temple_state]
+        modifiers:
+          - { target: "stat:legitimacy", value: 5 }
+
+  - id: socialism
+    name: Соціалізм
+    tags: [socialist]
+    modifiers:
+      - { target: "stat:hdi", value: 5 }
+    sub_ideologies:
+      - id: planned_economy
+        name: Планова економіка
+        tags: [planned_economy]
+      - id: market_socialism
+        name: Ринковий соціалізм
+        tags: [market_socialism]
+      - id: council_communism
+        name: Комунізм рад
+        tags: [council_communism]
+        modifiers:
+          - { target: "stat:legitimacy", value: 5 }

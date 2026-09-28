@@ -1,0 +1,35 @@
+# Природні ресурси (GD §4.5). Родовища — у провінціях; ресурси відкривають будівлі й технології
+# і є товаром для торгівлі.
+# Теги груп: energy, metal, strategic, food, construction.
+
+resources:
+  - id: iron
+    name: Залізо
+    tags: [metal]
+  - id: coal
+    name: Вугілля
+    tags: [energy]
+  - id: oil
+    name: Нафта
+    tags: [energy, strategic]
+  - id: gas
+    name: Газ
+    tags: [energy]
+  - id: uranium
+    name: Уран
+    tags: [energy, strategic, nuclear_fuel]
+  - id: copper
+    name: Мідь
+    tags: [metal]
+  - id: gold
+    name: Золото
+    tags: [metal, precious]
+  - id: rare_earths
+    name: Рідкісноземельні метали
+    tags: [metal, strategic]
+  - id: timber
+    name: Деревина
+    tags: [construction]
+  - id: fertile_land
+    name: Родючі землі
+    tags: [food]

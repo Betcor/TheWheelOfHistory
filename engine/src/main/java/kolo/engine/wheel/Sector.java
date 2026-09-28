@@ -18,7 +18,7 @@ import kolo.engine.error.Checks;
 public record Sector<T>(String id, int weightBp, T value, int quality, OutcomeTier tier, List<String> tags) {
 
     public Sector {
-        Ids.requireSnakeCase("sector.id", id);
+        Checks.snakeCase("sector.id", id);
         Checks.inRange("sector." + id + ".weight_bp", weightBp, 0, Wheel.TOTAL_BP);
         Objects.requireNonNull(value, "value");
         Checks.inRange("sector." + id + ".quality", quality, 0, 100);

@@ -28,4 +28,33 @@ public final class Checks {
         }
         return value;
     }
+
+    /**
+     * Ключ контенту у форматі {@code snake_case} англійською: з малої латинської літери, далі малі літери, цифри й
+     * {@code _}. Інакше {@link ErrorCode#INVALID_KEY_FORMAT}.
+     */
+    public static String snakeCase(String field, String value) {
+        if (!isSnakeCase(value)) {
+            throw new ValidationException(
+                    ErrorCode.INVALID_KEY_FORMAT, ErrorDetails.of("field", field, "value", value));
+        }
+        return value;
+    }
+
+    private static boolean isSnakeCase(String value) {
+        if (value == null || value.isEmpty() || !isLowerLetter(value.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (!isLowerLetter(c) && !(c >= '0' && c <= '9') && c != '_') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isLowerLetter(char c) {
+        return c >= 'a' && c <= 'z';
+    }
 }

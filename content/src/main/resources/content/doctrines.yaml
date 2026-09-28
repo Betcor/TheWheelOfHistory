@@ -1,0 +1,43 @@
+# Військові доктрини — спеціалізації армії (GD §4.4).
+#
+# Ефекти доктрин (атака, оборона, мобільність фронту, десанти, бомбардування…) з'являться разом
+# із колесами бою й фронтами; поки що доктрини описані назвою й тегами.
+# Теги рода військ: land, naval, air, special.
+
+doctrines:
+  - id: armored
+    name: Бронетанкова
+    tags: [land, front_mobility]
+  - id: infantry_mass
+    name: Піхотна маса
+    tags: [land, positional_war]
+  - id: mountain
+    name: Гірська
+    tags: [land, mountain_warfare]
+  - id: marines
+    name: Морська піхота
+    tags: [land, naval, amphibious]
+  - id: blue_water_navy
+    name: Океанський флот
+    tags: [naval, blockade]
+  - id: coastal_navy
+    name: Прибережний флот
+    tags: [naval, coastal_defense]
+  - id: strategic_aviation
+    name: Стратегічна авіація
+    tags: [air, strategic_bombing]
+  - id: tactical_aviation
+    name: Тактична авіація
+    tags: [air, front_mobility]
+  - id: air_defense
+    name: ППО
+    tags: [air, air_defense]
+  - id: guerrilla
+    name: Партизанська
+    tags: [land, occupation_resistance]
+  - id: special_forces
+    name: Спецпризначенці
+    tags: [special, sabotage]
+  - id: defense_in_depth
+    name: Глибока оборона
+    tags: [land, fortification]
