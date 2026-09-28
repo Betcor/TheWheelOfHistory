@@ -10,9 +10,12 @@ import java.util.Map;
 import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
+import kolo.engine.content.BalanceDef;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.CountRange;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MedianRange;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.NameFinalDef;
 import kolo.engine.content.NameParadigmId;
@@ -20,6 +23,7 @@ import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.StreakRulesDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
@@ -32,6 +36,7 @@ import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.Sex;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
@@ -447,6 +452,96 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsBalance() {
+        BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
+
+        assertThat(balance.wheel().strength(new WheelKind("economic_cycle"))).isEqualTo(80);
+        assertThat(balance.wheel().strength(new WheelKind("construction"))).isEqualTo(50);
+        assertThat(balance.wheel().investmentCurve()).containsExactly(20, 12, 7, 4);
+        assertThat(balance.streaks()).isEqualTo(new StreakRulesDef(85, 15, 3));
+        assertThat(balance.corridor(PowerCorridor.CLASSIC).players()).isEqualTo(new MedianRange(50, 200));
+        assertThat(balance.corridor(PowerCorridor.FULL_CHAOS).npc()).isEqualTo(new MedianRange(10, 1000));
+        assertThat(balance.generation().backstoryFragments()).isEqualTo(new CountRange(2, 4));
+        assertThat(balance.generation().notablePeople()).isEqualTo(new CountRange(1, 3));
+    }
+
+    @Test
+    void strengthOverridesAreOptional() {
+        BalanceDef balance = ContentLoader.load(Files.valid()
+                        .with(ContentLoader.BALANCE, Files.BALANCE.replace("  strength:\n    economic_cycle: 80\n", ""))
+                        .source())
+                .balance();
+
+        assertThat(balance.wheel().strengths()).isEmpty();
+    }
+
+    @Test
+    void invalidBalanceIsReportedAtItsPosition() {
+        assertContentError(
+                balance(Files.BALANCE.replace("[20, 12, 7, 4]", "[20, 12, 12]")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "file", "balance.yaml",
+                        "location", "wheel",
+                        "cause", "value_out_of_range",
+                        "field", "wheel.investment_curve[2]"));
+        assertContentError(
+                balance(Files.BALANCE.replace("economic_cycle: 80", "EconomicCycle: 80")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "wheel.strength.EconomicCycle", "cause", "invalid_key_format"));
+        assertContentError(
+                balance(Files.BALANCE.replace("very_bad_quality: 15", "very_bad_quality: 90")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "streaks", "field", "streaks.very_good_quality"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "npc: { min_pct: 33, max_pct: 300 }", "npc: { min_pct: 60, max_pct: 300 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_corridors[1]", "field", "power_corridor.classic.npc.min_pct"));
+        assertContentError(
+                balance(Files.BALANCE.replace("min_pct: 20, max_pct: 500", "min_pct: 20, max_pct: 50")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_corridors[2].players", "field", "max_pct"));
+        assertContentError(
+                balance(Files.BALANCE.replace("id: full_chaos", "id: anarchy")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_corridors[2]", "cause", "unknown_reference", "value", "anarchy"));
+        assertContentError(
+                balance(Files.BALANCE.replace("id: full_chaos", "id: classic")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_corridors[2]", "cause", "duplicate_id", "value", "classic"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "notable_people: { min: 1, max: 3 }", "notable_people: { min: 0, max: 3 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.notable_people.min"));
+    }
+
+    @Test
+    void missingBalanceNumbersAreErrorsNotZeros() {
+        assertContentError(
+                balance(Files.BALANCE.replace("  length: 3\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "streaks", "cause", "blank_value", "field", "streaks.length"));
+        assertContentError(
+                balance(Files.BALANCE.replace("{ min: 2, max: 4 }", "{ min: 2 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation.backstory_fragments", "cause", "blank_value", "field", "max"));
+        assertContentError(
+                balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_corridors[0].players", "cause", "blank_value"));
+        assertContentError(
+                balance(Files.BALANCE.substring(0, Files.BALANCE.indexOf("generation:"))),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "cause", "blank_value"));
+        assertContentError(
+                balance(Files.BALANCE.replaceAll("(?s)  - id: full_chaos.*?max_pct: 1000 }\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_corridors", "cause", "missing_definition", "value", "full_chaos"));
+    }
+
+    @Test
     void missingFileIsReported() {
         assertContentError(
                 Files.valid().without(ContentLoader.DOCTRINES).source(),
@@ -608,6 +703,10 @@ class ContentLoaderTest {
         assertThat(names).isNotEqualTo(Files.NAMES);
         assertContentError(
                 Files.valid().with(ContentLoader.NAMES, names).source(), ErrorCode.INVALID_CONTENT, expected);
+    }
+
+    private static ContentSource balance(String yaml) {
+        return Files.valid().with(ContentLoader.BALANCE, yaml).source();
     }
 
     private static void assertContentError(ContentSource source, ErrorCode code, Map<String, ?> expected) {

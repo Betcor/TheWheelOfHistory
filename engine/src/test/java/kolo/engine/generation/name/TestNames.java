@@ -8,12 +8,16 @@ import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BackstoryText;
+import kolo.engine.content.BalanceDef;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.CountRange;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
+import kolo.engine.content.GenerationBalanceDef;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MedianRange;
 import kolo.engine.content.NameContent;
 import kolo.engine.content.NameFinalDef;
 import kolo.engine.content.NameParadigmDef;
@@ -24,10 +28,12 @@ import kolo.engine.content.NameStyleId;
 import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.PersonNameStyleDef;
+import kolo.engine.content.PowerCorridorDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
+import kolo.engine.content.StreakRulesDef;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
@@ -35,10 +41,12 @@ import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
+import kolo.engine.content.WheelBalanceDef;
 import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.TechBranch;
 
 /** Контент для тестів генераторів назв та імен: дві ідеології, два стилі, три форми державності. */
@@ -180,7 +188,19 @@ final class TestNames {
                         List.of(NORTHERN, SOUTHERN),
                         List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM),
                         List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE)),
-                backstory());
+                backstory(),
+                balance());
+    }
+
+    private static BalanceDef balance() {
+        return BalanceDef.of(
+                new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
+                new StreakRulesDef(85, 15, 3),
+                Arrays.stream(PowerCorridor.values())
+                        .map(corridor ->
+                                new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
+                        .toList(),
+                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3)));
     }
 
     private static BackstoryContent backstory() {

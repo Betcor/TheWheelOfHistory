@@ -1,6 +1,5 @@
 package kolo.engine.content;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -8,7 +7,6 @@ import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.function.Function;
 import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
@@ -38,6 +36,7 @@ public final class ContentPack {
     private final SortedMap<TraitId, TraitDef> traits;
     private final NameContent names;
     private final BackstoryContent backstory;
+    private final BalanceDef balance;
 
     /**
      * @param hash хеш вихідних файлів контенту
@@ -67,7 +66,8 @@ public final class ContentPack {
             List<PersonKindDef> personKinds,
             List<TraitDef> traits,
             NameContent names,
-            BackstoryContent backstory) {
+            BackstoryContent backstory,
+            BalanceDef balance) {
         this.hash = Checks.notBlank("content.hash", hash);
 
         TreeMap<IdeologyId, IdeologyDef> ideologyMap = new TreeMap<>();
@@ -97,13 +97,13 @@ public final class ContentPack {
         for (TechBranchDef branch : techBranches) {
             put("tech_branch.id", branchMap, branch.branch(), branch.branch().key(), branch);
         }
-        this.techBranches = complete("tech_branches", branchMap, List.of(TechBranch.values()), TechBranch::key);
+        this.techBranches = Defs.complete("tech_branches", branchMap, List.of(TechBranch.values()), TechBranch::key);
 
         TreeMap<Integer, DevelopmentLevelDef> levelMap = new TreeMap<>();
         for (DevelopmentLevelDef level : developmentLevels) {
             put("development_level.level", levelMap, level.level(), level.level(), level);
         }
-        this.developmentLevels = complete("development_levels", levelMap, Development.levels(), level -> level);
+        this.developmentLevels = Defs.complete("development_levels", levelMap, Development.levels(), level -> level);
 
         TreeMap<NuclearStatus, NuclearStatusDef> nuclearMap = new TreeMap<>();
         for (NuclearStatusDef status : nuclearStatuses) {
@@ -115,13 +115,13 @@ public final class ContentPack {
                     status);
         }
         this.nuclearStatuses =
-                complete("nuclear_statuses", nuclearMap, List.of(NuclearStatus.values()), NuclearStatus::key);
+                Defs.complete("nuclear_statuses", nuclearMap, List.of(NuclearStatus.values()), NuclearStatus::key);
 
         TreeMap<PersonKind, PersonKindDef> kindMap = new TreeMap<>();
         for (PersonKindDef kind : personKinds) {
             put("person_kind.id", kindMap, kind.kind(), kind.kind().key(), kind);
         }
-        this.personKinds = complete("person_kinds", kindMap, List.of(PersonKind.values()), PersonKind::key);
+        this.personKinds = Defs.complete("person_kinds", kindMap, List.of(PersonKind.values()), PersonKind::key);
 
         TreeMap<TraitId, TraitDef> traitMap = new TreeMap<>();
         for (TraitDef trait : nonEmpty("traits", traits)) {
@@ -180,6 +180,8 @@ public final class ContentPack {
                 }
             }
         }
+
+        this.balance = Objects.requireNonNull(balance, "balance");
     }
 
     /** Хеш вихідних файлів контенту: однаковий на всіх машинах для однакових файлів. */
@@ -310,6 +312,11 @@ public final class ContentPack {
         return backstory;
     }
 
+    /** Числа балансу: колеса, стріки, коридор сили, кількості генерації. */
+    public BalanceDef balance() {
+        return balance;
+    }
+
     private static ValidationException unknown(String field, Object value) {
         return new ValidationException(ErrorCode.UNKNOWN_REFERENCE, ErrorDetails.of("field", field, "value", value));
     }
@@ -327,22 +334,6 @@ public final class ContentPack {
             throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", field));
         }
         return values;
-    }
-
-    /**
-     * Кожен ключ з {@code expected} має визначення, інакше {@link ErrorCode#MISSING_DEFINITION}.
-     *
-     * @param display як показати ключ у подробицях помилки: ключ контенту, а не ім'я константи enum
-     */
-    private static <K extends Comparable<K>, V> SortedMap<K, V> complete(
-            String field, TreeMap<K, V> map, Collection<K> expected, Function<K, Object> display) {
-        for (K key : expected) {
-            if (!map.containsKey(key)) {
-                throw new ValidationException(
-                        ErrorCode.MISSING_DEFINITION, ErrorDetails.of("field", field, "value", display.apply(key)));
-            }
-        }
-        return Collections.unmodifiableSortedMap(map);
     }
 
     private static <K extends Comparable<K>, V> void put(String field, TreeMap<K, V> map, K key, V value) {
