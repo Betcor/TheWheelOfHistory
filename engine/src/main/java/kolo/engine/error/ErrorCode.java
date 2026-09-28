@@ -28,6 +28,8 @@ public enum ErrorCode {
      * {@code field}, {@code value}.
      */
     MISSING_DEFINITION(ValidationException.class),
+    /** Об'єкт посилається сам на себе там, де це безглуздо (напр. риса несумісна сама з собою). Подробиці: {@code field}. */
+    SELF_REFERENCE(ValidationException.class),
     /** Сума ваг колеса нульова. */
     WHEEL_ZERO_WEIGHT(ValidationException.class),
     /** Критичних секторів більше, ніж вміщує мінімум 1% кожному. Подробиці: {@code count}, {@code max}. */

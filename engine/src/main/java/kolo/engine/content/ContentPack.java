@@ -14,6 +14,7 @@ import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
 import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
 
 /**
@@ -32,6 +33,8 @@ public final class ContentPack {
     private final SortedMap<TechBranch, TechBranchDef> techBranches;
     private final SortedMap<Integer, DevelopmentLevelDef> developmentLevels;
     private final SortedMap<NuclearStatus, NuclearStatusDef> nuclearStatuses;
+    private final SortedMap<PersonKind, PersonKindDef> personKinds;
+    private final SortedMap<TraitId, TraitDef> traits;
 
     /**
      * @param hash хеш вихідних файлів контенту
@@ -39,8 +42,11 @@ public final class ContentPack {
      * @param developmentLevels рівно по одному визначенню на кожен рівень {@link Development#MIN}..{@link
      *     Development#MAX}
      * @param nuclearStatuses рівно по одному визначенню на кожен {@link NuclearStatus}
+     * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}
+     * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
-     *     ідеологій) або бракує визначення галузі, рівня чи статусу
+     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, риса посилається на невідому рису
+     *     або типу постаті не доступна жодна риса
      */
     public ContentPack(
             String hash,
@@ -49,7 +55,9 @@ public final class ContentPack {
             List<ResourceDef> resources,
             List<TechBranchDef> techBranches,
             List<DevelopmentLevelDef> developmentLevels,
-            List<NuclearStatusDef> nuclearStatuses) {
+            List<NuclearStatusDef> nuclearStatuses,
+            List<PersonKindDef> personKinds,
+            List<TraitDef> traits) {
         this.hash = Checks.notBlank("content.hash", hash);
 
         TreeMap<IdeologyId, IdeologyDef> ideologyMap = new TreeMap<>();
@@ -98,6 +106,34 @@ public final class ContentPack {
         }
         this.nuclearStatuses =
                 complete("nuclear_statuses", nuclearMap, List.of(NuclearStatus.values()), NuclearStatus::key);
+
+        TreeMap<PersonKind, PersonKindDef> kindMap = new TreeMap<>();
+        for (PersonKindDef kind : personKinds) {
+            put("person_kind.id", kindMap, kind.kind(), kind.kind().key(), kind);
+        }
+        this.personKinds = complete("person_kinds", kindMap, List.of(PersonKind.values()), PersonKind::key);
+
+        TreeMap<TraitId, TraitDef> traitMap = new TreeMap<>();
+        for (TraitDef trait : nonEmpty("traits", traits)) {
+            put("trait.id", traitMap, trait.id(), trait);
+        }
+        for (TraitDef trait : traitMap.values()) {
+            for (TraitId other : trait.incompatible()) {
+                if (!traitMap.containsKey(other)) {
+                    throw new ValidationException(
+                            ErrorCode.UNKNOWN_REFERENCE,
+                            ErrorDetails.of("field", "trait." + trait.id() + ".incompatible", "value", other));
+                }
+            }
+        }
+        // Інакше генератор не зможе дати постаті цього типу жодної риси.
+        for (PersonKind kind : PersonKind.values()) {
+            if (traitMap.values().stream().noneMatch(trait -> trait.allows(kind))) {
+                throw new ValidationException(
+                        ErrorCode.MISSING_DEFINITION, ErrorDetails.of("field", "traits", "value", kind.key()));
+            }
+        }
+        this.traits = Collections.unmodifiableSortedMap(traitMap);
     }
 
     /** Хеш вихідних файлів контенту: однаковий на всіх машинах для однакових файлів. */
@@ -165,6 +201,50 @@ public final class ContentPack {
 
     public NuclearStatusDef nuclearStatus(NuclearStatus status) {
         return nuclearStatuses.get(Objects.requireNonNull(status, "status"));
+    }
+
+    /** Типи постатей у порядку enum; визначено кожен. */
+    public SortedMap<PersonKind, PersonKindDef> personKinds() {
+        return personKinds;
+    }
+
+    public PersonKindDef personKind(PersonKind kind) {
+        return personKinds.get(Objects.requireNonNull(kind, "kind"));
+    }
+
+    public SortedMap<TraitId, TraitDef> traits() {
+        return traits;
+    }
+
+    public Optional<TraitDef> trait(TraitId id) {
+        return Optional.ofNullable(traits.get(id));
+    }
+
+    /** Риси, доступні постаті цього типу, за id; хоча б одна. */
+    public List<TraitDef> traitsFor(PersonKind kind) {
+        Objects.requireNonNull(kind, "kind");
+        return traits.values().stream().filter(trait -> trait.allows(kind)).toList();
+    }
+
+    /**
+     * Чи можуть дві різні риси бути в однієї постаті. Несумісність симетрична: досить, щоб її вказала одна з рис.
+     *
+     * @throws ValidationException з {@link ErrorCode#UNKNOWN_REFERENCE}, якщо риси немає в контенті
+     */
+    public boolean compatible(TraitId a, TraitId b) {
+        TraitDef first = known(a);
+        TraitDef second = known(b);
+        return !a.equals(b)
+                && !first.incompatible().contains(b)
+                && !second.incompatible().contains(a);
+    }
+
+    private TraitDef known(TraitId id) {
+        TraitDef trait = traits.get(Objects.requireNonNull(id, "trait"));
+        if (trait == null) {
+            throw new ValidationException(ErrorCode.UNKNOWN_REFERENCE, ErrorDetails.of("field", "trait", "value", id));
+        }
+        return trait;
     }
 
     private static <T> List<T> nonEmpty(String field, List<T> values) {

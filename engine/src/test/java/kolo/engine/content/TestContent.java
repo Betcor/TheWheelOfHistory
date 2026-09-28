@@ -5,6 +5,7 @@ import java.util.List;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.state.Development;
 import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.PersonKind;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
 
@@ -60,6 +61,28 @@ final class TestContent {
                 .toList();
     }
 
+    /** По визначенню на кожен тип постаті. */
+    static List<PersonKindDef> personKinds() {
+        return Arrays.stream(PersonKind.values())
+                .map(kind -> new PersonKindDef(kind, "Тип " + kind.key(), "Опис типу " + kind.key(), List.of()))
+                .toList();
+    }
+
+    static TraitDef trait(String id, List<PersonKind> kinds, String... incompatible) {
+        return new TraitDef(
+                new TraitId(id),
+                "Риса " + id,
+                kinds,
+                List.of(),
+                List.of("positive"),
+                Arrays.stream(incompatible).map(TraitId::new).toList());
+    }
+
+    /** Одна риса для будь-якого типу постаті. */
+    static List<TraitDef> traits() {
+        return List.of(trait("charismatic", List.of()));
+    }
+
     static ContentPack pack(List<IdeologyDef> ideologies) {
         return new ContentPack(
                 HASH,
@@ -68,6 +91,8 @@ final class TestContent {
                 List.of(resource("iron")),
                 branches(),
                 levels(),
-                nuclearStatuses());
+                nuclearStatuses(),
+                personKinds(),
+                traits());
     }
 }

@@ -87,6 +87,39 @@ final class ContentYaml {
         }
     }
 
+    record PeopleFile(List<PersonKind> kinds, List<Trait> traits) {
+        PeopleFile {
+            kinds = orEmpty(kinds);
+            traits = orEmpty(traits);
+        }
+    }
+
+    /** @param id ключ типу постаті, напр. {@code pretender} */
+    record PersonKind(String id, String name, String description, List<String> tags) {
+        PersonKind {
+            tags = orEmpty(tags);
+        }
+    }
+
+    /**
+     * @param kinds ключі типів постатей; порожньо — будь-який тип
+     * @param incompatible id несумісних рис
+     */
+    record Trait(
+            String id,
+            String name,
+            List<String> kinds,
+            List<String> tags,
+            List<Modifier> modifiers,
+            List<String> incompatible) {
+        Trait {
+            kinds = orEmpty(kinds);
+            tags = orEmpty(tags);
+            modifiers = orEmpty(modifiers);
+            incompatible = orEmpty(incompatible);
+        }
+    }
+
     /** @param target {@code stat:<показник>} або {@code wheel:<тип колеса>} */
     record Modifier(String target, int value) {}
 
