@@ -1,0 +1,47 @@
+# Усі версії залежностей проєкту. Нові залежності — лише з обґрунтуванням (див. CONTRIBUTING.md).
+
+[versions]
+java = "25"
+javafx = "25.0.4"
+jackson = "2.22.3"
+jts = "1.20.0"
+netty = "4.2.18.Final"
+sqlite-jdbc = "3.53.4.0"
+slf4j = "2.0.20"
+logback = "1.6.4"
+# 3.x зібрана під JavaFX 27 і тягне його транзитивно; 2.1.0 — під JavaFX 23, сумісна з 25.
+atlantafx = "2.1.0"
+junit = "5.14.4"
+assertj = "3.27.7"
+jqwik = "1.10.1"
+archunit = "1.5.1"
+palantir-java-format = "2.100.0"
+spotless = "8.10.3"
+openjfx-gradle-plugin = "0.1.0"
+jlink-plugin = "4.1.1"
+
+[libraries]
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
+jts-core = { module = "org.locationtech.jts:jts-core", version.ref = "jts" }
+netty-handler = { module = "io.netty:netty-handler", version.ref = "netty" }
+netty-codec = { module = "io.netty:netty-codec", version.ref = "netty" }
+netty-transport = { module = "io.netty:netty-transport", version.ref = "netty" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+atlantafx-base = { module = "io.github.mkpaz:atlantafx-base", version.ref = "atlantafx" }
+
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+jqwik = { module = "net.jqwik:jqwik", version.ref = "jqwik" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+# Gradle-плагіни як бібліотеки — для convention-плагінів у build-logic.
+spotless-gradle-plugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
+
+[plugins]
+javafx = { id = "org.openjfx.javafxplugin", version.ref = "openjfx-gradle-plugin" }
+jlink = { id = "org.beryx.jlink", version.ref = "jlink-plugin" }
