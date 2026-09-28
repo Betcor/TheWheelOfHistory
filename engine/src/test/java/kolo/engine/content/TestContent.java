@@ -94,6 +94,31 @@ final class TestContent {
                 List.of("", "у", "у", "", "ом", "і", "е"));
     }
 
+    /** «Велена, Велени, Велені, Велену, Веленою, Велені, Велено». */
+    static NameParadigmDef femHard() {
+        return new NameParadigmDef(
+                new NameParadigmId("fem_hard"),
+                GrammaticalGender.FEMININE,
+                List.of("а", "и", "і", "у", "ою", "і", "о"));
+    }
+
+    static List<NameParadigmDef> paradigms() {
+        return List.of(mascHard(), femHard());
+    }
+
+    /** Стиль імен людей: «Велор Торвер» / «Велена Торвера». */
+    static PersonNameStyleDef personStyle(String id) {
+        NameParadigmId masc = new NameParadigmId("masc_hard");
+        NameParadigmId fem = new NameParadigmId("fem_hard");
+        return new PersonNameStyleDef(
+                new NameStyleId(id),
+                new NamePartsDef(List.of("вел", "тор"), List.of("ім"), 5000),
+                List.of(new NameFinalDef("ор", masc)),
+                List.of(new NameFinalDef("ен", fem)),
+                new NamePartsDef(List.of("торв"), List.of(), 0),
+                List.of(new SurnameFinalDef("ер", masc, fem)));
+    }
+
     static NameStyleDef style(String id) {
         return new NameStyleDef(
                 new NameStyleId(id),
@@ -124,7 +149,11 @@ final class TestContent {
     /** Назви з однією формою державності, доступною всім ідеологіям. */
     static NameContent names(List<IdeologyDef> ideologies) {
         List<IdeologyId> ids = ideologies.stream().map(IdeologyDef::id).toList();
-        return new NameContent(List.of(mascHard()), List.of(style("northern")), List.of(republic(ids, List.of())));
+        return new NameContent(
+                paradigms(),
+                List.of(style("northern")),
+                List.of(republic(ids, List.of())),
+                List.of(personStyle("northern")));
     }
 
     /** Фрагмент без умов, мало що дає; тести замінюють потрібні поля. */

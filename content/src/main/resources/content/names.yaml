@@ -1,4 +1,4 @@
-# Назви держав (GD §4.9): [форма державності] + [корінь].
+# Назви держав (GD §4.9): [форма державності] + [корінь]; імена людей (GD §12.3): [ім'я] + [прізвище].
 #
 # Корінь = початок + (вставка) + кінцівка + закінчення відмінка. Частини — малими українськими літерами,
 # першу літеру генератор робить великою. Щоб будь-яке поєднання читалося:
@@ -17,6 +17,14 @@
 # Кожній підкласифікації доступна хоча б одна форма.
 #
 # Стиль, частини й форма обираються рівноймовірно: назва не впливає на ігровий процес.
+#
+# Імена людей (person_styles) — ті самі мовні стилі: id стилю імен збігається з id стилю назв, і людей держави
+# звуть мовою її назви. Ім'я й прізвище збираються з тих самих частин і за тими самими правилами стику, що й корінь.
+# Людей відмінюють як істот: знахідний = родовому («бачу Велора», а не «бачу Велор»), тому парадигми окремі (person_*).
+# Кінцівки імен діляться за статтю (male — лише чоловічого роду, female — жіночого); кінцівка прізвища має парадигму
+# для кожної статі: жіночі прізвища на приголосну й на -о не відмінюються (Ольга Торвер, Ользі Торвер).
+# Після г/к/х/ж/ч/ш кличний і давальний відмінюються інакше — такі кінцівки мають окрему парадигму (surname_k,
+# surname_ich) або не вживаються.
 
 paradigms:
   # Велор, Велору, Велору, Велор, Велором, Велорі, Велоре
@@ -39,6 +47,52 @@ paradigms:
   - id: fem_iya
     gender: feminine
     endings: { nominative: я, genitive: ї, dative: ї, accusative: ю, instrumental: єю, locative: ї, vocative: є }
+
+  # --- Люди ---
+  # Велор, Велора, Велорові, Велора, Велором, Велорові, Велоре
+  - id: person_masc_hard
+    gender: masculine
+    endings: { nominative: "", genitive: а, dative: ові, accusative: а, instrumental: ом, locative: ові, vocative: е }
+  # Торій, Торія, Торієві, Торія, Торієм, Торієві, Торію
+  - id: person_masc_j
+    gender: masculine
+    endings: { nominative: й, genitive: я, dative: єві, accusative: я, instrumental: єм, locative: єві, vocative: ю }
+  # Сулак, Сулака, Сулакові, Сулака, Сулаком, Сулакові, Сулаку
+  - id: surname_k
+    gender: masculine
+    endings: { nominative: "", genitive: а, dative: ові, accusative: а, instrumental: ом, locative: ові, vocative: у }
+  # Грімович, Грімовича, Грімовичеві, Грімовича, Грімовичем, Грімовичеві, Грімовичу
+  - id: surname_ich
+    gender: masculine
+    endings: { nominative: "", genitive: а, dative: еві, accusative: а, instrumental: ем, locative: еві, vocative: у }
+  # Даненко, Даненка, Даненкові, Даненка, Даненком, Даненкові, Даненку
+  - id: surname_enko
+    gender: masculine
+    endings: { nominative: о, genitive: а, dative: ові, accusative: а, instrumental: ом, locative: ові, vocative: у }
+  # Каров, Карова, Карову, Карова, Каровим, Карові, Карове (так само -ін)
+  - id: surname_ov
+    gender: masculine
+    endings: { nominative: "", genitive: а, dative: у, accusative: а, instrumental: им, locative: і, vocative: е }
+  # Торвівський, Торвівського, Торвівському, Торвівського, Торвівським, Торвівському, Торвівський
+  - id: adj_masc
+    gender: masculine
+    endings: { nominative: ий, genitive: ого, dative: ому, accusative: ого, instrumental: им, locative: ому, vocative: ий }
+  # Торвівська, Торвівської, Торвівській, Торвівську, Торвівською, Торвівській, Торвівська (так само Карова)
+  - id: adj_fem
+    gender: feminine
+    endings: { nominative: а, genitive: ої, dative: ій, accusative: у, instrumental: ою, locative: ій, vocative: а }
+  # Незмінні: Калеску, Талані
+  - id: fixed_masc
+    gender: masculine
+    endings: { nominative: "", genitive: "", dative: "", accusative: "", instrumental: "", locative: "", vocative: "" }
+  # Незмінні жіночі: Торвер, Сулак, Грімович
+  - id: fixed_fem
+    gender: feminine
+    endings: { nominative: "", genitive: "", dative: "", accusative: "", instrumental: "", locative: "", vocative: "" }
+  # Незмінні жіночі на -о: Даненко
+  - id: fixed_fem_o
+    gender: feminine
+    endings: { nominative: о, genitive: о, dative: о, accusative: о, instrumental: о, locative: о, vocative: о }
 
 styles:
   - id: northern
@@ -272,3 +326,85 @@ state_forms:
       instrumental: Національною Державою {root}
       locative: Національній Державі {root}
       vocative: Національна Державо {root}
+
+person_styles:
+  - id: northern
+    given_names:
+      starts: [ал, вал, гер, гун, дар, ерв, ін, кар, лейв, ол, рун, сіг, тор, ульв]
+      middles: [ар, ен]
+      middle_chance_bp: 1500
+      male:
+        - { text: ор, paradigm: person_masc_hard }
+        - { text: ен, paradigm: person_masc_hard }
+        - { text: ард, paradigm: person_masc_hard }
+        - { text: ід, paradigm: person_masc_hard }
+        - { text: і, paradigm: person_masc_j }
+      female:
+        - { text: ен, paradigm: fem_hard }
+        - { text: ільд, paradigm: fem_hard }
+        - { text: ін, paradigm: fem_hard }
+        - { text: і, paradigm: fem_iya }
+    surnames:
+      starts: [бранд, вард, гальм, грім, дров, лінд, нор, свал, стер, торв, хольм, ульв]
+      middles: [ен, ер]
+      middle_chance_bp: 2000
+      finals:
+        - { text: ер, male: person_masc_hard, female: fixed_fem }
+        - { text: ін, male: person_masc_hard, female: fixed_fem }
+        - { text: ад, male: person_masc_hard, female: fixed_fem }
+        - { text: ун, male: person_masc_hard, female: fixed_fem }
+        - { text: ович, male: surname_ich, female: fixed_fem }
+        - { text: івськ, male: adj_masc, female: adj_fem }
+  - id: southern
+    given_names:
+      starts: [ал, бел, дам, ел, лор, мар, нер, сал, тав, фел, вір, кас]
+      middles: [ер, ан, ил]
+      middle_chance_bp: 2000
+      male:
+        - { text: ан, paradigm: person_masc_hard }
+        - { text: ес, paradigm: person_masc_hard }
+        - { text: ір, paradigm: person_masc_hard }
+        - { text: ент, paradigm: person_masc_hard }
+        - { text: і, paradigm: person_masc_j }
+      female:
+        - { text: ен, paradigm: fem_hard }
+        - { text: ел, paradigm: fem_hard }
+        - { text: ін, paradigm: fem_hard }
+        - { text: і, paradigm: fem_iya }
+    surnames:
+      starts: [бар, дан, кал, лув, мар, нов, рен, сав, тал, фер, вар, мел]
+      middles: [ан, ер, ил]
+      middle_chance_bp: 2500
+      finals:
+        - { text: енк, male: surname_enko, female: fixed_fem_o }
+        - { text: ук, male: surname_k, female: fixed_fem }
+        - { text: ес, male: person_masc_hard, female: fixed_fem }
+        - { text: ані, male: fixed_masc, female: fixed_fem }
+        - { text: еску, male: fixed_masc, female: fixed_fem }
+        - { text: инськ, male: adj_masc, female: adj_fem }
+  - id: eastern
+    given_names:
+      starts: [ал, бат, дар, ер, жан, кан, мур, нур, сан, таш, тем, тул]
+      middles: [ир, ат, ул]
+      middle_chance_bp: 1500
+      male:
+        - { text: ан, paradigm: person_masc_hard }
+        - { text: ир, paradigm: person_masc_hard }
+        - { text: ат, paradigm: person_masc_hard }
+        - { text: им, paradigm: person_masc_hard }
+        - { text: а, paradigm: person_masc_j }
+      female:
+        - { text: ин, paradigm: fem_hard }
+        - { text: ар, paradigm: fem_hard }
+        - { text: ел, paradigm: fem_hard }
+        - { text: і, paradigm: fem_iya }
+    surnames:
+      starts: [бал, кар, мур, сар, тол, ерк, жан, бек, кас, тем, нур, сул]
+      middles: [ир, ат, ул]
+      middle_chance_bp: 2000
+      finals:
+        - { text: ов, male: surname_ov, female: adj_fem }
+        - { text: ін, male: surname_ov, female: adj_fem }
+        - { text: ат, male: person_masc_hard, female: fixed_fem }
+        - { text: ен, male: person_masc_hard, female: fixed_fem }
+        - { text: ак, male: surname_k, female: fixed_fem }

@@ -446,7 +446,11 @@ class ContentPackTest {
                 nuclearStatuses(),
                 personKinds(),
                 traits(),
-                new NameContent(List.of(TestContent.mascHard()), List.of(TestContent.style("northern")), forms),
+                new NameContent(
+                        TestContent.paradigms(),
+                        List.of(TestContent.style("northern")),
+                        forms,
+                        List.of(TestContent.personStyle("northern"))),
                 TestContent.backstory());
     }
 

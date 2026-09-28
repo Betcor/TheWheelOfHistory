@@ -125,11 +125,13 @@ final class ContentYaml {
     record NamesFile(
             List<Paradigm> paradigms,
             List<NameStyle> styles,
-            @JsonProperty("state_forms") List<StateForm> stateForms) {
+            @JsonProperty("state_forms") List<StateForm> stateForms,
+            @JsonProperty("person_styles") List<PersonStyle> personStyles) {
         NamesFile {
             paradigms = orEmpty(paradigms);
             styles = orEmpty(styles);
             stateForms = orEmpty(stateForms);
+            personStyles = orEmpty(personStyles);
         }
     }
 
@@ -152,6 +154,46 @@ final class ContentYaml {
 
     /** @param paradigm id парадигми відмінювання */
     record NameFinal(String text, String paradigm) {}
+
+    /** @param id id стилю назв держав, якому відповідає стиль імен */
+    record PersonStyle(
+            String id, @JsonProperty("given_names") GivenNames givenNames, Surnames surnames) {}
+
+    /**
+     * @param male кінцівки чоловічих імен
+     * @param female кінцівки жіночих імен
+     */
+    record GivenNames(
+            List<String> starts,
+            List<String> middles,
+            @JsonProperty("middle_chance_bp") int middleChanceBp,
+            List<NameFinal> male,
+            List<NameFinal> female) {
+        GivenNames {
+            starts = orEmpty(starts);
+            middles = orEmpty(middles);
+            male = orEmpty(male);
+            female = orEmpty(female);
+        }
+    }
+
+    record Surnames(
+            List<String> starts,
+            List<String> middles,
+            @JsonProperty("middle_chance_bp") int middleChanceBp,
+            List<SurnameFinal> finals) {
+        Surnames {
+            starts = orEmpty(starts);
+            middles = orEmpty(middles);
+            finals = orEmpty(finals);
+        }
+    }
+
+    /**
+     * @param male id парадигми чоловічого прізвища
+     * @param female id парадигми жіночого прізвища
+     */
+    record SurnameFinal(String text, String male, String female) {}
 
     /** @param forms шаблони назви за відмінками, з {@code {root}} */
     record StateForm(

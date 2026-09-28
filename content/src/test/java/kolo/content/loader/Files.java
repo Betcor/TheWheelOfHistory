@@ -98,6 +98,15 @@ final class Files {
               - id: masc_hard
                 gender: masculine
                 endings: { nominative: "", genitive: у, dative: у, accusative: "", instrumental: ом, locative: і, vocative: е }
+              - id: person_masc
+                gender: masculine
+                endings: { nominative: "", genitive: а, dative: ові, accusative: а, instrumental: ом, locative: ові, vocative: е }
+              - id: fem_hard
+                gender: feminine
+                endings: { nominative: а, genitive: и, dative: і, accusative: у, instrumental: ою, locative: і, vocative: о }
+              - id: fixed_fem
+                gender: feminine
+                endings: { nominative: "", genitive: "", dative: "", accusative: "", instrumental: "", locative: "", vocative: "" }
             styles:
               - id: northern
                 name: Північний
@@ -129,6 +138,21 @@ final class Files {
                   instrumental: Державою {root}
                   locative: Державі {root}
                   vocative: Державо {root}
+            person_styles:
+              - id: northern
+                given_names:
+                  starts: [ал, дар]
+                  middles: [ен]
+                  middle_chance_bp: 1000
+                  male:
+                    - { text: ор, paradigm: person_masc }
+                  female:
+                    - { text: ін, paradigm: fem_hard }
+                surnames:
+                  starts: [торв]
+                  middle_chance_bp: 0
+                  finals:
+                    - { text: ер, male: person_masc, female: fixed_fem }
             """;
 
     static final String BACKSTORY = """

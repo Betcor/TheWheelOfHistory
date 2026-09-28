@@ -12,10 +12,7 @@ public record NameFinalDef(String text, NameParadigmId paradigm) {
 
     /** @throws ValidationException з {@link kolo.engine.error.ErrorCode#INVALID_NAME_FORMAT}, якщо формат не той */
     public NameFinalDef {
-        NameText.part("name_final.text", text);
-        if (!NameText.startsWithVowel(text)) {
-            throw NameText.invalid("name_final.text", text);
-        }
+        NameText.finalText("name_final.text", text);
         Objects.requireNonNull(paradigm, "paradigm");
     }
 }

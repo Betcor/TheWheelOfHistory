@@ -1,5 +1,7 @@
 package kolo.engine.content;
 
+import java.util.List;
+import java.util.TreeSet;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
@@ -37,6 +39,32 @@ final class NameText {
             throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", field));
         }
         if (!letters(value)) {
+            throw invalid(field, value);
+        }
+        return value;
+    }
+
+    /**
+     * Початки чи вставки: кожна частина закінчується приголосною й не повторюється; порядок зберігається.
+     *
+     * @param vowelStart частина має починатися з голосної (вставка)
+     */
+    static List<String> parts(String field, List<String> parts, boolean vowelStart) {
+        TreeSet<String> seen = new TreeSet<>();
+        for (String part : parts) {
+            part(field, part);
+            if ((vowelStart && !startsWithVowel(part)) || endsWithVowel(part)) {
+                throw invalid(field, part);
+            }
+            Defs.unique(field, seen, part);
+        }
+        return List.copyOf(parts);
+    }
+
+    /** Кінцівка: частина назви, що починається з голосної. */
+    static String finalText(String field, String value) {
+        part(field, value);
+        if (!startsWithVowel(value)) {
             throw invalid(field, value);
         }
         return value;

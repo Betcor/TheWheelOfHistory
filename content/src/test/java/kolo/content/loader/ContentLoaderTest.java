@@ -14,10 +14,14 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.ModifierDef;
+import kolo.engine.content.NameFinalDef;
+import kolo.engine.content.NameParadigmId;
 import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
+import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -28,6 +32,7 @@ import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
+import kolo.engine.state.Sex;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
 import kolo.engine.wheel.WheelKind;
@@ -190,6 +195,87 @@ class ContentLoaderTest {
         assertNamesError(
                 Files.NAMES.replaceAll("(?m)^    endings: .*\n", ""),
                 Map.of("location", "paradigms[0]", "cause", "blank_value", "field", "endings"));
+    }
+
+    @Test
+    void loadsPersonNames() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        PersonNameStyleDef northern =
+                pack.names().personStyle(new NameStyleId("northern")).orElseThrow();
+        assertThat(northern.given().starts()).containsExactly("ал", "дар");
+        assertThat(northern.given().middleChanceBp()).isEqualTo(1000);
+        assertThat(northern.givenFinals(Sex.MALE))
+                .containsExactly(new NameFinalDef("ор", new NameParadigmId("person_masc")));
+        assertThat(northern.givenFinals(Sex.FEMALE))
+                .containsExactly(new NameFinalDef("ін", new NameParadigmId("fem_hard")));
+        assertThat(northern.surnames().middles()).isEmpty();
+        assertThat(northern.surnameFinals())
+                .containsExactly(
+                        new SurnameFinalDef("ер", new NameParadigmId("person_masc"), new NameParadigmId("fixed_fem")));
+    }
+
+    @Test
+    void invalidPersonNamesAreReportedAtTheirPosition() {
+        assertNamesError(
+                Files.NAMES.replace("{ text: ор, paradigm: person_masc }", "{ text: ор, paradigm: fem_hard }"),
+                Map.of(
+                        "file", "names.yaml",
+                        "location", "person_styles[0].given_names.male[0].paradigm",
+                        "cause", "name_gender_mismatch",
+                        "value", "fem_hard",
+                        "expected", "masculine"));
+        assertNamesError(
+                Files.NAMES.replace("female: fixed_fem", "female: person_masc"),
+                Map.of(
+                        "location",
+                        "person_styles[0].surnames.finals[0].female",
+                        "cause",
+                        "name_gender_mismatch",
+                        "expected",
+                        "feminine"));
+        assertNamesError(
+                Files.NAMES.replace("male: person_masc,", "male: masc_soft,"),
+                Map.of(
+                        "location",
+                        "person_styles[0].surnames.finals[0].male",
+                        "cause",
+                        "unknown_reference",
+                        "value",
+                        "masc_soft"));
+        assertNamesError(
+                Files.NAMES.replace("person_styles:\n  - id: northern", "person_styles:\n  - id: southern"),
+                Map.of("location", "person_styles[0].id", "cause", "unknown_reference", "value", "southern"));
+        assertNamesError(
+                Files.NAMES.substring(0, Files.NAMES.indexOf("person_styles:")),
+                Map.of("location", "person_styles", "cause", "empty_collection"));
+        assertNamesError(
+                Files.NAMES.replace("starts: [ал, дар]", "starts: [але, дар]"),
+                Map.of("location", "person_styles[0].given_names", "cause", "invalid_name_format", "value", "але"));
+        assertNamesError(
+                Files.NAMES.replaceAll("(?m)^ *- \\{ text: ін, paradigm: fem_hard }\n", ""),
+                Map.of(
+                        "location",
+                        "person_styles[0]",
+                        "cause",
+                        "empty_collection",
+                        "field",
+                        "person_name_style.northern.female_finals"));
+        assertNamesError(
+                Files.NAMES.replaceAll("(?s)    given_names:.*?    surnames:", "    surnames:"),
+                Map.of("location", "person_styles[0].given_names", "cause", "blank_value"));
+        // Стиль назв без стилю імен: людей такої держави не буде як назвати.
+        assertNamesError(
+                Files.NAMES.replaceFirst("(?m)^styles:\n", """
+                        styles:
+                          - id: southern
+                            name: Південний
+                            middle_chance_bp: 0
+                            starts: [сал]
+                            finals:
+                              - { text: ан, paradigm: masc_hard }
+                        """),
+                Map.of("location", "person_styles", "cause", "missing_definition", "value", "southern"));
     }
 
     @Test
