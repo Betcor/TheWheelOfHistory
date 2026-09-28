@@ -43,12 +43,40 @@ final class Files {
                 tags: [energy]
             """;
 
+    static final String DEVELOPMENT = """
+            branches:
+              - { id: economy, name: Економіка }
+              - { id: military, name: Військо }
+              - { id: society, name: Суспільство }
+              - { id: energy_science, name: Енергетика й наука }
+            levels:
+              - { level: -3, name: Глибоке відставання, description: Лише базові технології. }
+              - { level: -2, name: Відставання, description: Частини технологій немає. }
+              - { level: -1, name: Легке відставання, description: Окремих технологій бракує. }
+              - { level: 0, name: Світовий рівень, description: Усі технології 1970 року. }
+              - { level: 1, name: Передовий, description: На 1–2 технології попереду. }
+              - { level: 2, name: Лідер, description: Кілька технологій попереду. }
+            """;
+
+    static final String NUCLEAR = """
+            statuses:
+              - id: none
+                name: Без ядерної зброї
+              - id: program
+                name: Ядерна програма
+              - id: arsenal
+                name: Ядерний арсенал
+                tags: [nuclear_power]
+            """;
+
     private final TreeMap<String, String> files = new TreeMap<>();
 
     private Files() {
         files.put(ContentLoader.IDEOLOGIES, IDEOLOGIES);
         files.put(ContentLoader.DOCTRINES, DOCTRINES);
         files.put(ContentLoader.RESOURCES, RESOURCES);
+        files.put(ContentLoader.DEVELOPMENT, DEVELOPMENT);
+        files.put(ContentLoader.NUCLEAR, NUCLEAR);
     }
 
     static Files valid() {

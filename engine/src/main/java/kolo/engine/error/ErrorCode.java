@@ -23,6 +23,11 @@ public enum ErrorCode {
     UNKNOWN_REFERENCE(ValidationException.class),
     /** Порожня колекція там, де потрібен хоча б один елемент. Подробиці: {@code field}. */
     EMPTY_COLLECTION(ValidationException.class),
+    /**
+     * Не задано визначення для значення, яке має бути визначене завжди (напр. кожна галузь технологій). Подробиці:
+     * {@code field}, {@code value}.
+     */
+    MISSING_DEFINITION(ValidationException.class),
     /** Сума ваг колеса нульова. */
     WHEEL_ZERO_WEIGHT(ValidationException.class),
     /** Критичних секторів більше, ніж вміщує мінімум 1% кожному. Подробиці: {@code count}, {@code max}. */

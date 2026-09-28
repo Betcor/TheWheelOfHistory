@@ -16,11 +16,14 @@ import kolo.engine.content.IdeologyId;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
+import kolo.engine.content.TechBranchDef;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.modifier.ModifierSource;
 import kolo.engine.modifier.Modifiers;
 import kolo.engine.modifier.SourceKind;
 import kolo.engine.state.CountryStats;
+import kolo.engine.state.Development;
+import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.Stat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -71,6 +74,20 @@ class BundledContentIntegrationTest {
     }
 
     @Test
+    void developmentAndNuclearStatusesMatchDesign() {
+        // GD §4.3: чотири галузі, рівні від −3 до +2.
+        assertThat(PACK.techBranches().values())
+                .extracting(TechBranchDef::name)
+                .containsExactly("Економіка", "Військо", "Суспільство", "Енергетика й наука");
+        assertThat(PACK.developmentLevels().keySet()).containsExactly(-3, -2, -1, 0, 1, 2);
+        assertThat(PACK.developmentLevel(Development.WORLD).name()).isEqualTo("Світовий рівень");
+        assertThat(PACK.developmentLevel(Development.MAX).name()).isEqualTo("Лідер");
+        // GD §4.6: арсенал дає тег nuclear_power.
+        assertThat(PACK.nuclearStatus(NuclearStatus.ARSENAL).tags()).contains("nuclear_power");
+        assertThat(PACK.nuclearStatus(NuclearStatus.NONE).tags()).doesNotContain("nuclear_power");
+    }
+
+    @Test
     void everyIdeologyCombinationKeepsStatsInBounds() {
         CountryStats middle = new CountryStats(1_000_000, 50, 50, 50, 50, 50, 100);
         CountryStats extreme = new CountryStats(0, 0, 100, 0, 100, 0, 0);
@@ -110,6 +127,9 @@ class BundledContentIntegrationTest {
         assertThat(fromDisk.ideologies()).isEqualTo(PACK.ideologies());
         assertThat(fromDisk.doctrines()).isEqualTo(PACK.doctrines());
         assertThat(fromDisk.resources()).isEqualTo(PACK.resources());
+        assertThat(fromDisk.techBranches()).isEqualTo(PACK.techBranches());
+        assertThat(fromDisk.developmentLevels()).isEqualTo(PACK.developmentLevels());
+        assertThat(fromDisk.nuclearStatuses()).isEqualTo(PACK.nuclearStatuses());
     }
 
     private static List<String> subIds(String ideology) {

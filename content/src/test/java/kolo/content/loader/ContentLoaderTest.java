@@ -16,7 +16,9 @@ import kolo.engine.content.SubIdeologyId;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.modifier.ModifierTarget;
+import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.Stat;
+import kolo.engine.state.TechBranch;
 import kolo.engine.wheel.WheelKind;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +40,83 @@ class ContentLoaderTest {
         // Відсутні списки — порожні.
         assertThat(pack.resource(new ResourceId("iron")).orElseThrow().tags()).isEmpty();
         assertThat(pack.hash()).matches("[0-9a-f]{64}");
+    }
+
+    @Test
+    void loadsDevelopmentAndNuclearStatuses() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.techBranch(TechBranch.ENERGY_SCIENCE).name()).isEqualTo("Енергетика й наука");
+        assertThat(pack.developmentLevel(-3).name()).isEqualTo("Глибоке відставання");
+        assertThat(pack.nuclearStatus(NuclearStatus.ARSENAL).tags()).containsExactly("nuclear_power");
+        assertThat(pack.nuclearStatus(NuclearStatus.NONE).tags()).isEmpty();
+    }
+
+    @Test
+    void unknownBranchOrStatusKeyIsReported() {
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replace("id: society", "id: culture"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "file", "development.yaml",
+                        "location", "branches[2]",
+                        "cause", "unknown_reference",
+                        "field", "tech_branch",
+                        "value", "culture"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.NUCLEAR, Files.NUCLEAR.replace("id: arsenal", "id: ARSENAL"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("file", "nuclear.yaml", "location", "statuses[2]", "cause", "unknown_reference"));
+    }
+
+    @Test
+    void missingBranchLevelOrStatusIsReportedAtItsList() {
+        assertContentError(
+                Files.valid()
+                        .with(
+                                ContentLoader.DEVELOPMENT,
+                                Files.DEVELOPMENT.replace("  - { id: military, name: Військо }\n", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "branches", "cause", "missing_definition", "value", "military"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replace("level: 2,", "level: 1,"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "levels[5]", "cause", "duplicate_id", "value", 1));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replaceAll("(?m)^  - \\{ level: 2,.*\n", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "levels", "cause", "missing_definition", "value", 2));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.NUCLEAR, "statuses:\n  - { id: none, name: Немає }\n")
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("file", "nuclear.yaml", "location", "statuses", "value", "program"));
+    }
+
+    @Test
+    void developmentLevelOutsideScaleIsReported() {
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replace("level: 2,", "level: 3,"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "levels[5]", "cause", "value_out_of_range", "value", 3L));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replace("level: 0,", "level: \"0\","))
+                        .source(),
+                ErrorCode.CONTENT_MALFORMED,
+                Map.of("file", "development.yaml"));
     }
 
     @Test

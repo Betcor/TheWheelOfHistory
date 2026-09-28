@@ -62,6 +62,31 @@ final class ContentYaml {
         }
     }
 
+    record DevelopmentFile(List<Branch> branches, List<Level> levels) {
+        DevelopmentFile {
+            branches = orEmpty(branches);
+            levels = orEmpty(levels);
+        }
+    }
+
+    /** @param id ключ галузі, напр. {@code energy_science} */
+    record Branch(String id, String name) {}
+
+    record Level(int level, String name, String description) {}
+
+    record NuclearFile(List<NuclearStatus> statuses) {
+        NuclearFile {
+            statuses = orEmpty(statuses);
+        }
+    }
+
+    /** @param id ключ статусу: {@code none}, {@code program} або {@code arsenal} */
+    record NuclearStatus(String id, String name, List<String> tags) {
+        NuclearStatus {
+            tags = orEmpty(tags);
+        }
+    }
+
     /** @param target {@code stat:<показник>} або {@code wheel:<тип колеса>} */
     record Modifier(String target, int value) {}
 
