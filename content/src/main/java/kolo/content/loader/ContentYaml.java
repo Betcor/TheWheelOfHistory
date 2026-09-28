@@ -251,6 +251,50 @@ final class ContentYaml {
 
     record Years(int from, int to) {}
 
+    /**
+     * Числа — {@code Integer}, а не {@code int}: пропущене поле має стати помилкою, а не тихим нулем.
+     *
+     * @param powerCorridors по одному на кожен варіант коридору
+     */
+    record BalanceFile(
+            WheelBalance wheel,
+            Streaks streaks,
+            @JsonProperty("power_corridors") List<PowerCorridor> powerCorridors,
+            Generation generation) {
+        BalanceFile {
+            powerCorridors = orEmpty(powerCorridors);
+        }
+    }
+
+    /** @param strength тип колеса → окрема сила переваги */
+    record WheelBalance(
+            @JsonProperty("default_strength") Integer defaultStrength,
+            Map<String, Integer> strength,
+            @JsonProperty("investment_curve") List<Integer> investmentCurve) {
+        WheelBalance {
+            strength = strength == null ? Map.of() : strength;
+            investmentCurve = orEmpty(investmentCurve);
+        }
+    }
+
+    record Streaks(
+            @JsonProperty("very_good_quality") Integer veryGoodQuality,
+            @JsonProperty("very_bad_quality") Integer veryBadQuality,
+            Integer length) {}
+
+    /** @param id ключ варіанта: {@code equal_chances}, {@code classic} або {@code full_chaos} */
+    record PowerCorridor(String id, MedianRange players, MedianRange npc) {}
+
+    record MedianRange(
+            @JsonProperty("min_pct") Integer minPct,
+            @JsonProperty("max_pct") Integer maxPct) {}
+
+    record Generation(
+            @JsonProperty("backstory_fragments") Count backstoryFragments,
+            @JsonProperty("notable_people") Count notablePeople) {}
+
+    record Count(Integer min, Integer max) {}
+
     /** По рядку на відмінок; порядок полів — порядок {@link kolo.engine.state.GrammaticalCase}. */
     record Cases(
             String nominative,

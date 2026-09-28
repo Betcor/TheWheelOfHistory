@@ -32,6 +32,7 @@ class ContentSmokeTest {
         assertThat(pack.names().stateForms()).isNotEmpty();
         assertThat(pack.names().personStyles()).isNotEmpty();
         assertThat(pack.backstory().fragments()).isNotEmpty();
+        assertThat(pack.balance().corridors()).isNotEmpty();
         assertThat(pack.hash()).matches("[0-9a-f]{64}");
         // Повторне завантаження — той самий хеш: клієнт і сервер з однаковими файлами зійдуться.
         assertThat(ContentLoader.loadBundled().hash()).isEqualTo(pack.hash());

@@ -44,7 +44,8 @@ class ContentPackTest {
                 personKinds().reversed(),
                 traits(),
                 names(List.of(ideology("socialism", "planned_economy"), ideology("democracy", "liberal_democracy"))),
-                TestContent.backstory());
+                TestContent.backstory(),
+                TestContent.balance());
 
         assertThat(pack.hash()).isEqualTo(HASH);
         assertThat(pack.ideologies().keySet()).extracting(IdeologyId::value).containsExactly("democracy", "socialism");
@@ -54,6 +55,7 @@ class ContentPackTest {
         assertThat(pack.developmentLevels().keySet()).containsExactly(-3, -2, -1, 0, 1, 2);
         assertThat(pack.nuclearStatuses().keySet()).containsExactly(NuclearStatus.values());
         assertThat(pack.personKinds().keySet()).containsExactly(PersonKind.values());
+        assertThat(pack.balance()).isEqualTo(TestContent.balance());
     }
 
     @Test
@@ -87,7 +89,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(ideologies),
-                        TestContent.backstory()),
+                        TestContent.backstory(),
+                        TestContent.balance()),
                 "tech_branches",
                 "energy_science");
         assertMissing(
@@ -102,7 +105,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(ideologies),
-                        TestContent.backstory()),
+                        TestContent.backstory(),
+                        TestContent.balance()),
                 "development_levels",
                 -3);
         assertMissing(
@@ -117,7 +121,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(ideologies),
-                        TestContent.backstory()),
+                        TestContent.backstory(),
+                        TestContent.balance()),
                 "nuclear_statuses",
                 "program");
     }
@@ -138,7 +143,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
-                        TestContent.backstory()))
+                        TestContent.backstory(),
+                        TestContent.balance()))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
                     assertThat(e.details())
@@ -188,7 +194,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
-                        TestContent.backstory()))
+                        TestContent.backstory(),
+                        TestContent.balance()))
                 .isInstanceOf(ValidationException.class);
     }
 
@@ -210,7 +217,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(ideologies),
-                        TestContent.backstory()),
+                        TestContent.backstory(),
+                        TestContent.balance()),
                 "ideologies");
         assertEmpty(
                 () -> new ContentPack(
@@ -224,7 +232,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(ideologies),
-                        TestContent.backstory()),
+                        TestContent.backstory(),
+                        TestContent.balance()),
                 "doctrines");
         assertEmpty(
                 () -> new ContentPack(
@@ -238,7 +247,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(ideologies),
-                        TestContent.backstory()),
+                        TestContent.backstory(),
+                        TestContent.balance()),
                 "resources");
         assertThatThrownBy(() -> new ContentPack(
                         " ",
@@ -251,7 +261,8 @@ class ContentPackTest {
                         personKinds(),
                         traits(),
                         names(ideologies),
-                        TestContent.backstory()))
+                        TestContent.backstory(),
+                        TestContent.balance()))
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BLANK_VALUE));
     }
@@ -334,7 +345,8 @@ class ContentPackTest {
                         personKinds().subList(0, PersonKind.values().length - 1),
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
-                        TestContent.backstory()),
+                        TestContent.backstory(),
+                        TestContent.balance()),
                 "person_kinds",
                 "pretender");
     }
@@ -422,7 +434,8 @@ class ContentPackTest {
                 personKinds(),
                 traits(),
                 names(ideologies),
-                backstory);
+                backstory,
+                TestContent.balance());
     }
 
     private static StateFormDef form(String id, List<IdeologyId> ideologies, List<SubIdeologyId> subIdeologies) {
@@ -451,7 +464,8 @@ class ContentPackTest {
                         List.of(TestContent.style("northern")),
                         forms,
                         List.of(TestContent.personStyle("northern"))),
-                TestContent.backstory());
+                TestContent.backstory(),
+                TestContent.balance());
     }
 
     private static ContentPack withTraits(List<TraitDef> traits) {
@@ -466,7 +480,8 @@ class ContentPackTest {
                 personKinds(),
                 traits,
                 names(List.of(ideology("democracy", "a"))),
-                TestContent.backstory());
+                TestContent.backstory(),
+                TestContent.balance());
     }
 
     private static void assertMissing(Runnable create, String field, Object value) {

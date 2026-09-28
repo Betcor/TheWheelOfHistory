@@ -181,6 +181,31 @@ final class Files {
                 text: Контрибуції задушили економіку {country.genitive}.
             """;
 
+    static final String BALANCE = """
+            wheel:
+              default_strength: 50
+              strength:
+                economic_cycle: 80
+              investment_curve: [20, 12, 7, 4]
+            streaks:
+              very_good_quality: 85
+              very_bad_quality: 15
+              length: 3
+            power_corridors:
+              - id: equal_chances
+                players: { min_pct: 75, max_pct: 133 }
+                npc: { min_pct: 50, max_pct: 200 }
+              - id: classic
+                players: { min_pct: 50, max_pct: 200 }
+                npc: { min_pct: 33, max_pct: 300 }
+              - id: full_chaos
+                players: { min_pct: 20, max_pct: 500 }
+                npc: { min_pct: 10, max_pct: 1000 }
+            generation:
+              backstory_fragments: { min: 2, max: 4 }
+              notable_people: { min: 1, max: 3 }
+            """;
+
     private final TreeMap<String, String> files = new TreeMap<>();
 
     private Files() {
@@ -192,6 +217,7 @@ final class Files {
         files.put(ContentLoader.PEOPLE, PEOPLE);
         files.put(ContentLoader.NAMES, NAMES);
         files.put(ContentLoader.BACKSTORY, BACKSTORY);
+        files.put(ContentLoader.BALANCE, BALANCE);
     }
 
     static Files valid() {

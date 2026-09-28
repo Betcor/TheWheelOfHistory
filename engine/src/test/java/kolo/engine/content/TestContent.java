@@ -9,6 +9,7 @@ import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
 
@@ -178,6 +179,20 @@ final class TestContent {
         return new BackstoryContent(Map.of(), List.of(fragment("civil_war", TagCondition.NONE, List.of("civil_war"))));
     }
 
+    /** Коридор, у якому NPC ширші за гравців. */
+    static PowerCorridorDef corridor(PowerCorridor corridor) {
+        return new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(25, 400));
+    }
+
+    /** Баланс із визначенням кожного коридору. */
+    static BalanceDef balance() {
+        return BalanceDef.of(
+                new WheelBalanceDef(50, new TreeMap<>(), List.of(20, 10, 5)),
+                new StreakRulesDef(85, 15, 3),
+                Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList(),
+                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3)));
+    }
+
     static ContentPack pack(List<IdeologyDef> ideologies) {
         return new ContentPack(
                 HASH,
@@ -190,6 +205,7 @@ final class TestContent {
                 personKinds(),
                 traits(),
                 names(ideologies),
-                backstory());
+                backstory(),
+                balance());
     }
 }

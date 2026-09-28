@@ -23,12 +23,16 @@ import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BackstoryText;
+import kolo.engine.content.BalanceDef;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.CountRange;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
+import kolo.engine.content.GenerationBalanceDef;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MedianRange;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.NameContent;
 import kolo.engine.content.NameFinalDef;
@@ -40,10 +44,12 @@ import kolo.engine.content.NameStyleId;
 import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.PersonNameStyleDef;
+import kolo.engine.content.PowerCorridorDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
+import kolo.engine.content.StreakRulesDef;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
@@ -51,6 +57,7 @@ import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
+import kolo.engine.content.WheelBalanceDef;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
@@ -59,7 +66,9 @@ import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.WheelKind;
 
 /**
  * Читає YAML-файли контенту й збирає з них {@link ContentPack}.
@@ -78,10 +87,11 @@ public final class ContentLoader {
     public static final String PEOPLE = "people.yaml";
     public static final String NAMES = "names.yaml";
     public static final String BACKSTORY = "backstory.yaml";
+    public static final String BALANCE = "balance.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
     public static final List<String> FILES =
-            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE, NAMES, BACKSTORY);
+            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE, NAMES, BACKSTORY, BALANCE);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -111,6 +121,7 @@ public final class ContentLoader {
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
         BackstoryContent backstory =
                 backstory(parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, nuclear);
+        BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
         String hash = ContentHash.of(files);
@@ -128,7 +139,8 @@ public final class ContentLoader {
                         kinds,
                         traits,
                         names,
-                        backstory));
+                        backstory,
+                        balance));
     }
 
     // ---- Файли ----
@@ -560,6 +572,92 @@ public final class ContentLoader {
                 fragment.duration(),
                 modifiers,
                 new BackstoryText(field + ".text", fragment.text()));
+    }
+
+    private static BalanceDef balance(ContentYaml.BalanceFile yaml) {
+        ContentYaml.WheelBalance wheelYaml = section("wheel", yaml.wheel());
+        TreeMap<WheelKind, Integer> strengths = new TreeMap<>();
+        wheelYaml.strength().forEach((kind, strength) -> {
+            String location = "wheel.strength." + kind;
+            strengths.put(
+                    at(BALANCE, location, () -> new WheelKind(kind)),
+                    at(BALANCE, location, () -> required(location, strength)));
+        });
+        WheelBalanceDef wheel = at(
+                BALANCE,
+                "wheel",
+                () -> new WheelBalanceDef(
+                        required("wheel.default_strength", wheelYaml.defaultStrength()),
+                        strengths,
+                        wheelYaml.investmentCurve()));
+
+        ContentYaml.Streaks streaksYaml = section("streaks", yaml.streaks());
+        StreakRulesDef streaks = at(
+                BALANCE,
+                "streaks",
+                () -> new StreakRulesDef(
+                        required("streaks.very_good_quality", streaksYaml.veryGoodQuality()),
+                        required("streaks.very_bad_quality", streaksYaml.veryBadQuality()),
+                        required("streaks.length", streaksYaml.length())));
+
+        TreeSet<PowerCorridor> seen = new TreeSet<>();
+        List<PowerCorridorDef> corridors =
+                list(BALANCE, "power_corridors", yaml.powerCorridors(), (location, corridor) -> {
+                    PowerCorridor key = at(
+                            BALANCE,
+                            location,
+                            () -> unique(
+                                    seen,
+                                    ContentKeys.parse(
+                                            "power_corridor",
+                                            PowerCorridor.values(),
+                                            PowerCorridor::key,
+                                            corridor.id()),
+                                    PowerCorridor::key));
+                    MedianRange players = at(BALANCE, location + ".players", () -> median(corridor.players()));
+                    MedianRange npc = at(BALANCE, location + ".npc", () -> median(corridor.npc()));
+                    return at(BALANCE, location, () -> new PowerCorridorDef(key, players, npc));
+                });
+        complete(BALANCE, "power_corridors", seen, List.of(PowerCorridor.values()), PowerCorridor::key);
+
+        ContentYaml.Generation generationYaml = section("generation", yaml.generation());
+        CountRange fragments =
+                at(BALANCE, "generation.backstory_fragments", () -> count(generationYaml.backstoryFragments()));
+        CountRange people = at(BALANCE, "generation.notable_people", () -> count(generationYaml.notablePeople()));
+        GenerationBalanceDef generation = at(BALANCE, "generation", () -> new GenerationBalanceDef(fragments, people));
+
+        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation));
+    }
+
+    /** Розділ файлу балансу; пропущений — помилка з назвою розділу як місцем. */
+    private static <T> T section(String name, T value) {
+        return at(BALANCE, name, () -> {
+            if (value == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", name));
+            }
+            return value;
+        });
+    }
+
+    private static MedianRange median(ContentYaml.MedianRange range) {
+        if (range == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "median_range"));
+        }
+        return new MedianRange(required("min_pct", range.minPct()), required("max_pct", range.maxPct()));
+    }
+
+    private static CountRange count(ContentYaml.Count count) {
+        if (count == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "count"));
+        }
+        return new CountRange(required("min", count.min()), required("max", count.max()));
+    }
+
+    private static int required(String field, Integer value) {
+        if (value == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", field));
+        }
+        return value;
     }
 
     private static GrammaticalGender gender(String key) {

@@ -12,6 +12,7 @@ import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.NuclearStatusDef;
+import kolo.engine.content.StreakRulesDef;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.generation.name.CountryNames;
@@ -25,15 +26,18 @@ class BundledBackstoryIntegrationTest {
     private static final ContentPack PACK = ContentLoader.loadBundled();
     private static final BackstoryContent BACKSTORY = PACK.backstory();
 
-    /** Колесо передісторії обирає до 4 фрагментів (GD §4.7). */
-    private static final int MAX_FRAGMENTS = 4;
+    /** Скільки фрагментів найбільше обирає колесо передісторії (GD §4.7: 2–4). */
+    private static final int MAX_FRAGMENTS =
+            PACK.balance().generation().backstoryFragments().max();
+
+    private static final StreakRulesDef STREAKS = PACK.balance().streaks();
 
     @Test
     void thereAreEnoughFragmentsForStreaksBothWays() {
         // Етап 2: 30+ фрагментів; стріки (GD §4.10) потребують і дуже добрих, і дуже поганих результатів.
         assertThat(BACKSTORY.fragments()).hasSizeGreaterThanOrEqualTo(30);
-        assertThat(BACKSTORY.fragments().values()).anyMatch(fragment -> fragment.quality() >= 85);
-        assertThat(BACKSTORY.fragments().values()).anyMatch(fragment -> fragment.quality() <= 15);
+        assertThat(BACKSTORY.fragments().values()).anyMatch(fragment -> STREAKS.isVeryGood(fragment.quality()));
+        assertThat(BACKSTORY.fragments().values()).anyMatch(fragment -> STREAKS.isVeryBad(fragment.quality()));
         assertThat(BACKSTORY.fragments().values()).anyMatch(BackstoryFragmentDef::neighbor);
     }
 
