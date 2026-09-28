@@ -1,6 +1,7 @@
 package kolo.engine.state;
 
 import java.util.function.ToLongFunction;
+import kolo.engine.error.Checks;
 
 /**
  * Показники держави. У стані зберігаються лише базові значення, без модифікаторів; ефективні рахує
@@ -40,8 +41,6 @@ public record CountryStats(
     }
 
     private static void requireInRange(Stat stat, long value) {
-        if (!stat.contains(value)) {
-            throw new IllegalArgumentException(stat + " поза " + stat.min() + ".." + stat.max() + ": " + value);
-        }
+        Checks.inRange("stats." + stat.name(), value, stat.min(), stat.max());
     }
 }

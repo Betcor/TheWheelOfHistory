@@ -1,6 +1,7 @@
 package kolo.engine.modifier;
 
 import java.util.Objects;
+import kolo.engine.error.Checks;
 
 /**
  * Баф або дебаф.
@@ -25,17 +26,13 @@ public record Modifier(
         String descriptionKey) {
 
     public Modifier {
-        if (id == null || id.isBlank()) {
-            throw new IllegalArgumentException("порожній id модифікатора");
-        }
+        Checks.notBlank("modifier.id", id);
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(target, "target");
-        if (expiresAtTurn != null && expiresAtTurn < 0) {
-            throw new IllegalArgumentException("термін модифікатора " + id + " від'ємний: " + expiresAtTurn);
+        if (expiresAtTurn != null) {
+            Checks.inRange("modifier." + id + ".expires_at_turn", expiresAtTurn, 0, Integer.MAX_VALUE);
         }
-        if (descriptionKey == null || descriptionKey.isBlank()) {
-            throw new IllegalArgumentException("порожній descriptionKey модифікатора " + id);
-        }
+        Checks.notBlank("modifier." + id + ".description_key", descriptionKey);
     }
 
     /** Чи діє модифікатор у ході {@code turn}. */

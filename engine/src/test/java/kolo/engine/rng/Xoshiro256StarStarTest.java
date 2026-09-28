@@ -3,6 +3,7 @@ package kolo.engine.rng;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import kolo.engine.error.ValidationException;
 import org.junit.jupiter.api.Test;
 
 class Xoshiro256StarStarTest {
@@ -38,7 +39,7 @@ class Xoshiro256StarStarTest {
 
     @Test
     void rejectsAllZeroState() {
-        assertThatThrownBy(() -> new Xoshiro256StarStar(0, 0, 0, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Xoshiro256StarStar(0, 0, 0, 0)).isInstanceOf(ValidationException.class);
     }
 
     private static long[] next(Xoshiro256StarStar rng, int count) {

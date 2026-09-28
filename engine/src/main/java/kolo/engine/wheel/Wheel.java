@@ -5,6 +5,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeSet;
+import kolo.engine.error.Checks;
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
+import kolo.engine.error.InvariantViolationException;
+import kolo.engine.error.ValidationException;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.Season;
 import kolo.engine.util.Fixed;
@@ -51,12 +56,8 @@ public final class Wheel {
      */
     public static <T> List<Sector<T>> applyAdvantage(List<Sector<T>> sectors, int advantage, int strength) {
         validate(sectors);
-        if (advantage < Advantage.MIN || advantage > Advantage.MAX) {
-            throw new IllegalArgumentException("перевага поза −100..100: " + advantage);
-        }
-        if (strength < 0 || strength > MAX_STRENGTH) {
-            throw new IllegalArgumentException("сила переваги поза 0..100: " + strength);
-        }
+        Checks.inRange("advantage", advantage, Advantage.MIN, Advantage.MAX);
+        Checks.inRange("strength", strength, 0, MAX_STRENGTH);
 
         int shift = advantage * strength;
         long[] scaled = new long[sectors.size()];
@@ -120,19 +121,22 @@ public final class Wheel {
                 return sector;
             }
         }
-        throw new IllegalStateException("сума ваг менша за " + TOTAL_BP + ": " + cumulative);
+        // Недосяжно: applyAdvantage завжди повертає рівно TOTAL_BP.
+        throw new InvariantViolationException(
+                ErrorDetails.of("check", "wheel_total_bp", "expected", TOTAL_BP, "actual", cumulative));
     }
 
     private static <T> void validate(List<Sector<T>> sectors) {
         if (sectors.isEmpty()) {
-            throw new IllegalArgumentException("колесо без секторів");
+            throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", "sectors"));
         }
         TreeSet<String> ids = new TreeSet<>();
         long total = 0;
         int critical = 0;
         for (Sector<T> sector : sectors) {
             if (!ids.add(sector.id())) {
-                throw new IllegalArgumentException("повторний id сектора: " + sector.id());
+                throw new ValidationException(
+                        ErrorCode.DUPLICATE_ID, ErrorDetails.of("field", "sector.id", "value", sector.id()));
             }
             total += sector.weightBp();
             if (sector.tier().isCritical()) {
@@ -140,10 +144,12 @@ public final class Wheel {
             }
         }
         if (total == 0) {
-            throw new IllegalArgumentException("сума ваг колеса нульова");
+            throw new ValidationException(ErrorCode.WHEEL_ZERO_WEIGHT, ErrorDetails.of());
         }
         if ((long) critical * MIN_CRITICAL_BP > TOTAL_BP) {
-            throw new IllegalArgumentException("забагато критичних секторів для мінімуму 1%: " + critical);
+            throw new ValidationException(
+                    ErrorCode.WHEEL_TOO_MANY_CRITICAL,
+                    ErrorDetails.of("count", critical, "max", TOTAL_BP / MIN_CRITICAL_BP));
         }
     }
 

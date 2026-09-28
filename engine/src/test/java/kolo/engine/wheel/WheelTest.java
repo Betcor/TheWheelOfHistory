@@ -6,11 +6,15 @@ import static kolo.engine.wheel.Wheels.sector;
 import static kolo.engine.wheel.Wheels.weights;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 
 import java.util.ArrayList;
 import java.util.List;
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ValidationException;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.Season;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
 class WheelTest {
@@ -116,31 +120,47 @@ class WheelTest {
 
     @Test
     void rejectsInvalidWheels() {
-        assertThatThrownBy(() -> Wheel.applyAdvantage(List.of(), 0, 100)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Wheel.applyAdvantage(List.of(sector("zero", 0, OutcomeTier.PARTIAL)), 0, 100))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Wheel.applyAdvantage(
-                        List.of(sector("same", 1, OutcomeTier.FAIL), sector("same", 1, OutcomeTier.SUCCESS)), 0, 100))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertRejected(() -> Wheel.applyAdvantage(List.of(), 0, 100), ErrorCode.EMPTY_COLLECTION);
+        assertRejected(
+                () -> Wheel.applyAdvantage(List.of(sector("zero", 0, OutcomeTier.PARTIAL)), 0, 100),
+                ErrorCode.WHEEL_ZERO_WEIGHT);
+        assertRejected(
+                () -> Wheel.applyAdvantage(
+                        List.of(sector("same", 1, OutcomeTier.FAIL), sector("same", 1, OutcomeTier.SUCCESS)), 0, 100),
+                ErrorCode.DUPLICATE_ID);
 
         List<Sector<String>> tooManyCriticals = new ArrayList<>();
         for (int i = 0; i <= 100; i++) {
             tooManyCriticals.add(sector("crit_" + i, 1, OutcomeTier.CRIT_SUCCESS));
         }
-        assertThatThrownBy(() -> Wheel.applyAdvantage(tooManyCriticals, 0, 100))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertRejected(() -> Wheel.applyAdvantage(tooManyCriticals, 0, 100), ErrorCode.WHEEL_TOO_MANY_CRITICAL);
     }
 
     @Test
     void rejectsOutOfRangeAdvantageAndStrength() {
-        assertThatThrownBy(() -> Wheel.applyAdvantage(CONSTRUCTION, 101, 100))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Wheel.applyAdvantage(CONSTRUCTION, -101, 100))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertRejected(() -> Wheel.applyAdvantage(CONSTRUCTION, 101, 100), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertRejected(() -> Wheel.applyAdvantage(CONSTRUCTION, -101, 100), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertRejected(() -> Wheel.applyAdvantage(CONSTRUCTION, 0, 101), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertRejected(() -> Wheel.applyAdvantage(CONSTRUCTION, 0, -1), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void outOfRangeDetailsNameTheField() {
         assertThatThrownBy(() -> Wheel.applyAdvantage(CONSTRUCTION, 0, 101))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Wheel.applyAdvantage(CONSTRUCTION, 0, -1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(
+                        ValidationException.class,
+                        e -> assertThat(e.details())
+                                .containsExactly(
+                                        entry("field", "strength"),
+                                        entry("max", 100L),
+                                        entry("min", 0L),
+                                        entry("value", 101L)));
+    }
+
+    private static void assertRejected(ThrowingCallable call, ErrorCode code) {
+        assertThatThrownBy(call)
+                .isInstanceOfSatisfying(
+                        ValidationException.class, e -> assertThat(e.code()).isEqualTo(code));
     }
 
     @Test

@@ -2,6 +2,7 @@ package kolo.engine.wheel;
 
 import java.util.List;
 import java.util.Objects;
+import kolo.engine.error.Checks;
 
 /**
  * Сектор колеса.
@@ -17,14 +18,10 @@ import java.util.Objects;
 public record Sector<T>(String id, int weightBp, T value, int quality, OutcomeTier tier, List<String> tags) {
 
     public Sector {
-        Ids.requireSnakeCase(id, "id сектора");
-        if (weightBp < 0 || weightBp > Wheel.TOTAL_BP) {
-            throw new IllegalArgumentException("вага сектора " + id + " поза 0..10000: " + weightBp);
-        }
+        Ids.requireSnakeCase("sector.id", id);
+        Checks.inRange("sector." + id + ".weight_bp", weightBp, 0, Wheel.TOTAL_BP);
         Objects.requireNonNull(value, "value");
-        if (quality < 0 || quality > 100) {
-            throw new IllegalArgumentException("якість сектора " + id + " поза 0..100: " + quality);
-        }
+        Checks.inRange("sector." + id + ".quality", quality, 0, 100);
         Objects.requireNonNull(tier, "tier");
         tags = List.copyOf(tags);
     }

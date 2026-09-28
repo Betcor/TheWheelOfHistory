@@ -48,8 +48,4 @@ public enum Stat {
     public long clamp(long value) {
         return Math.clamp(value, min, max);
     }
-
-    boolean contains(long value) {
-        return value >= min && value <= max;
-    }
 }

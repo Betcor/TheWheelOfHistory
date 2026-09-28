@@ -3,9 +3,11 @@ package kolo.engine.archfixture;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import kolo.engine.error.Checks;
 
 /** Дозволені конструкції, схожі на заборонені: правила не повинні на них спрацьовувати. */
 public final class Allowed {
@@ -33,5 +35,13 @@ public final class Allowed {
 
     public static int clamp(long value) {
         return Math.clamp(value, 0, 100);
+    }
+
+    public static int checked(int value) {
+        return Checks.inRange("value", value, 0, 100);
+    }
+
+    public static int required(Integer value) {
+        return Objects.requireNonNull(value, "value");
     }
 }

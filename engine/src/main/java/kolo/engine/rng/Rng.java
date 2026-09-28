@@ -1,5 +1,7 @@
 package kolo.engine.rng;
 
+import kolo.engine.error.Checks;
+
 /**
  * Потік псевдовипадкових чисел рушія.
  *
@@ -55,9 +57,7 @@ public final class Rng {
      * генеруються наново.
      */
     public int nextInt(int bound) {
-        if (bound <= 0) {
-            throw new IllegalArgumentException("bound має бути додатним: " + bound);
-        }
+        Checks.inRange("bound", bound, 1, Integer.MAX_VALUE);
         // Старші 31 біт: у xoshiro256** вони найякісніші, а невід'ємне int спрощує перевірку переповнення.
         int bits = (int) (nextLong() >>> 33);
         int value = bits % bound;

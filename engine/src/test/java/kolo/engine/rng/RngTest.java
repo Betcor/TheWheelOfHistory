@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.TreeSet;
+import kolo.engine.error.ValidationException;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.IntRange;
@@ -151,7 +152,7 @@ class RngTest {
 
     @Property
     void rejectsNonPositiveBound(@ForAll @IntRange(min = Integer.MIN_VALUE, max = 0) int bound) {
-        assertThatThrownBy(() -> Rng.of(1).nextInt(bound)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Rng.of(1).nextInt(bound)).isInstanceOf(ValidationException.class);
     }
 
     private static double chiSquare(int[] counts, int draws) {

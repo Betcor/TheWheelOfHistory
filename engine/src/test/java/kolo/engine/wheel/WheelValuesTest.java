@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import kolo.engine.error.ValidationException;
 import org.junit.jupiter.api.Test;
 
 /** Значення-об'єкти колеса: перевірки в конструкторах і незмінність. */
@@ -29,20 +30,20 @@ class WheelValuesTest {
 
     @Test
     void advantageRejectsOutOfRangeValue() {
-        assertThatThrownBy(() -> new Advantage(101, List.of())).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new Advantage(-101, List.of())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Advantage(101, List.of())).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> new Advantage(-101, List.of())).isInstanceOf(ValidationException.class);
     }
 
     @Test
     void sectorValidatesFields() {
         assertThatThrownBy(() -> new Sector<>("Bad-Id", 1, "x", 0, OutcomeTier.FAIL, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new Sector<>("ok", -1, "x", 0, OutcomeTier.FAIL, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new Sector<>("ok", 10_001, "x", 0, OutcomeTier.FAIL, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new Sector<>("ok", 1, "x", 101, OutcomeTier.FAIL, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new Sector<>("ok", 1, null, 0, OutcomeTier.FAIL, List.of()))
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new Sector<>("ok", 1, "x", 0, null, List.of()))
@@ -61,9 +62,9 @@ class WheelValuesTest {
     @Test
     void wheelKindIsSnakeCase() {
         assertThat(new WheelKind("economic_cycle").id()).isEqualTo("economic_cycle");
-        assertThatThrownBy(() -> new WheelKind("EconomicCycle")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new WheelKind("1st")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new WheelKind("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new WheelKind("EconomicCycle")).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> new WheelKind("1st")).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> new WheelKind("")).isInstanceOf(ValidationException.class);
     }
 
     @Test
@@ -90,10 +91,10 @@ class WheelValuesTest {
         assertThat(record.result().quality()).isEqualTo(80);
 
         assertThatThrownBy(() -> new RollRecord(kind, sectors, 0, List.of(), "missing", 5000, 0, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new RollRecord(kind, sectors, 0, List.of(), "fail", 10_000, 0, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> new RollRecord(kind, sectors, 0, List.of(), "fail", 0, -1, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ValidationException.class);
     }
 }

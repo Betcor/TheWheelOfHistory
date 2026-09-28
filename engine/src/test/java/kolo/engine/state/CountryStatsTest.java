@@ -3,6 +3,8 @@ package kolo.engine.state;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ValidationException;
 import org.junit.jupiter.api.Test;
 
 class CountryStatsTest {
@@ -26,15 +28,22 @@ class CountryStatsTest {
     }
 
     @Test
-    void rejectsValuesOutsideRange() {
-        assertThatThrownBy(() -> new CountryStats(-1, 60, 55, 30, 70, 10, 40))
-                .isInstanceOf(IllegalArgumentException.class);
+    void outOfRangeDetailsNameTheStat() {
         assertThatThrownBy(() -> new CountryStats(0, 101, 55, 30, 70, 10, 40))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new CountryStats(0, 60, 55, 30, 70, -1, 40))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new CountryStats(0, 60, 55, 30, 70, 10, -5))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE);
+                    assertThat(e.details())
+                            .containsEntry("field", "stats.STABILITY")
+                            .containsEntry("value", 101L);
+                });
+    }
+
+    @Test
+    void rejectsValuesOutsideRange() {
+        assertThatThrownBy(() -> new CountryStats(-1, 60, 55, 30, 70, 10, 40)).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> new CountryStats(0, 101, 55, 30, 70, 10, 40)).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> new CountryStats(0, 60, 55, 30, 70, -1, 40)).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> new CountryStats(0, 60, 55, 30, 70, 10, -5)).isInstanceOf(ValidationException.class);
     }
 
     @Test
