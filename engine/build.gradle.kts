@@ -3,7 +3,6 @@ plugins {
 }
 
 dependencies {
-    // Рушій бачить лише модель контенту; заборону kolo.content.loader перевіряє ArchUnit.
-    api(project(":content"))
+    // Рушій — нижній шар: модель контенту живе в ньому, завантажувач (модуль content) залежить від рушія.
     implementation(libs.jts.core)
 }

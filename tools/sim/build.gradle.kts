@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":ai"))
+    implementation(project(":content"))
 }
 
 application {

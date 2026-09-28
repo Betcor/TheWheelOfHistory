@@ -7,24 +7,18 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
-/** Межі модуля {@code engine}: рушій бачить лише модель контенту. */
+/** Межі модуля {@code engine}: рушій — нижній шар і не залежить від інших модулів гри. */
 @AnalyzeClasses(packages = "kolo", importOptions = ImportOption.DoNotIncludeTests.class)
 class EngineBoundariesTest {
 
-    // Gradle пускає content у classpath рушія цілком, тож заборону завантажувача перевіряємо тут.
+    // Граф Gradle і так цього не дозволяє; правило ловить випадкову залежність, додану в build.gradle.kts.
     @ArchTest
-    static final ArchRule engineUsesOnlyContentModel = noClasses()
+    static final ArchRule engineIsBottomLayer = noClasses()
             .that()
             .resideInAPackage("kolo.engine..")
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(
-                    "kolo.content.loader..",
-                    "kolo.content.validation..",
-                    "kolo.ai..",
-                    "kolo.protocol..",
-                    "kolo.server..",
-                    "kolo.client..",
-                    "kolo.tools..")
+                    "kolo.content..", "kolo.ai..", "kolo.protocol..", "kolo.server..", "kolo.client..", "kolo.tools..")
             .allowEmptyShould(true);
 }

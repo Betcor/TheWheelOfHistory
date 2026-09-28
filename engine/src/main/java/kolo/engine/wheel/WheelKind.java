@@ -1,5 +1,7 @@
 package kolo.engine.wheel;
 
+import kolo.engine.error.Checks;
+
 /**
  * Тип колеса, напр. {@code construction}, {@code economic_cycle}, {@code generation_ideology}.
  *
@@ -8,7 +10,7 @@ package kolo.engine.wheel;
 public record WheelKind(String id) implements Comparable<WheelKind> {
 
     public WheelKind {
-        Ids.requireSnakeCase("wheel_kind", id);
+        Checks.snakeCase("wheel_kind", id);
     }
 
     @Override

@@ -47,7 +47,20 @@ public enum ErrorCode {
     CONFLICT(ConflictException.class),
     PROTOCOL_ERROR(ProtocolException.class),
     VERSION_MISMATCH(VersionMismatchException.class),
+    /**
+     * Значення в контенті невалідне. Подробиці: {@code file}, {@code location} (шлях усередині файлу), {@code cause}
+     * (код первинної помилки) і подробиці первинної помилки ({@code field}, {@code value}…).
+     */
     INVALID_CONTENT(ContentException.class),
+    /** Файлу контенту немає. Подробиці: {@code file}. */
+    CONTENT_FILE_MISSING(ContentException.class),
+    /** Файл контенту не вдалося прочитати. Подробиці: {@code file}. */
+    CONTENT_READ_FAILED(ContentException.class),
+    /**
+     * Файл контенту — не валідний YAML або не відповідає структурі (невідоме поле, не той тип). Подробиці: {@code
+     * file}, {@code line}, {@code column}, {@code problem} (опис для автора контенту, не для гравця).
+     */
+    CONTENT_MALFORMED(ContentException.class),
     SAVE_FILE_ERROR(SaveFileException.class),
     SAVE_VERSION_TOO_NEW(SaveVersionException.class),
     INVARIANT_VIOLATION(InvariantViolationException.class);

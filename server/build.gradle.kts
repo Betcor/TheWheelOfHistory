@@ -6,6 +6,7 @@ plugins {
 dependencies {
     api(project(":protocol"))
     implementation(project(":ai"))
+    implementation(project(":content"))
     implementation(libs.netty.handler)
     implementation(libs.netty.transport)
     implementation(libs.sqlite.jdbc)

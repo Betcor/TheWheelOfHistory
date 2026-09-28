@@ -7,16 +7,15 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
-@AnalyzeClasses(packages = "kolo.content", importOptions = ImportOption.DoNotIncludeTests.class)
+@AnalyzeClasses(packages = "kolo", importOptions = ImportOption.DoNotIncludeTests.class)
 class ContentBoundariesTest {
 
-    // Модель потрапляє в рушій, тому не може тягнути за собою завантажувач (Jackson, файли).
+    // Формат файлів (Jackson, YAML) — деталь завантажувача: модель рушія не повинна від нього залежати.
     @ArchTest
-    static final ArchRule modelIsIndependentOfLoading = noClasses()
+    static final ArchRule jacksonStaysInLoader = noClasses()
             .that()
-            .resideInAPackage("kolo.content.model..")
+            .resideOutsideOfPackage("kolo.content.loader..")
             .should()
             .dependOnClassesThat()
-            .resideInAnyPackage("kolo.content.loader..", "kolo.content.validation..", "com.fasterxml.jackson..")
-            .allowEmptyShould(true);
+            .resideInAPackage("com.fasterxml.jackson..");
 }
