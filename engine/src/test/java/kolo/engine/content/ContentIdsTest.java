@@ -18,7 +18,8 @@ class ContentIdsTest {
             () -> new SubIdeologyId("liberal-democracy"),
             () -> new DoctrineId(""),
             () -> new ResourceId(null),
-            () -> new TraitId("Brave")
+            () -> new TraitId("Brave"),
+            () -> new GdpLevelId("Very Rich")
         }) {
             assertThatThrownBy(invalid::run)
                     .isInstanceOfSatisfying(
@@ -36,5 +37,7 @@ class ContentIdsTest {
 
         assertThat(ids).extracting(ResourceId::value).containsExactly("coal", "oil", "uranium");
         assertThat(new DoctrineId("armored")).hasToString("armored");
+        assertThat(new GdpLevelId("middle")).hasToString("middle");
+        assertThat(new GdpLevelId("middle")).isLessThan(new GdpLevelId("poor"));
     }
 }

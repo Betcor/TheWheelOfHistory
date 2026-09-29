@@ -81,6 +81,13 @@ class WheelValuesTest {
     }
 
     @Test
+    void tierKeyIsContentKey() {
+        assertThat(OutcomeTier.CRIT_FAIL.key()).isEqualTo("crit_fail");
+        assertThat(OutcomeTier.PARTIAL.key()).isEqualTo("partial");
+        assertThat(OutcomeTier.CRIT_SUCCESS.key()).isEqualTo("crit_success");
+    }
+
+    @Test
     void rollRecordValidatesResult() {
         List<RolledSector> sectors = List.of(
                 new RolledSector("fail", 4000, OutcomeTier.FAIL, 10),

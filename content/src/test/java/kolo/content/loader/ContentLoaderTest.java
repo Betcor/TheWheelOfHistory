@@ -3,16 +3,20 @@ package kolo.content.loader;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BalanceDef;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.CountRange;
+import kolo.engine.content.GdpLevelDef;
+import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MedianRange;
@@ -40,6 +44,7 @@ import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.Sex;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.OutcomeTier;
 import kolo.engine.wheel.WheelKind;
 import org.junit.jupiter.api.Test;
 
@@ -529,6 +534,87 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsGdpLevelsInContentOrder() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.gdpLevels())
+                .extracting(GdpLevelDef::id, GdpLevelDef::perCapita, GdpLevelDef::tier, GdpLevelDef::weight)
+                .containsExactly(
+                        tuple(new GdpLevelId("poor"), 250, OutcomeTier.CRIT_FAIL, 30),
+                        tuple(new GdpLevelId("middle"), 1000, OutcomeTier.PARTIAL, 40),
+                        tuple(new GdpLevelId("rich"), 3500, OutcomeTier.CRIT_SUCCESS, 30));
+        GdpLevelDef rich = pack.gdpLevel(new GdpLevelId("rich")).orElseThrow();
+        assertThat(rich.name()).isEqualTo("Заможність");
+        assertThat(rich.quality()).isEqualTo(80);
+        assertThat(rich.tags()).containsExactly("rich");
+        assertThat(pack.gdpLevel(new GdpLevelId("middle")).orElseThrow().tags()).isEmpty();
+    }
+
+    @Test
+    void invalidGdpLevelIsReportedAtItsPosition() {
+        assertGdpError(
+                Files.GDP.replace("per_capita: 1000, ", ""),
+                Map.of("location", "levels[1]", "cause", "blank_value", "field", "per_capita"));
+        assertGdpError(
+                Files.GDP.replace("tier: partial", "tier: average"),
+                Map.of("location", "levels[1]", "cause", "unknown_reference", "field", "tier", "value", "average"));
+        assertGdpError(
+                Files.GDP.replace("tier: crit_success", "tier: CRIT_SUCCESS"),
+                Map.of("location", "levels[2]", "cause", "unknown_reference"));
+        assertGdpError(
+                Files.GDP.replace("per_capita: 250", "per_capita: 0"),
+                Map.of("location", "levels[0]", "cause", "value_out_of_range", "field", "gdp_level.poor.per_capita"));
+        assertGdpError(
+                Files.GDP.replace("id: rich", "id: middle"), Map.of("location", "levels[2]", "cause", "duplicate_id"));
+        assertGdpError("levels: []\n", Map.of("location", "levels", "cause", "empty_collection"));
+    }
+
+    @Test
+    void gdpLevelsMustGoFromPoorToRich() {
+        assertGdpError(
+                Files.GDP.replace("per_capita: 3500", "per_capita: 1000"),
+                Map.of(
+                        "location",
+                        "levels[2]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "gdp_level.rich.per_capita",
+                        "value",
+                        1000));
+        assertGdpError(
+                Files.GDP.replace("tier: crit_success", "tier: fail"),
+                Map.of(
+                        "location",
+                        "levels[2]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "gdp_level.rich.tier",
+                        "value",
+                        "fail"));
+    }
+
+    @Test
+    void gdpLevelTagIsASourceForBackstoryConditions() {
+        String backstory = Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, rich]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.GDP, Files.GDP.replace(", tags: [rich]", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "rich"));
+    }
+
+    @Test
     void loadsBalance() {
         BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
 
@@ -602,6 +688,10 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("nuclear_energy_advantage: 10", "nuclear_energy_advantage: 101")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.nuclear_energy_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("gdp_development_advantage: 10", "gdp_development_advantage: -1")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.gdp_development_advantage"));
     }
 
     @Test
@@ -628,6 +718,16 @@ class ContentLoaderTest {
                         "blank_value",
                         "field",
                         "nuclear_energy_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  gdp_development_advantage: 10\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "generation.gdp_development_advantage",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "gdp_development_advantage"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,
@@ -822,6 +922,20 @@ class ContentLoaderTest {
         assertThat(backstory).isNotEqualTo(Files.BACKSTORY);
         assertContentError(
                 Files.valid().with(ContentLoader.BACKSTORY, backstory).source(), ErrorCode.INVALID_CONTENT, expected);
+    }
+
+    private static void assertGdpError(String gdp, Map<String, ?> expected) {
+        assertThat(gdp).isNotEqualTo(Files.GDP);
+        assertContentError(
+                Files.valid().with(ContentLoader.GDP, gdp).source(),
+                ErrorCode.INVALID_CONTENT,
+                withFile(ContentLoader.GDP, expected));
+    }
+
+    private static Map<String, ?> withFile(String file, Map<String, ?> expected) {
+        TreeMap<String, Object> all = new TreeMap<>(expected);
+        all.put("file", file);
+        return all;
     }
 
     private static void assertNamesError(String names, Map<String, ?> expected) {

@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import kolo.engine.error.Checks;
@@ -12,6 +13,7 @@ import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.AppliedModifier;
 import kolo.engine.wheel.RollRecord;
 
 /**
@@ -46,5 +48,17 @@ public record StartDevelopment(
     /** Рівень галузі. */
     public int level(TechBranch branch) {
         return levels.get(branch);
+    }
+
+    /**
+     * Внесок галузі в перевагу колеса генерації: рівень × {@code perLevel}. Рядок пояснення має id {@code
+     * development:<галузь>} і ключ {@code development.<галузь>}; на світовому рівні внеску немає.
+     */
+    public Optional<AppliedModifier> advantage(TechBranch branch, int perLevel) {
+        int value = level(branch) * perLevel;
+        if (value == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(new AppliedModifier("development:" + branch.key(), "development." + branch.key(), value));
     }
 }

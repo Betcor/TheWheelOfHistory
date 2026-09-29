@@ -29,6 +29,8 @@ import kolo.engine.content.CountRange;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
+import kolo.engine.content.GdpLevelDef;
+import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
@@ -68,6 +70,7 @@ import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.OutcomeTier;
 import kolo.engine.wheel.WheelKind;
 
 /**
@@ -84,6 +87,7 @@ public final class ContentLoader {
     public static final String RESOURCES = "resources.yaml";
     public static final String DEVELOPMENT = "development.yaml";
     public static final String NUCLEAR = "nuclear.yaml";
+    public static final String GDP = "gdp.yaml";
     public static final String PEOPLE = "people.yaml";
     public static final String NAMES = "names.yaml";
     public static final String BACKSTORY = "backstory.yaml";
@@ -91,7 +95,7 @@ public final class ContentLoader {
 
     /** Усі файли контенту; кожен обов'язковий. */
     public static final List<String> FILES =
-            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, PEOPLE, NAMES, BACKSTORY, BALANCE);
+            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, GDP, PEOPLE, NAMES, BACKSTORY, BALANCE);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -115,12 +119,13 @@ public final class ContentLoader {
         List<TechBranchDef> branches = techBranches(development);
         List<DevelopmentLevelDef> levels = developmentLevels(development);
         List<NuclearStatusDef> nuclear = nuclearStatuses(parse(files, NUCLEAR, ContentYaml.NuclearFile.class));
+        List<GdpLevelDef> gdp = gdpLevels(parse(files, GDP, ContentYaml.GdpFile.class));
         ContentYaml.PeopleFile people = parse(files, PEOPLE, ContentYaml.PeopleFile.class);
         List<PersonKindDef> kinds = personKinds(people);
         List<TraitDef> traits = traits(people);
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
         BackstoryContent backstory =
-                backstory(parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, levels, nuclear);
+                backstory(parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, levels, nuclear, gdp);
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -136,6 +141,7 @@ public final class ContentLoader {
                         branches,
                         levels,
                         nuclear,
+                        gdp,
                         kinds,
                         traits,
                         names,
@@ -298,6 +304,35 @@ public final class ContentLoader {
         });
         complete(NUCLEAR, "statuses", seen, List.of(NuclearStatus.values()), NuclearStatus::key);
         return statuses;
+    }
+
+    private static List<GdpLevelDef> gdpLevels(ContentYaml.GdpFile yaml) {
+        TreeSet<GdpLevelId> ids = new TreeSet<>();
+        List<GdpLevelDef> levels = list(GDP, "levels", nonEmpty(GDP, "levels", yaml.levels()), (location, level) -> {
+            GdpLevelId id = at(GDP, location, () -> unique(ids, new GdpLevelId(level.id())));
+            return at(
+                    GDP,
+                    location,
+                    () -> new GdpLevelDef(
+                            id,
+                            level.name(),
+                            level.description(),
+                            required("per_capita", level.perCapita()),
+                            ContentKeys.parse("tier", OutcomeTier.values(), OutcomeTier::key, level.tier()),
+                            required("weight", level.weight()),
+                            required("quality", level.quality()),
+                            level.tags()));
+        });
+        // Порядок перевіряється тут, щоб помилка вказувала на рівень, що стоїть не на своєму місці.
+        for (int i = 1; i < levels.size(); i++) {
+            GdpLevelDef previous = levels.get(i - 1);
+            GdpLevelDef next = levels.get(i);
+            at(GDP, "levels[" + i + "]", () -> {
+                GdpLevelDef.checkFollows(previous, next);
+                return next;
+            });
+        }
+        return levels;
     }
 
     private static List<PersonKindDef> personKinds(ContentYaml.PeopleFile yaml) {
@@ -544,14 +579,15 @@ public final class ContentLoader {
     }
 
     /**
-     * @param ideologies уже завантажені ідеології, рівні розвиненості й ядерні статуси: їхні мітки — джерела міток в
-     *     умовах фрагментів
+     * @param ideologies уже завантажені ідеології, рівні розвиненості, ядерні статуси й рівні ВВП: їхні мітки —
+     *     джерела міток в умовах фрагментів
      */
     private static BackstoryContent backstory(
             ContentYaml.BackstoryFile yaml,
             List<IdeologyDef> ideologies,
             List<DevelopmentLevelDef> levels,
-            List<NuclearStatusDef> nuclear) {
+            List<NuclearStatusDef> nuclear,
+            List<GdpLevelDef> gdp) {
         TreeSet<BackstoryFragmentId> ids = new TreeSet<>();
         List<BackstoryFragmentDef> fragments = list(
                 BACKSTORY, "fragments", nonEmpty(BACKSTORY, "fragments", yaml.fragments()), (location, fragment) -> {
@@ -570,6 +606,7 @@ public final class ContentLoader {
         }
         levels.forEach(level -> known.addAll(level.tags()));
         nuclear.forEach(status -> known.addAll(status.tags()));
+        gdp.forEach(level -> known.addAll(level.tags()));
         for (int i = 0; i < fragments.size(); i++) {
             for (String tag : fragments.get(i).referencedTags()) {
                 if (!known.contains(tag)) {
@@ -659,8 +696,14 @@ public final class ContentLoader {
                 BALANCE,
                 "generation.nuclear_energy_advantage",
                 () -> required("nuclear_energy_advantage", generationYaml.nuclearEnergyAdvantage()));
-        GenerationBalanceDef generation =
-                at(BALANCE, "generation", () -> new GenerationBalanceDef(fragments, people, warheads, energyAdvantage));
+        int gdpAdvantage = at(
+                BALANCE,
+                "generation.gdp_development_advantage",
+                () -> required("gdp_development_advantage", generationYaml.gdpDevelopmentAdvantage()));
+        GenerationBalanceDef generation = at(
+                BALANCE,
+                "generation",
+                () -> new GenerationBalanceDef(fragments, people, warheads, energyAdvantage, gdpAdvantage));
 
         return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation));
     }

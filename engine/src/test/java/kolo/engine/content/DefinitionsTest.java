@@ -13,6 +13,7 @@ import kolo.engine.state.Development;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.OutcomeTier;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
@@ -110,6 +111,61 @@ class DefinitionsTest {
     }
 
     @Test
+    void gdpLevelFieldsAreBounded() {
+        GdpLevelDef middle = gdp("middle", 1000, OutcomeTier.PARTIAL, 24, 50);
+        assertThat(middle)
+                .extracting(GdpLevelDef::perCapita, GdpLevelDef::tier, GdpLevelDef::weight, GdpLevelDef::quality)
+                .containsExactly(1000, OutcomeTier.PARTIAL, 24, 50);
+        assertFails(() -> gdp("middle", 0, OutcomeTier.PARTIAL, 24, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> gdp("middle", GdpLevelDef.MAX_PER_CAPITA + 1, OutcomeTier.PARTIAL, 24, 50),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> gdp("middle", 1000, OutcomeTier.PARTIAL, 0, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> gdp("middle", 1000, OutcomeTier.PARTIAL, GdpLevelDef.MAX_WEIGHT + 1, 50),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> gdp("middle", 1000, OutcomeTier.PARTIAL, 24, 101), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GdpLevelDef(
+                        new GdpLevelId("middle"), " ", "Опис", 1000, OutcomeTier.PARTIAL, 24, 50, List.of()),
+                ErrorCode.BLANK_VALUE);
+        assertFails(
+                () -> new GdpLevelDef(
+                        new GdpLevelId("middle"),
+                        "Середній",
+                        "Опис",
+                        1000,
+                        OutcomeTier.PARTIAL,
+                        24,
+                        50,
+                        List.of("Poor")),
+                ErrorCode.INVALID_KEY_FORMAT);
+        assertThatThrownBy(() ->
+                        new GdpLevelDef(new GdpLevelId("middle"), "Середній", "Опис", 1000, null, 24, 50, List.of()))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void gdpLevelFollowsPoorerLevelWithHigherIncomeAndNoLowerTier() {
+        GdpLevelDef poor = gdp("poor", 250, OutcomeTier.FAIL, 10, 20);
+
+        GdpLevelDef.checkFollows(poor, gdp("lower_middle", 500, OutcomeTier.FAIL, 10, 40));
+        GdpLevelDef.checkFollows(poor, gdp("rich", 3500, OutcomeTier.CRIT_SUCCESS, 10, 80));
+        assertThatThrownBy(() -> GdpLevelDef.checkFollows(poor, gdp("same", 250, OutcomeTier.SUCCESS, 10, 50)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "gdp_level.same.per_capita"), entry("value", 250));
+                });
+        assertThatThrownBy(() -> GdpLevelDef.checkFollows(poor, gdp("worse", 500, OutcomeTier.CRIT_FAIL, 10, 5)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "gdp_level.worse.tier"), entry("value", "crit_fail"));
+                });
+    }
+
+    @Test
     void personKindNeedsNameAndDescription() {
         assertThat(new PersonKindDef(PersonKind.GENERAL, "Генерал", "Командує фронтом.", List.of("military")).tags())
                 .containsExactly("military");
@@ -165,6 +221,10 @@ class DefinitionsTest {
 
         assertThat(iron.tags()).containsExactly("metal");
         assertThatThrownBy(() -> iron.tags().add("x")).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    private static GdpLevelDef gdp(String id, int perCapita, OutcomeTier tier, int weight, int quality) {
+        return new GdpLevelDef(new GdpLevelId(id), "Рівень", "Опис", perCapita, tier, weight, quality, List.of());
     }
 
     private static void assertFails(ThrowingCallable call, ErrorCode code) {

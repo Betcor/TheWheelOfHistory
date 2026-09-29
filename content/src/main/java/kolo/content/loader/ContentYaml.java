@@ -94,6 +94,31 @@ final class ContentYaml {
         }
     }
 
+    record GdpFile(List<GdpLevel> levels) {
+        GdpFile {
+            levels = orEmpty(levels);
+        }
+    }
+
+    /**
+     * @param perCapita ВВП на душу, умовні долари 1970 року
+     * @param tier ключ рівня результату: {@code crit_fail}, {@code fail}, {@code partial}, {@code success} або
+     *     {@code crit_success}
+     */
+    record GdpLevel(
+            String id,
+            String name,
+            String description,
+            @JsonProperty("per_capita") Integer perCapita,
+            String tier,
+            Integer weight,
+            Integer quality,
+            List<String> tags) {
+        GdpLevel {
+            tags = orEmpty(tags);
+        }
+    }
+
     record PeopleFile(List<PersonKind> kinds, List<Trait> traits) {
         PeopleFile {
             kinds = orEmpty(kinds);
@@ -298,7 +323,8 @@ final class ContentYaml {
             @JsonProperty("backstory_fragments") Count backstoryFragments,
             @JsonProperty("notable_people") Count notablePeople,
             Count warheads,
-            @JsonProperty("nuclear_energy_advantage") Integer nuclearEnergyAdvantage) {}
+            @JsonProperty("nuclear_energy_advantage") Integer nuclearEnergyAdvantage,
+            @JsonProperty("gdp_development_advantage") Integer gdpDevelopmentAdvantage) {}
 
     record Count(Integer min, Integer max) {}
 

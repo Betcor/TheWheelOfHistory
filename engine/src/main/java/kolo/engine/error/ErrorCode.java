@@ -45,6 +45,11 @@ public enum ErrorCode {
      * визначення. Подробиці: {@code field}, {@code value}.
      */
     INVALID_TEMPLATE(ValidationException.class),
+    /**
+     * Елементи списку йдуть не в тому порядку, якого вимагають правила (напр. рівні ВВП — від бідного до багатого).
+     * Подробиці: {@code field}, {@code value}.
+     */
+    OUT_OF_ORDER(ValidationException.class),
     /** Сума ваг колеса нульова. */
     WHEEL_ZERO_WEIGHT(ValidationException.class),
     /** Критичних секторів більше, ніж вміщує мінімум 1% кожному. Подробиці: {@code count}, {@code max}. */

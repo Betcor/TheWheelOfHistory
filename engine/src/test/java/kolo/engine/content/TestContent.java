@@ -12,6 +12,7 @@ import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.OutcomeTier;
 
 /** Мінімальні валідні визначення для тестів моделі контенту. */
 final class TestContent {
@@ -64,6 +65,18 @@ final class TestContent {
         return Arrays.stream(NuclearStatus.values())
                 .map(status -> new NuclearStatusDef(status, "Статус " + status.key(), 100, 50, List.of()))
                 .toList();
+    }
+
+    static GdpLevelDef gdpLevel(String id, int perCapita, OutcomeTier tier, List<String> tags) {
+        return new GdpLevelDef(new GdpLevelId(id), "Рівень " + id, "Опис рівня " + id, perCapita, tier, 100, 50, tags);
+    }
+
+    /** Три рівні ВВП від бідного до багатого. */
+    static List<GdpLevelDef> gdpLevels() {
+        return List.of(
+                gdpLevel("poor", 250, OutcomeTier.CRIT_FAIL, List.of()),
+                gdpLevel("middle", 1000, OutcomeTier.PARTIAL, List.of()),
+                gdpLevel("rich", 3500, OutcomeTier.CRIT_SUCCESS, List.of()));
     }
 
     /** По визначенню на кожен тип постаті. */
@@ -191,7 +204,7 @@ final class TestContent {
                 new WheelBalanceDef(50, new TreeMap<>(), List.of(20, 10, 5)),
                 new StreakRulesDef(85, 15, 3),
                 Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList(),
-                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10));
+                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10));
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {
@@ -203,6 +216,7 @@ final class TestContent {
                 branches(),
                 levels(),
                 nuclearStatuses(),
+                gdpLevels(),
                 personKinds(),
                 traits(),
                 names(ideologies),
