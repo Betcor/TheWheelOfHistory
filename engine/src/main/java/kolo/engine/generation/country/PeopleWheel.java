@@ -11,6 +11,7 @@ import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
+import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.InvariantViolationException;
 import kolo.engine.error.ValidationException;
@@ -28,7 +29,7 @@ import kolo.engine.wheel.WheelKind;
 import kolo.engine.wheel.WheelSpin;
 
 /**
- * Колесо відомих людей (GD §4.1, колесо 16: залежить від ідеології, ІЛР і передісторії; GD §4.8, §12.3).
+ * Колесо відомих людей (GD §4.1, колесо 17: залежить від ідеології, ІЛР, передісторії й стилю назви; GD §4.8, §12.3).
  *
  * <ol>
  *   <li>Колесо {@link #COUNT_KIND} з рівними секторами обирає кількість постатей у межах балансу ({@code
@@ -80,6 +81,19 @@ public final class PeopleWheel {
      */
     public static StartPeople generate(
             Rng rng, ContentPack content, Set<String> tags, NameStyleId style, Set<String> takenNames) {
+        return generate(rng, content, tags, style, takenNames, 0);
+    }
+
+    /**
+     * Те саме, що {@link #generate(Rng, ContentPack, Set, NameStyleId, Set)}, але з додатковими постатями понад
+     * обрану кількість — нагородами стріків генерації (GD §4.10). Додаткові постаті йдуть після обраних, кожна у
+     * своєму потоці {@code person:<номер>}, тож обрані постаті ті самі, що й без додаткових.
+     *
+     * @param extra скільки постатей додати, {@code 0..}
+     */
+    public static StartPeople generate(
+            Rng rng, ContentPack content, Set<String> tags, NameStyleId style, Set<String> takenNames, int extra) {
+        Checks.inRange("extra_people", extra, 0, Integer.MAX_VALUE);
         Objects.requireNonNull(rng, "rng");
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(tags, "tags");
@@ -94,7 +108,7 @@ public final class PeopleWheel {
         List<Sector<PersonKind>> kinds = kindSectors(content, tags);
         List<StartPerson> people = new ArrayList<>();
         // Ваги типів не залежать від уже обраних постатей: без жодного доступного типу постатей немає зовсім.
-        for (int i = 0; i < countSpin.value() && !kinds.isEmpty(); i++) {
+        for (int i = 0; i < countSpin.value() + extra && !kinds.isEmpty(); i++) {
             people.add(person(rng.fork("person:" + i), content, kinds, style, taken));
         }
         return new StartPeople(people, countSpin.record());

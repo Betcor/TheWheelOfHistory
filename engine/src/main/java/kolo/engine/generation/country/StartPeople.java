@@ -6,7 +6,7 @@ import java.util.Objects;
 import kolo.engine.wheel.RollRecord;
 
 /**
- * Відомі люди держави на старті (GD §4.1, колесо 16; GD §4.8) — результат {@link PeopleWheel}.
+ * Відомі люди держави на старті (GD §4.1, колесо 17; GD §4.8) — результат {@link PeopleWheel}.
  *
  * @param people постаті в порядку генерації
  * @param countRoll обертання колеса кількості постатей

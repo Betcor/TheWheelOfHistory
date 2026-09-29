@@ -22,7 +22,7 @@ import kolo.engine.wheel.WheelKind;
 import kolo.engine.wheel.WheelSpin;
 
 /**
- * Колесо назви (GD §4.1, колесо 17; GD §4.9).
+ * Колесо назви (GD §4.1, колесо 16; GD §4.9).
  *
  * <p>Перед обертанням складається {@code generation.name_candidates} готових назв-кандидатів: кожна — рівноймовірні
  * мовний стиль, форма державності, доступна підкласифікації, і корінь ({@link CountryNames}). Колесо {@link #KIND}

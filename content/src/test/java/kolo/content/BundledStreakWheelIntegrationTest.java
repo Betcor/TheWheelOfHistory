@@ -2,9 +2,7 @@ package kolo.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.IntPredicate;
@@ -15,25 +13,12 @@ import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
 import kolo.engine.content.StreakRulesDef;
 import kolo.engine.content.StreakWheelDef;
-import kolo.engine.generation.country.ArmySizeWheel;
-import kolo.engine.generation.country.ArmyTrainingWheel;
-import kolo.engine.generation.country.Backstory;
-import kolo.engine.generation.country.BackstoryWheel;
-import kolo.engine.generation.country.DevelopmentWheel;
-import kolo.engine.generation.country.GdpWheel;
-import kolo.engine.generation.country.HdiWheel;
-import kolo.engine.generation.country.NuclearWheel;
-import kolo.engine.generation.country.Regime;
-import kolo.engine.generation.country.RegimeWheel;
-import kolo.engine.generation.country.StartArmySize;
-import kolo.engine.generation.country.StartArmyTraining;
-import kolo.engine.generation.country.StartDevelopment;
-import kolo.engine.generation.country.StartGdp;
-import kolo.engine.generation.country.StartHdi;
-import kolo.engine.generation.country.StartNuclear;
+import kolo.engine.generation.country.CountryGenerationInput;
+import kolo.engine.generation.country.CountryGenerator;
 import kolo.engine.generation.country.StreakBonus;
 import kolo.engine.generation.country.StreakWheel;
-import kolo.engine.generation.country.Streaks;
+import kolo.engine.generation.religion.StartReligion;
+import kolo.engine.generation.religion.WorldReligionsWheel;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.rng.Rng;
 import org.junit.jupiter.api.Test;
@@ -46,6 +31,8 @@ class BundledStreakWheelIntegrationTest {
 
     private static final ContentPack PACK = ContentLoader.loadBundled();
     private static final int SEEDS = 5_000;
+    private static final List<StartReligion> RELIGIONS =
+            WorldReligionsWheel.generate(Rng.of(0), PACK, 20).religions();
 
     @Test
     void goldenAgeAlwaysDrawsWorldAttention() {
@@ -147,46 +134,16 @@ class BundledStreakWheelIntegrationTest {
         return longest;
     }
 
-    /** Стріки держави в порядку коліс GD §4.1 без карти; нейтральні колеса лічильнику не передаються. */
+    /** Стріки держави з ланцюжка коліс генерації без карти; уран — у кожної другої. */
     private static List<StreakKind> streaksOf(long seed) {
-        Rng rng = Rng.of(seed);
-        Regime regime = RegimeWheel.generate(rng.fork("regime"), PACK);
-        StartDevelopment development = DevelopmentWheel.generate(rng.fork("development"), PACK, regime.modifiers());
-        StartGdp gdp = GdpWheel.generate(rng.fork("gdp"), PACK, regime.modifiers(), development);
-        StartHdi hdi = HdiWheel.generate(rng.fork("hdi"), PACK, regime.modifiers(), gdp);
-        StartArmySize army = ArmySizeWheel.generate(rng.fork("army_size"), PACK, regime.modifiers(), gdp);
-        StartArmyTraining training =
-                ArmyTrainingWheel.generate(rng.fork("army_training"), PACK, regime.modifiers(), gdp, development);
-        List<ResourceId> resources = seed % 2 == 0 ? List.of(new ResourceId("uranium")) : List.of();
-        StartNuclear nuclear =
-                NuclearWheel.generate(rng.fork("nuclear"), PACK, regime.modifiers(), development, resources);
-        TreeSet<String> tags = new TreeSet<>(regime.tags());
-        tags.addAll(development.tags());
-        tags.addAll(gdp.tags());
-        tags.addAll(hdi.tags());
-        tags.addAll(army.tags());
-        tags.addAll(training.tags());
-        tags.addAll(nuclear.tags());
-        Backstory backstory = BackstoryWheel.generate(rng.fork("backstory"), PACK, tags, List.of());
-
-        List<Integer> qualities = new ArrayList<>(List.of(
-                development.quality(),
-                gdp.quality(),
-                hdi.quality(),
-                army.quality(),
-                training.quality(),
-                nuclear.quality()));
-        OptionalInt backstoryQuality = backstory.quality();
-        backstoryQuality.ifPresent(qualities::add);
-
-        StreakRulesDef rules = PACK.balance().streaks();
-        List<StreakKind> fired = new ArrayList<>();
-        Streaks streaks = Streaks.START;
-        for (int quality : qualities) {
-            Streaks.Step step = streaks.next(rules, quality);
-            step.triggered().ifPresent(fired::add);
-            streaks = step.streaks();
+        TreeSet<ResourceId> resources = new TreeSet<>();
+        if (seed % 2 == 0) {
+            resources.add(new ResourceId("uranium"));
         }
-        return fired;
+        CountryGenerationInput input =
+                new CountryGenerationInput(RELIGIONS, resources, new TreeSet<>(), new TreeSet<>(), new TreeSet<>());
+        return CountryGenerator.generate(Rng.of(seed), PACK, input).streaks().stream()
+                .map(StreakBonus::streak)
+                .toList();
     }
 }
