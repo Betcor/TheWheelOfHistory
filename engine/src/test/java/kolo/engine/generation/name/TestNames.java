@@ -17,6 +17,8 @@ import kolo.engine.content.DoctrineId;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
+import kolo.engine.content.HdiLevelDef;
+import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MedianRange;
@@ -185,6 +187,8 @@ final class TestNames {
                         .toList(),
                 List.of(new GdpLevelDef(
                         new GdpLevelId("middle"), "Рівень", "Опис", 1000, OutcomeTier.PARTIAL, 100, 50, List.of())),
+                List.of(new HdiLevelDef(
+                        new HdiLevelId("middle"), "Рівень", "Опис", 60, OutcomeTier.PARTIAL, 100, 50, List.of())),
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -206,7 +210,8 @@ final class TestNames {
                         .map(corridor ->
                                 new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
                         .toList(),
-                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10));
+                new GenerationBalanceDef(
+                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15));
     }
 
     private static BackstoryContent backstory() {

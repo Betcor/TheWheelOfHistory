@@ -24,6 +24,7 @@ import kolo.engine.rng.Rng;
 import kolo.engine.state.TechBranch;
 import kolo.engine.wheel.Advantage;
 import kolo.engine.wheel.AppliedModifier;
+import kolo.engine.wheel.OutcomeTier;
 import kolo.engine.wheel.RollRecord;
 import kolo.engine.wheel.Sector;
 import kolo.engine.wheel.Wheel;
@@ -113,6 +114,7 @@ class GdpWheelTest {
             assertThat(roll.turn()).isZero();
             assertThat(roll.season()).isNull();
             assertThat(gdp.perCapita()).isEqualTo(level.perCapita());
+            assertThat(gdp.tier()).isEqualTo(level.tier());
             assertThat(gdp.quality()).isEqualTo(level.quality());
             assertThat(gdp.tags()).containsExactlyElementsOf(new TreeSet<>(level.tags()));
             seen[Arrays.asList(IDS).indexOf(gdp.level().value())] = true;
@@ -155,11 +157,14 @@ class GdpWheelTest {
     @Test
     void startGdpValidatesFields() {
         GdpLevelId middle = new GdpLevelId("middle");
-        assertThat(new StartGdp(middle, 1000, new TreeSet<>(List.of("b", "a")), 50, List.of()).tags())
+        assertThat(new StartGdp(middle, 1000, OutcomeTier.PARTIAL, new TreeSet<>(List.of("b", "a")), 50, List.of())
+                        .tags())
                 .containsExactly("a", "b");
-        assertOutOfRange(() -> new StartGdp(middle, 0, new TreeSet<>(), 50, List.of()));
-        assertOutOfRange(() -> new StartGdp(middle, 1000, new TreeSet<>(), 101, List.of()));
-        assertThatThrownBy(() -> new StartGdp(null, 1000, new TreeSet<>(), 50, List.of()))
+        assertOutOfRange(() -> new StartGdp(middle, 0, OutcomeTier.PARTIAL, new TreeSet<>(), 50, List.of()));
+        assertOutOfRange(() -> new StartGdp(middle, 1000, OutcomeTier.PARTIAL, new TreeSet<>(), 101, List.of()));
+        assertThatThrownBy(() -> new StartGdp(null, 1000, OutcomeTier.PARTIAL, new TreeSet<>(), 50, List.of()))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new StartGdp(middle, 1000, null, new TreeSet<>(), 50, List.of()))
                 .isInstanceOf(NullPointerException.class);
     }
 

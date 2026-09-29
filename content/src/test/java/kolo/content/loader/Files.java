@@ -86,6 +86,13 @@ final class Files {
               - { id: rich, name: Заможність, description: Високі зарплати., per_capita: 3500, tier: crit_success, weight: 30, quality: 80, tags: [rich] }
             """;
 
+    static final String HDI = """
+            levels:
+              - { id: low, name: Низький розвиток, description: Мало шкіл і лікарень., hdi: 30, tier: crit_fail, weight: 30, quality: 20 }
+              - { id: middle, name: Середній розвиток, description: Базова медицина., hdi: 60, tier: partial, weight: 40, quality: 50 }
+              - { id: high, name: Високий розвиток, description: Довге життя., hdi: 80, tier: crit_success, weight: 30, quality: 80, tags: [educated] }
+            """;
+
     static final String PEOPLE = """
             kinds:
               - { id: scientist, name: Вчений, description: Прискорює дослідження. }
@@ -224,6 +231,7 @@ final class Files {
               warheads: { min: 2, max: 10 }
               nuclear_energy_advantage: 10
               gdp_development_advantage: 10
+              hdi_gdp_advantage: 15
             """;
 
     private final TreeMap<String, String> files = new TreeMap<>();
@@ -235,6 +243,7 @@ final class Files {
         files.put(ContentLoader.DEVELOPMENT, DEVELOPMENT);
         files.put(ContentLoader.NUCLEAR, NUCLEAR);
         files.put(ContentLoader.GDP, GDP);
+        files.put(ContentLoader.HDI, HDI);
         files.put(ContentLoader.PEOPLE, PEOPLE);
         files.put(ContentLoader.NAMES, NAMES);
         files.put(ContentLoader.BACKSTORY, BACKSTORY);

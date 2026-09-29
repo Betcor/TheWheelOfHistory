@@ -19,7 +19,8 @@ class ContentIdsTest {
             () -> new DoctrineId(""),
             () -> new ResourceId(null),
             () -> new TraitId("Brave"),
-            () -> new GdpLevelId("Very Rich")
+            () -> new GdpLevelId("Very Rich"),
+            () -> new HdiLevelId("very-high")
         }) {
             assertThatThrownBy(invalid::run)
                     .isInstanceOfSatisfying(
@@ -39,5 +40,7 @@ class ContentIdsTest {
         assertThat(new DoctrineId("armored")).hasToString("armored");
         assertThat(new GdpLevelId("middle")).hasToString("middle");
         assertThat(new GdpLevelId("middle")).isLessThan(new GdpLevelId("poor"));
+        assertThat(new HdiLevelId("high")).hasToString("high");
+        assertThat(new HdiLevelId("high")).isLessThan(new HdiLevelId("low"));
     }
 }

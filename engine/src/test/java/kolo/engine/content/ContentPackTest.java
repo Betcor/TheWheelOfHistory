@@ -43,6 +43,7 @@ class ContentPackTest {
                 levels().reversed(),
                 nuclearStatuses().reversed(),
                 TestContent.gdpLevels(),
+                TestContent.hdiLevels(),
                 personKinds().reversed(),
                 traits(),
                 names(List.of(ideology("socialism", "planned_economy"), ideology("democracy", "liberal_democracy"))),
@@ -89,6 +90,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -106,6 +108,7 @@ class ContentPackTest {
                         levels().subList(1, 6),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -123,6 +126,7 @@ class ContentPackTest {
                         levels(),
                         List.of(new NuclearStatusDef(NuclearStatus.NONE, "Немає", 80, 50, List.of())),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -146,6 +150,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
@@ -198,6 +203,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
@@ -222,6 +228,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -238,6 +245,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -254,6 +262,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -269,6 +278,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -354,6 +364,7 @@ class ContentPackTest {
                         levels(),
                         nuclearStatuses(),
                         TestContent.gdpLevels(),
+                        TestContent.hdiLevels(),
                         personKinds().subList(0, PersonKind.values().length - 1),
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
@@ -505,11 +516,71 @@ class ContentPackTest {
                 });
     }
 
+    @Test
+    void hdiLevelsKeepContentOrderAndAreLookedUpById() {
+        ContentPack pack = pack(List.of(ideology("democracy", "a")));
+
+        assertThat(pack.hdiLevels())
+                .extracting(HdiLevelDef::id)
+                .containsExactly(new HdiLevelId("low"), new HdiLevelId("middle"), new HdiLevelId("high"));
+        assertThat(pack.hdiLevel(new HdiLevelId("high")).orElseThrow().hdi()).isEqualTo(80);
+        assertThat(pack.hdiLevel(new HdiLevelId("unknown"))).isEmpty();
+        assertThatThrownBy(() -> pack.hdiLevels().clear()).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void hdiLevelsMustBePresentUniqueAndGoFromLowToHigh() {
+        assertEmpty(() -> withHdi(List.of()), "hdi_levels");
+        assertThatThrownBy(() -> withHdi(List.of(
+                        TestContent.hdiLevel("low", 30, OutcomeTier.FAIL, List.of()),
+                        TestContent.hdiLevel("low", 60, OutcomeTier.SUCCESS, List.of()))))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
+                    assertThat(e.details()).containsExactly(entry("field", "hdi_level.id"), entry("value", "low"));
+                });
+        assertThatThrownBy(() -> withHdi(TestContent.hdiLevels().reversed()))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+                    assertThat(e.details()).containsExactly(entry("field", "hdi_level.middle.hdi"), entry("value", 60));
+                });
+    }
+
+    @Test
+    void hdiLevelTagsAreBackstoryTagSources() {
+        BackstoryFragmentDef exodus = TestContent.fragment(
+                "brain_drain", new TagCondition(List.of("educated"), List.of(), List.of()), List.of());
+        BackstoryContent backstory = new BackstoryContent(Map.of(), List.of(exodus));
+        List<HdiLevelDef> tagged = List.of(
+                TestContent.hdiLevel("low", 30, OutcomeTier.CRIT_FAIL, List.of()),
+                TestContent.hdiLevel("high", 80, OutcomeTier.CRIT_SUCCESS, List.of("educated")));
+
+        assertThat(withHdi(tagged, backstory).backstory().fragments()).hasSize(1);
+        assertThatThrownBy(() -> withHdi(TestContent.hdiLevels(), backstory))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "backstory.brain_drain.tags"), entry("value", "educated"));
+                });
+    }
+
     private static ContentPack withGdp(List<GdpLevelDef> gdpLevels) {
         return withGdp(gdpLevels, TestContent.backstory());
     }
 
     private static ContentPack withGdp(List<GdpLevelDef> gdpLevels, BackstoryContent backstory) {
+        return withLevels(gdpLevels, TestContent.hdiLevels(), backstory);
+    }
+
+    private static ContentPack withHdi(List<HdiLevelDef> hdiLevels) {
+        return withHdi(hdiLevels, TestContent.backstory());
+    }
+
+    private static ContentPack withHdi(List<HdiLevelDef> hdiLevels, BackstoryContent backstory) {
+        return withLevels(TestContent.gdpLevels(), hdiLevels, backstory);
+    }
+
+    private static ContentPack withLevels(
+            List<GdpLevelDef> gdpLevels, List<HdiLevelDef> hdiLevels, BackstoryContent backstory) {
         List<IdeologyDef> ideologies = List.of(ideology("democracy", "a"));
         return new ContentPack(
                 HASH,
@@ -520,6 +591,7 @@ class ContentPackTest {
                 levels(),
                 nuclearStatuses(),
                 gdpLevels,
+                hdiLevels,
                 personKinds(),
                 traits(),
                 names(ideologies),
@@ -543,6 +615,7 @@ class ContentPackTest {
                 levels,
                 statuses,
                 TestContent.gdpLevels(),
+                TestContent.hdiLevels(),
                 personKinds(),
                 traits(),
                 names(ideologies),
@@ -570,6 +643,7 @@ class ContentPackTest {
                 levels(),
                 nuclearStatuses(),
                 TestContent.gdpLevels(),
+                TestContent.hdiLevels(),
                 personKinds(),
                 traits(),
                 new NameContent(
@@ -591,6 +665,7 @@ class ContentPackTest {
                 levels(),
                 nuclearStatuses(),
                 TestContent.gdpLevels(),
+                TestContent.hdiLevels(),
                 personKinds(),
                 traits,
                 names(List.of(ideology("democracy", "a"))),

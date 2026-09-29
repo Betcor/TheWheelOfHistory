@@ -60,7 +60,12 @@ public final class GdpWheel {
                 null);
         GdpLevelDef level = spin.value();
         return new StartGdp(
-                level.id(), level.perCapita(), new TreeSet<>(level.tags()), level.quality(), List.of(spin.record()));
+                level.id(),
+                level.perCapita(),
+                level.tier(),
+                new TreeSet<>(level.tags()),
+                level.quality(),
+                List.of(spin.record()));
     }
 
     /** Модифікатори з ціллю {@link #KIND}, потім ненульові внески галузей у порядку {@link #DEVELOPMENT_BRANCHES}. */

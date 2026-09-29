@@ -13,6 +13,7 @@
 # підкласифікації складаються.
 # Перевага колеса ядерного статусу (GD §4.1, №14): wheel:generation_nuclear.
 # Перевага колеса ВВП на душу (GD §4.1, №8): wheel:generation_gdp.
+# Перевага колеса ІЛР (GD §4.1, №9): wheel:generation_hdi.
 
 ideologies:
   - id: democracy
@@ -26,6 +27,7 @@ ideologies:
       - { target: "wheel:generation_development_society", value: 10 }
       - { target: "wheel:generation_development_energy_science", value: 10 }
       - { target: "wheel:generation_gdp", value: 10 }
+      - { target: "wheel:generation_hdi", value: 10 }
     sub_ideologies:
       - id: liberal_democracy
         name: Ліберальна демократія
@@ -39,6 +41,7 @@ ideologies:
         tags: [welfare_state]
         modifiers:
           - { target: "stat:hdi", value: 5 }
+          - { target: "wheel:generation_hdi", value: 10 }
       - id: direct_democracy
         name: Пряма демократія
         weight: 100
@@ -71,6 +74,7 @@ ideologies:
         modifiers:
           - { target: "stat:hdi", value: -5 }
           - { target: "wheel:generation_development_society", value: -10 }
+          - { target: "wheel:generation_hdi", value: -10 }
       - id: technocracy
         name: Технократія
         weight: 100
@@ -97,6 +101,7 @@ ideologies:
       - { target: "wheel:generation_development_society", value: -10 }
       - { target: "wheel:generation_development_energy_science", value: -10 }
       - { target: "wheel:generation_nuclear", value: 10 }
+      - { target: "wheel:generation_hdi", value: -10 }
     sub_ideologies:
       - id: personality_cult
         name: Культ особи
@@ -145,6 +150,7 @@ ideologies:
           - { target: "wheel:generation_development_economy", value: -10 }
           - { target: "wheel:generation_development_society", value: -10 }
           - { target: "wheel:generation_gdp", value: -10 }
+          - { target: "wheel:generation_hdi", value: -10 }
       - id: hereditary_empire
         name: Спадкова імперія
         weight: 100
@@ -174,6 +180,7 @@ ideologies:
           - { target: "stat:hdi", value: -5 }
           - { target: "wheel:generation_development_society", value: -10 }
           - { target: "wheel:generation_development_energy_science", value: -10 }
+          - { target: "wheel:generation_hdi", value: -10 }
       - id: temple_state
         name: Храмова держава
         weight: 100
@@ -189,6 +196,7 @@ ideologies:
       - { target: "stat:hdi", value: 5 }
       - { target: "wheel:generation_development_economy", value: 10 }
       - { target: "wheel:generation_development_society", value: 10 }
+      - { target: "wheel:generation_hdi", value: 10 }
     sub_ideologies:
       - id: planned_economy
         name: Планова економіка
