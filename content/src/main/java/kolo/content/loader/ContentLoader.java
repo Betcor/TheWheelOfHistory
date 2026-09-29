@@ -56,7 +56,12 @@ import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
+import kolo.engine.content.StreakContent;
+import kolo.engine.content.StreakKind;
+import kolo.engine.content.StreakRewardDef;
+import kolo.engine.content.StreakRewardId;
 import kolo.engine.content.StreakRulesDef;
+import kolo.engine.content.StreakWheelDef;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
@@ -100,11 +105,24 @@ public final class ContentLoader {
     public static final String PEOPLE = "people.yaml";
     public static final String NAMES = "names.yaml";
     public static final String BACKSTORY = "backstory.yaml";
+    public static final String STREAKS = "streaks.yaml";
     public static final String BALANCE = "balance.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
     public static final List<String> FILES = List.of(
-            IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, GDP, HDI, ARMY, PEOPLE, NAMES, BACKSTORY, BALANCE);
+            IDEOLOGIES,
+            DOCTRINES,
+            RESOURCES,
+            DEVELOPMENT,
+            NUCLEAR,
+            GDP,
+            HDI,
+            ARMY,
+            PEOPLE,
+            NAMES,
+            BACKSTORY,
+            STREAKS,
+            BALANCE);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -137,8 +155,10 @@ public final class ContentLoader {
         List<PersonKindDef> kinds = personKinds(people);
         List<TraitDef> traits = traits(people);
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
+        StreakContent streaks = streaks(parse(files, STREAKS, ContentYaml.StreaksFile.class));
         BackstoryContent backstory = backstory(
                 parse(files, BACKSTORY, ContentYaml.BackstoryFile.class),
+                streaks,
                 ideologies,
                 levels,
                 nuclear,
@@ -146,7 +166,8 @@ public final class ContentLoader {
                 hdi,
                 army,
                 training);
-        checkPersonKindTags(kinds, knownTags(backstory, ideologies, levels, nuclear, gdp, hdi, army, training));
+        checkPersonKindTags(
+                kinds, knownTags(backstory, streaks, ideologies, levels, nuclear, gdp, hdi, army, training));
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -170,6 +191,7 @@ public final class ContentLoader {
                         traits,
                         names,
                         backstory,
+                        streaks,
                         balance));
     }
 
@@ -701,11 +723,12 @@ public final class ContentLoader {
     }
 
     /**
-     * @param ideologies уже завантажені ідеології, рівні розвиненості, ядерні статуси, рівні ВВП, ІЛР, розміру й
-     *     вишколу армії: їхні мітки — джерела міток в умовах фрагментів
+     * @param streaks уже завантажені колеса стріків, ідеології, рівні розвиненості, ядерні статуси, рівні ВВП, ІЛР,
+     *     розміру й вишколу армії: їхні мітки — джерела міток в умовах фрагментів
      */
     private static BackstoryContent backstory(
             ContentYaml.BackstoryFile yaml,
+            StreakContent streaks,
             List<IdeologyDef> ideologies,
             List<DevelopmentLevelDef> levels,
             List<NuclearStatusDef> nuclear,
@@ -724,7 +747,7 @@ public final class ContentLoader {
         BackstoryContent content = at(BACKSTORY, "", () -> new BackstoryContent(yaml.generationTags(), fragments));
 
         // Мітки в умовах мають джерело; перевіряється тут, щоб помилка вказувала на фрагмент.
-        TreeSet<String> known = knownTags(content, ideologies, levels, nuclear, gdp, hdi, army, training);
+        TreeSet<String> known = knownTags(content, streaks, ideologies, levels, nuclear, gdp, hdi, army, training);
         for (int i = 0; i < fragments.size(); i++) {
             for (String tag : fragments.get(i).referencedTags()) {
                 if (!known.contains(tag)) {
@@ -736,11 +759,12 @@ public final class ContentLoader {
     }
 
     /**
-     * Мітки, які може мати держава після генерації: з ладу, рівнів коліс генерації, фрагментів передісторії й
-     * словника міток коліс генерації.
+     * Мітки, які може мати держава після генерації: з ладу, рівнів коліс генерації, фрагментів передісторії, коліс
+     * стріків і словника міток коліс генерації.
      */
     private static TreeSet<String> knownTags(
             BackstoryContent backstory,
+            StreakContent streaks,
             List<IdeologyDef> ideologies,
             List<DevelopmentLevelDef> levels,
             List<NuclearStatusDef> nuclear,
@@ -749,6 +773,7 @@ public final class ContentLoader {
             List<ArmySizeDef> army,
             List<TrainingLevelDef> training) {
         TreeSet<String> known = new TreeSet<>(backstory.producedTags());
+        known.addAll(streaks.producedTags());
         for (IdeologyDef ideology : ideologies) {
             known.addAll(ideology.tags());
             ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
@@ -771,6 +796,48 @@ public final class ContentLoader {
                 }
             }
         }
+    }
+
+    private static StreakContent streaks(ContentYaml.StreaksFile yaml) {
+        TreeSet<StreakKind> seen = new TreeSet<>();
+        List<StreakWheelDef> wheels = list(STREAKS, "wheels", yaml.wheels(), (location, wheel) -> {
+            StreakKind kind = at(
+                    STREAKS,
+                    location,
+                    () -> unique(
+                            seen,
+                            ContentKeys.parse("streak", StreakKind.values(), StreakKind::key, wheel.id()),
+                            StreakKind::key));
+            TreeSet<StreakRewardId> ids = new TreeSet<>();
+            List<StreakRewardDef> rewards = list(
+                    STREAKS,
+                    location + ".rewards",
+                    nonEmpty(STREAKS, location + ".rewards", wheel.rewards()),
+                    (rewardLocation, reward) -> {
+                        StreakRewardId id =
+                                at(STREAKS, rewardLocation, () -> unique(ids, new StreakRewardId(reward.id())));
+                        List<ModifierDef> modifiers = modifiers(STREAKS, rewardLocation, reward.modifiers());
+                        return at(
+                                STREAKS,
+                                rewardLocation,
+                                () -> new StreakRewardDef(
+                                        id,
+                                        reward.name(),
+                                        reward.description(),
+                                        required("weight", reward.weight()),
+                                        reward.duration(),
+                                        modifiers,
+                                        reward.fateTokens(),
+                                        reward.extraPeople(),
+                                        reward.tags()));
+                    });
+            return at(
+                    STREAKS,
+                    location,
+                    () -> new StreakWheelDef(kind, wheel.name(), wheel.description(), wheel.tags(), rewards));
+        });
+        complete(STREAKS, "wheels", seen, List.of(StreakKind.values()), StreakKind::key);
+        return at(STREAKS, "", () -> new StreakContent(wheels));
     }
 
     private static BackstoryFragmentDef fragment(

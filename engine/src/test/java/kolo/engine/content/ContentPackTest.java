@@ -51,6 +51,7 @@ class ContentPackTest {
                 traits(),
                 names(List.of(ideology("socialism", "planned_economy"), ideology("democracy", "liberal_democracy"))),
                 TestContent.backstory(),
+                TestContent.streaks(),
                 TestContent.balance());
 
         assertThat(pack.hash()).isEqualTo(HASH);
@@ -100,6 +101,7 @@ class ContentPackTest {
                         traits(),
                         names(ideologies),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()),
                 "tech_branches",
                 "energy_science");
@@ -120,6 +122,7 @@ class ContentPackTest {
                         traits(),
                         names(ideologies),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()),
                 "development_levels",
                 -3);
@@ -140,6 +143,7 @@ class ContentPackTest {
                         traits(),
                         names(ideologies),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()),
                 "nuclear_statuses",
                 "program");
@@ -166,6 +170,7 @@ class ContentPackTest {
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
@@ -221,6 +226,7 @@ class ContentPackTest {
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()))
                 .isInstanceOf(ValidationException.class);
     }
@@ -248,6 +254,7 @@ class ContentPackTest {
                         traits(),
                         names(ideologies),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()),
                 "ideologies");
         assertEmpty(
@@ -267,6 +274,7 @@ class ContentPackTest {
                         traits(),
                         names(ideologies),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()),
                 "doctrines");
         assertEmpty(
@@ -286,6 +294,7 @@ class ContentPackTest {
                         traits(),
                         names(ideologies),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()),
                 "resources");
         assertThatThrownBy(() -> new ContentPack(
@@ -304,6 +313,7 @@ class ContentPackTest {
                         traits(),
                         names(ideologies),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()))
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BLANK_VALUE));
@@ -392,6 +402,7 @@ class ContentPackTest {
                         traits(),
                         names(List.of(ideology("democracy", "a"))),
                         TestContent.backstory(),
+                        TestContent.streaks(),
                         TestContent.balance()),
                 "person_kinds",
                 "pretender");
@@ -724,6 +735,63 @@ class ContentPackTest {
                 TestContent.gdpLevels(), TestContent.hdiLevels(), TestContent.armySizes(), trainingLevels, backstory);
     }
 
+    @Test
+    void looksUpStreakWheelsByKind() {
+        ContentPack pack = pack(List.of(ideology("democracy", "a")));
+
+        assertThat(pack.streaks().wheels()).containsOnlyKeys(StreakKind.GOLDEN_AGE, StreakKind.UNDERDOG);
+        assertThat(pack.streaks().wheel(StreakKind.UNDERDOG).rewards())
+                .extracting(StreakRewardDef::id)
+                .containsExactly(new StreakRewardId("sympathy"));
+    }
+
+    @Test
+    void streakWheelAndRewardTagsAreBackstoryTagSources() {
+        // world_attention — мітка колеса «Золотої доби», international_sympathy — мітка нагороди «Андердога».
+        BackstoryFragmentDef scrutiny = TestContent.fragment(
+                "scrutiny",
+                new TagCondition(List.of("world_attention"), List.of(), List.of("international_sympathy")),
+                List.of());
+        BackstoryContent backstory = new BackstoryContent(Map.of(), List.of(scrutiny));
+        StreakContent withoutTags = new StreakContent(List.of(
+                TestContent.streakWheel(
+                        StreakKind.GOLDEN_AGE, List.of("world_attention"), TestContent.reward("pride", List.of())),
+                TestContent.streakWheel(StreakKind.UNDERDOG, List.of(), TestContent.reward("sympathy", List.of()))));
+
+        assertThat(withStreaks(TestContent.streaks(), backstory).backstory().fragments())
+                .hasSize(1);
+        assertThatThrownBy(() -> withStreaks(withoutTags, backstory))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(
+                                    entry("field", "backstory.scrutiny.tags"),
+                                    entry("value", "international_sympathy"));
+                });
+    }
+
+    private static ContentPack withStreaks(StreakContent streaks, BackstoryContent backstory) {
+        List<IdeologyDef> ideologies = List.of(ideology("democracy", "a"));
+        return new ContentPack(
+                HASH,
+                ideologies,
+                List.of(doctrine("armored")),
+                List.of(resource("iron")),
+                branches(),
+                levels(),
+                nuclearStatuses(),
+                TestContent.gdpLevels(),
+                TestContent.hdiLevels(),
+                TestContent.armySizes(),
+                TestContent.trainingLevels(),
+                personKinds(),
+                traits(),
+                names(ideologies),
+                backstory,
+                streaks,
+                TestContent.balance());
+    }
+
     private static ContentPack withLevels(
             List<GdpLevelDef> gdpLevels,
             List<HdiLevelDef> hdiLevels,
@@ -747,6 +815,7 @@ class ContentPackTest {
                 traits(),
                 names(ideologies),
                 backstory,
+                TestContent.streaks(),
                 TestContent.balance());
     }
 
@@ -773,6 +842,7 @@ class ContentPackTest {
                 traits(),
                 names(ideologies),
                 backstory,
+                TestContent.streaks(),
                 TestContent.balance());
     }
 
@@ -807,6 +877,7 @@ class ContentPackTest {
                         forms,
                         List.of(TestContent.personStyle("northern"))),
                 TestContent.backstory(),
+                TestContent.streaks(),
                 TestContent.balance());
     }
 
@@ -827,6 +898,7 @@ class ContentPackTest {
                 traits,
                 names(List.of(ideology("democracy", "a"))),
                 TestContent.backstory(),
+                TestContent.streaks(),
                 TestContent.balance());
     }
 

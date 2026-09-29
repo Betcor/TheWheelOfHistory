@@ -50,6 +50,7 @@ import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.content.WheelBalanceDef;
+import kolo.engine.generation.country.TestStreaks;
 import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
@@ -215,6 +216,7 @@ public final class TestNames {
                         List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM),
                         List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE)),
                 backstory(),
+                TestStreaks.CONTENT,
                 balance(nameCandidates));
     }
 

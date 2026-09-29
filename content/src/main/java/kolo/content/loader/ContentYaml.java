@@ -359,6 +359,44 @@ final class ContentYaml {
 
     record Years(int from, int to) {}
 
+    record StreaksFile(List<StreakWheel> wheels) {
+        StreaksFile {
+            wheels = orEmpty(wheels);
+        }
+    }
+
+    /** @param id ключ виду стріку, напр. {@code golden_age} */
+    record StreakWheel(String id, String name, String description, List<String> tags, List<StreakReward> rewards) {
+        StreakWheel {
+            tags = orEmpty(tags);
+            rewards = orEmpty(rewards);
+        }
+    }
+
+    /**
+     * @param duration роки дії модифікаторів; без поля — постійно
+     * @param fateTokens без поля — жодного жетона
+     * @param extraPeople без поля — жодної додаткової постаті
+     */
+    record StreakReward(
+            String id,
+            String name,
+            String description,
+            Integer weight,
+            Integer duration,
+            List<Modifier> modifiers,
+            @JsonProperty("fate_tokens") Integer fateTokens,
+            @JsonProperty("extra_people") Integer extraPeople,
+            List<String> tags) {
+        StreakReward {
+            duration = duration == null ? 0 : duration;
+            modifiers = orEmpty(modifiers);
+            fateTokens = fateTokens == null ? 0 : fateTokens;
+            extraPeople = extraPeople == null ? 0 : extraPeople;
+            tags = orEmpty(tags);
+        }
+    }
+
     /**
      * Числа — {@code Integer}, а не {@code int}: пропущене поле має стати помилкою, а не тихим нулем.
      *

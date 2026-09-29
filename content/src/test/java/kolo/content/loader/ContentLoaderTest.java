@@ -31,7 +31,11 @@ import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.StreakKind;
+import kolo.engine.content.StreakRewardDef;
+import kolo.engine.content.StreakRewardId;
 import kolo.engine.content.StreakRulesDef;
+import kolo.engine.content.StreakWheelDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
@@ -934,6 +938,111 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsStreakWheels() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        StreakWheelDef golden = pack.streaks().wheel(StreakKind.GOLDEN_AGE);
+        assertThat(golden.name()).isEqualTo("Золота доба");
+        assertThat(golden.tags()).containsExactly("golden_age", "world_attention");
+        assertThat(golden.rewards())
+                .extracting(
+                        StreakRewardDef::id,
+                        StreakRewardDef::weight,
+                        StreakRewardDef::durationYears,
+                        StreakRewardDef::fateTokens,
+                        StreakRewardDef::extraPeople)
+                .containsExactly(
+                        tuple(new StreakRewardId("national_pride"), 100, 10, 0, 0),
+                        tuple(new StreakRewardId("great_figure"), 100, 0, 0, 1));
+        assertThat(golden.rewards().getFirst().modifiers())
+                .containsExactly(new ModifierDef(ModifierTarget.stat(Stat.STABILITY), 10));
+        StreakRewardDef chance = pack.streaks()
+                .wheel(StreakKind.UNDERDOG)
+                .reward(new StreakRewardId("second_chance"))
+                .orElseThrow();
+        assertThat(chance.fateTokens()).isEqualTo(2);
+        assertThat(chance.modifiers()).isEmpty();
+        assertThat(chance.tags()).isEmpty();
+    }
+
+    @Test
+    void invalidStreakWheelIsReportedAtItsPosition() {
+        assertStreaksError(
+                Files.STREAKS.replace("id: underdog", "id: bad_luck"),
+                Map.of("location", "wheels[1]", "cause", "unknown_reference", "field", "streak", "value", "bad_luck"));
+        assertStreaksError(
+                Files.STREAKS.replace("id: underdog", "id: golden_age"),
+                Map.of("location", "wheels[1]", "cause", "duplicate_id", "value", "golden_age"));
+        assertStreaksError(
+                Files.STREAKS.substring(0, Files.STREAKS.indexOf("  - id: underdog")),
+                Map.of("location", "wheels", "cause", "missing_definition", "value", "underdog"));
+        assertStreaksError(
+                Files.STREAKS.replace("    description: Доля била державу знову й знову.\n", ""),
+                Map.of("location", "wheels[1]", "cause", "blank_value", "field", "streak.underdog.description"));
+        assertStreaksError(
+                Files.STREAKS.replace("id: great_figure", "id: national_pride"),
+                Map.of("location", "wheels[0].rewards[1]", "cause", "duplicate_id", "value", "national_pride"));
+    }
+
+    @Test
+    void invalidStreakRewardIsReportedAtItsPosition() {
+        assertStreaksError(
+                Files.STREAKS.replace("        weight: 100\n        fate_tokens: 2", "        fate_tokens: 2"),
+                Map.of("location", "wheels[1].rewards[0]", "cause", "blank_value", "field", "weight"));
+        assertStreaksError(
+                Files.STREAKS.replace("fate_tokens: 2", "fate_tokens: 4"),
+                Map.of(
+                        "location",
+                        "wheels[1].rewards[0]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "streak_reward.second_chance.fate_tokens"));
+        assertStreaksError(
+                Files.STREAKS.replace("extra_people: 1", "extra_people: 0"),
+                Map.of(
+                        "location",
+                        "wheels[0].rewards[1]",
+                        "cause",
+                        "empty_collection",
+                        "field",
+                        "streak_reward.great_figure.effects"));
+        assertStreaksError(
+                Files.STREAKS.replace("duration: 10", "duration: 101"),
+                Map.of("location", "wheels[0].rewards[0]", "cause", "value_out_of_range"));
+        assertStreaksError(
+                Files.STREAKS.replace("stat:stability", "stat:happiness"),
+                Map.of("location", "wheels[0].rewards[0].modifiers[0]", "cause", "unknown_reference"));
+        assertStreaksError(
+                Files.STREAKS.substring(0, Files.STREAKS.indexOf("  - id: underdog")) + """
+                          - id: underdog
+                            name: Андердог
+                            description: Доля била державу знову й знову.
+                            rewards: []
+                        """,
+                Map.of("location", "wheels[1].rewards", "cause", "empty_collection"));
+    }
+
+    @Test
+    void streakTagIsASourceForBackstoryConditions() {
+        String backstory = Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, world_attention]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.STREAKS, Files.STREAKS.replace(", world_attention]", "]"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "world_attention"));
+    }
+
+    @Test
     void loadsBalance() {
         BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
 
@@ -1347,6 +1456,14 @@ class ContentLoaderTest {
                 Files.valid().with(ContentLoader.HDI, hdi).source(),
                 ErrorCode.INVALID_CONTENT,
                 withFile(ContentLoader.HDI, expected));
+    }
+
+    private static void assertStreaksError(String streaks, Map<String, ?> expected) {
+        assertThat(streaks).isNotEqualTo(Files.STREAKS);
+        assertContentError(
+                Files.valid().with(ContentLoader.STREAKS, streaks).source(),
+                ErrorCode.INVALID_CONTENT,
+                withFile(ContentLoader.STREAKS, expected));
     }
 
     private static void assertArmyError(String army, Map<String, ?> expected) {

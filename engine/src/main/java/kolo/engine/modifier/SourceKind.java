@@ -8,6 +8,8 @@ public enum SourceKind {
     BUILDING,
     PERSON,
     BACKSTORY,
+    /** Колесо стріку генерації: «Золота доба» чи «Андердог» (GD §4.10). */
+    STREAK,
     EVENT,
     GLOBAL_EVENT,
     TREATY,

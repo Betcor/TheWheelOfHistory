@@ -460,6 +460,7 @@ final class TestBackstory {
                 persons.traits(),
                 new NameContent(List.of(masc, fem), List.of(style), List.of(republic), List.of(people)),
                 new BackstoryContent(GENERATION_TAGS, fragments),
+                TestStreaks.CONTENT,
                 BalanceDef.of(
                         new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                         new StreakRulesDef(85, 15, 3),
