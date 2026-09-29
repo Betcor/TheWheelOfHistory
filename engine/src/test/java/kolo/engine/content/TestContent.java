@@ -12,6 +12,7 @@ import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
+import kolo.engine.state.Training;
 import kolo.engine.wheel.OutcomeTier;
 
 /** Мінімальні валідні визначення для тестів моделі контенту. */
@@ -101,6 +102,18 @@ final class TestContent {
                 armySize("small", 40, OutcomeTier.CRIT_FAIL, List.of()),
                 armySize("regular", 150, OutcomeTier.PARTIAL, List.of()),
                 armySize("large", 300, OutcomeTier.CRIT_SUCCESS, List.of()));
+    }
+
+    static TrainingLevelDef trainingLevel(int level, OutcomeTier tier, List<String> tags) {
+        return new TrainingLevelDef(
+                level, "Рівень " + level, "Опис рівня " + level, (level - Training.REGULAR) * 10, tier, 100, 50, tags);
+    }
+
+    /** По визначенню на кожен рівень вишколу, від ополчення до еліти. */
+    static List<TrainingLevelDef> trainingLevels() {
+        return Training.levels().stream()
+                .map(level -> trainingLevel(level, OutcomeTier.values()[level - Training.MIN], List.of()))
+                .toList();
     }
 
     /** По визначенню на кожен тип постаті. */
@@ -229,7 +242,7 @@ final class TestContent {
                 new StreakRulesDef(85, 15, 3),
                 Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList(),
                 new GenerationBalanceDef(
-                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15, 10));
+                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15, 10, 10, 10));
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {
@@ -244,6 +257,7 @@ final class TestContent {
                 gdpLevels(),
                 hdiLevels(),
                 armySizes(),
+                trainingLevels(),
                 personKinds(),
                 traits(),
                 names(ideologies),

@@ -143,9 +143,10 @@ final class ContentYaml {
         }
     }
 
-    record ArmyFile(List<ArmySize> sizes) {
+    record ArmyFile(List<ArmySize> sizes, List<TrainingLevel> training) {
         ArmyFile {
             sizes = orEmpty(sizes);
+            training = orEmpty(training);
         }
     }
 
@@ -163,6 +164,25 @@ final class ContentYaml {
             Integer quality,
             List<String> tags) {
         ArmySize {
+            tags = orEmpty(tags);
+        }
+    }
+
+    /**
+     * @param level рівень вишколу {@code 1..5}
+     * @param combatModifier модифікатор вишколу в боях
+     * @param tier ключ рівня результату, як у {@link GdpLevel}
+     */
+    record TrainingLevel(
+            Integer level,
+            String name,
+            String description,
+            @JsonProperty("combat_modifier") Integer combatModifier,
+            String tier,
+            Integer weight,
+            Integer quality,
+            List<String> tags) {
+        TrainingLevel {
             tags = orEmpty(tags);
         }
     }
@@ -374,7 +394,11 @@ final class ContentYaml {
             @JsonProperty("nuclear_energy_advantage") Integer nuclearEnergyAdvantage,
             @JsonProperty("gdp_development_advantage") Integer gdpDevelopmentAdvantage,
             @JsonProperty("hdi_gdp_advantage") Integer hdiGdpAdvantage,
-            @JsonProperty("army_size_gdp_advantage") Integer armySizeGdpAdvantage) {}
+            @JsonProperty("army_size_gdp_advantage") Integer armySizeGdpAdvantage,
+            @JsonProperty("army_training_gdp_advantage") Integer armyTrainingGdpAdvantage,
+
+            @JsonProperty("army_training_development_advantage")
+            Integer armyTrainingDevelopmentAdvantage) {}
 
     record Count(Integer min, Integer max) {}
 

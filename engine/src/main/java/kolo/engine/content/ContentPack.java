@@ -15,6 +15,7 @@ import kolo.engine.state.Development;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
+import kolo.engine.state.Training;
 
 /**
  * Увесь контент гри: незмінний, зібраний і перевірений при старті.
@@ -39,6 +40,7 @@ public final class ContentPack {
     private final SortedMap<HdiLevelId, HdiLevelDef> hdiLevelsById;
     private final List<ArmySizeDef> armySizes;
     private final SortedMap<ArmySizeId, ArmySizeDef> armySizesById;
+    private final SortedMap<Integer, TrainingLevelDef> trainingLevels;
     private final SortedMap<PersonKind, PersonKindDef> personKinds;
     private final SortedMap<TraitId, TraitDef> traits;
     private final NameContent names;
@@ -55,15 +57,17 @@ public final class ContentPack {
      * @param gdpLevels рівні ВВП на душу від найбіднішого до найбагатшого (порядок секторів колеса ВВП)
      * @param hdiLevels рівні ІЛР від найнижчого до найвищого (порядок секторів колеса ІЛР)
      * @param armySizes рівні розміру армії від найменшої до найбільшої (порядок секторів колеса розміру армії)
+     * @param trainingLevels рівно по одному визначенню на кожен рівень вишколу {@link Training#MIN}..{@link
+     *     Training#MAX}, від ополчення до еліти (порядок секторів колеса вишколу)
      * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
-     *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, ІЛР чи розміру армії, фрагмент або словник
-     *     міток коліс генерації
+     *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, ІЛР, розміру армії чи вишколу, фрагмент
+     *     або словник міток коліс генерації
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
-     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР чи розміру
-     *     армії не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
+     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР, розміру армії
+     *     чи вишколу не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
      *     підкласифікацію, підкласифікації не доступна жодна форма або фрагмент передісторії залежить від мітки без
      *     джерела
@@ -79,6 +83,7 @@ public final class ContentPack {
             List<GdpLevelDef> gdpLevels,
             List<HdiLevelDef> hdiLevels,
             List<ArmySizeDef> armySizes,
+            List<TrainingLevelDef> trainingLevels,
             List<PersonKindDef> personKinds,
             List<TraitDef> traits,
             NameContent names,
@@ -170,6 +175,17 @@ public final class ContentPack {
         this.armySizes = List.copyOf(armySizes);
         this.armySizesById = Collections.unmodifiableSortedMap(armyMap);
 
+        TreeMap<Integer, TrainingLevelDef> trainingMap = new TreeMap<>();
+        TrainingLevelDef previousTraining = null;
+        for (TrainingLevelDef training : trainingLevels) {
+            put("training_level.level", trainingMap, training.level(), training.level(), training);
+            if (previousTraining != null) {
+                TrainingLevelDef.checkFollows(previousTraining, training);
+            }
+            previousTraining = training;
+        }
+        this.trainingLevels = Defs.complete("training_levels", trainingMap, Training.levels(), level -> level);
+
         TreeMap<PersonKind, PersonKindDef> kindMap = new TreeMap<>();
         for (PersonKindDef kind : personKinds) {
             put("person_kind.id", kindMap, kind.kind(), kind.kind().key(), kind);
@@ -230,6 +246,7 @@ public final class ContentPack {
         gdpMap.values().forEach(gdp -> known.addAll(gdp.tags()));
         hdiMap.values().forEach(hdi -> known.addAll(hdi.tags()));
         armyMap.values().forEach(army -> known.addAll(army.tags()));
+        trainingMap.values().forEach(training -> known.addAll(training.tags()));
         for (BackstoryFragmentDef fragment : backstory.fragments().values()) {
             for (String tag : fragment.referencedTags()) {
                 if (!known.contains(tag)) {
@@ -338,6 +355,19 @@ public final class ContentPack {
 
     public Optional<ArmySizeDef> armySize(ArmySizeId id) {
         return Optional.ofNullable(armySizesById.get(Objects.requireNonNull(id, "id")));
+    }
+
+    /**
+     * Рівні вишколу від {@link Training#MIN} до {@link Training#MAX} — від ополчення до еліти, порядок секторів
+     * колеса вишколу; визначено кожен.
+     */
+    public SortedMap<Integer, TrainingLevelDef> trainingLevels() {
+        return trainingLevels;
+    }
+
+    /** @throws ValidationException якщо рівень поза {@link Training#MIN}..{@link Training#MAX} */
+    public TrainingLevelDef trainingLevel(int level) {
+        return trainingLevels.get(Training.check("training_level", level));
     }
 
     /** Типи постатей у порядку enum; визначено кожен. */

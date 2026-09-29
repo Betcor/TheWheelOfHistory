@@ -98,6 +98,12 @@ final class Files {
               - { id: small, name: Мала армія, description: Кілька бригад., share_bp: 40, tier: crit_fail, weight: 30, quality: 30, tags: [small_army] }
               - { id: regular, name: Звичайна армія, description: Армія мирного часу., share_bp: 150, tier: partial, weight: 40, quality: 50 }
               - { id: large, name: Велика армія, description: Загальний призов., share_bp: 300, tier: crit_success, weight: 30, quality: 60, tags: [large_army] }
+            training:
+              - { level: 1, name: Ополчення, description: Новобранці., combat_modifier: -20, tier: crit_fail, weight: 10, quality: 10 }
+              - { level: 2, name: Резервісти, description: Запас., combat_modifier: -10, tier: fail, weight: 25, quality: 30 }
+              - { level: 3, name: Регулярна армія, description: Кадрові частини., combat_modifier: 0, tier: partial, weight: 35, quality: 50 }
+              - { level: 4, name: Ветерани, description: Бойовий досвід., combat_modifier: 10, tier: success, weight: 20, quality: 70 }
+              - { level: 5, name: Еліта, description: Професіонали., combat_modifier: 20, tier: crit_success, weight: 10, quality: 90, tags: [elite_army] }
             """;
 
     static final String PEOPLE = """
@@ -240,6 +246,8 @@ final class Files {
               gdp_development_advantage: 10
               hdi_gdp_advantage: 15
               army_size_gdp_advantage: 10
+              army_training_gdp_advantage: 10
+              army_training_development_advantage: 10
             """;
 
     private final TreeMap<String, String> files = new TreeMap<>();

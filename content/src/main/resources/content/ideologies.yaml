@@ -15,6 +15,7 @@
 # Перевага колеса ВВП на душу (GD §4.1, №8): wheel:generation_gdp.
 # Перевага колеса ІЛР (GD §4.1, №9): wheel:generation_hdi.
 # Перевага колеса розміру армії (GD §4.1, №10): wheel:generation_army_size.
+# Перевага колеса вишколу армії (GD §4.1, №12): wheel:generation_army_training.
 
 ideologies:
   - id: democracy
@@ -69,6 +70,7 @@ ideologies:
           - { target: "stat:legitimacy", value: -10 }
           - { target: "wheel:generation_development_military", value: 15 }
           - { target: "wheel:generation_army_size", value: 15 }
+          - { target: "wheel:generation_army_training", value: 10 }
       - id: oligarchy
         name: Олігархія
         weight: 100
@@ -127,6 +129,7 @@ ideologies:
           - { target: "wheel:generation_development_military", value: 15 }
           - { target: "wheel:generation_nuclear", value: 10 }
           - { target: "wheel:generation_army_size", value: 15 }
+          - { target: "wheel:generation_army_training", value: 10 }
       - id: isolationism
         name: Ізоляціонізм
         weight: 100

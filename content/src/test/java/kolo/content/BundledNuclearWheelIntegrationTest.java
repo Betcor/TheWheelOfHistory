@@ -14,6 +14,7 @@ import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.generation.country.ArmySizeWheel;
+import kolo.engine.generation.country.ArmyTrainingWheel;
 import kolo.engine.generation.country.Backstory;
 import kolo.engine.generation.country.BackstoryWheel;
 import kolo.engine.generation.country.DevelopmentWheel;
@@ -84,6 +85,7 @@ class BundledNuclearWheelIntegrationTest {
         kinds.add(GdpWheel.KIND);
         kinds.add(HdiWheel.KIND);
         kinds.add(ArmySizeWheel.KIND);
+        kinds.add(ArmyTrainingWheel.KIND);
         int nuclear = 0;
         for (IdeologyDef ideology : PACK.ideologies().values()) {
             List<ModifierDef> all = new ArrayList<>(ideology.modifiers());

@@ -51,3 +51,10 @@ generation:
   # crit_fail → −2·x, fail → −x, success → +x, crit_success → +2·x. Багатша держава утримує
   # більшу армію.
   army_size_gdp_advantage: 10
+  # Перевага колеса вишколу армії за кожен крок рівня результату рівня ВВП від partial (0..100):
+  # crit_fail → −2·x, fail → −x, success → +x, crit_success → +2·x. Багатша держава більше
+  # витрачає на навчання.
+  army_training_gdp_advantage: 10
+  # Перевага колеса вишколу армії за кожен рівень розвиненості військової галузі відносно світового
+  # (0..100): рівень −3 дає −3·x, +2 — +2·x.
+  army_training_development_advantage: 10
