@@ -10,6 +10,8 @@ public enum SourceKind {
     BACKSTORY,
     /** Колесо стріку генерації: «Золота доба» чи «Андердог» (GD §4.10). */
     STREAK,
+    /** Догмат чи устрій державної релігії (GD §25.2). */
+    RELIGION,
     EVENT,
     GLOBAL_EVENT,
     TREATY,

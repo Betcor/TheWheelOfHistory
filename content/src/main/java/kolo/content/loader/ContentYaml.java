@@ -402,7 +402,8 @@ final class ContentYaml {
             List<Aspect> aspects,
             List<Dogma> dogmas,
             List<Polity> polities,
-            @JsonProperty("faith_forms") List<FaithForm> faithForms) {
+            @JsonProperty("faith_forms") List<FaithForm> faithForms,
+            @JsonProperty("state_religion") StateReligion stateReligion) {
         ReligionsFile {
             archetypes = orEmpty(archetypes);
             aspects = orEmpty(aspects);
@@ -477,6 +478,28 @@ final class ContentYaml {
         Polity {
             weightTags = weightTags == null ? Map.of() : weightTags;
             modifiers = orEmpty(modifiers);
+            tags = orEmpty(tags);
+        }
+    }
+
+    /** @param religionWeight вага кожної релігії світу в колесі релігії держави */
+    record StateReligion(@JsonProperty("religion_weight") Integer religionWeight, Secular secular) {}
+
+    /** @param weightTags мітка ладу → добавка до ваги */
+    record Secular(
+            String name,
+            String description,
+            Integer weight,
+            @JsonProperty("weight_tags") Map<String, Integer> weightTags,
+            List<String> requires,
+            @JsonProperty("requires_any") List<String> requiresAny,
+            List<String> excludes,
+            List<String> tags) {
+        Secular {
+            weightTags = weightTags == null ? Map.of() : weightTags;
+            requires = orEmpty(requires);
+            requiresAny = orEmpty(requiresAny);
+            excludes = orEmpty(excludes);
             tags = orEmpty(tags);
         }
     }

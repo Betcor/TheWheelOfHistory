@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.entry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
@@ -781,6 +782,80 @@ class ContentPackTest {
                                     entry("field", "backstory.scrutiny.tags"),
                                     entry("value", "international_sympathy"));
                 });
+    }
+
+    @Test
+    void religionAndSecularTagsAreBackstoryTagSources() {
+        // secular — мітка світської держави, dogma_holy_war — мітка догмату.
+        BackstoryFragmentDef crusade = TestContent.fragment(
+                "crusade", new TagCondition(List.of("dogma_holy_war"), List.of(), List.of("secular")), List.of());
+        BackstoryContent backstory = new BackstoryContent(Map.of(), List.of(crusade));
+        ReligionContent laicite = TestReligions.content(new StateReligionDef(
+                100,
+                new SecularStateDef(
+                        "Світська держава", "Опис", 100, new TreeMap<>(), TagCondition.NONE, List.of("laicite"))));
+
+        assertThat(withReligions(TestReligions.content(), backstory).backstory().fragments())
+                .hasSize(1);
+        assertThatThrownBy(() -> withReligions(laicite, backstory))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "backstory.crusade.tags"), entry("value", "secular"));
+                });
+    }
+
+    @Test
+    void secularStateDependsOnlyOnRegimeTags() {
+        // democracy — мітка ідеології; world_attention є в державі лише після стріку, тобто після колеса релігії.
+        ReligionContent byRegime = TestReligions.content(
+                new StateReligionDef(100, TestReligions.secular(100, Map.of("democracy", 50), TagCondition.NONE)));
+        ReligionContent byWeight = TestReligions.content(new StateReligionDef(
+                100, TestReligions.secular(100, Map.of("world_attention", 50), TagCondition.NONE)));
+        ReligionContent byCondition = TestReligions.content(new StateReligionDef(
+                100,
+                TestReligions.secular(
+                        100, Map.of(), new TagCondition(List.of(), List.of(), List.of("world_attention")))));
+
+        assertThat(withReligions(byRegime, TestContent.backstory())
+                        .religions()
+                        .stateReligion()
+                        .secular()
+                        .weightTags())
+                .containsEntry("democracy", 50);
+        for (ReligionContent religions : List.of(byWeight, byCondition)) {
+            assertThatThrownBy(() -> withReligions(religions, TestContent.backstory()))
+                    .isInstanceOfSatisfying(ValidationException.class, e -> {
+                        assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                        assertThat(e.details())
+                                .containsExactly(
+                                        entry("field", "state_religion.secular.tags"),
+                                        entry("value", "world_attention"));
+                    });
+        }
+    }
+
+    private static ContentPack withReligions(ReligionContent religions, BackstoryContent backstory) {
+        List<IdeologyDef> ideologies = List.of(ideology("democracy", "a"));
+        return new ContentPack(
+                HASH,
+                ideologies,
+                List.of(doctrine("armored")),
+                List.of(resource("iron")),
+                branches(),
+                levels(),
+                nuclearStatuses(),
+                TestContent.gdpLevels(),
+                TestContent.hdiLevels(),
+                TestContent.armySizes(),
+                TestContent.trainingLevels(),
+                personKinds(),
+                traits(),
+                names(ideologies),
+                backstory,
+                TestContent.streaks(),
+                religions,
+                TestContent.balance());
     }
 
     private static ContentPack withStreaks(StreakContent streaks, BackstoryContent backstory) {

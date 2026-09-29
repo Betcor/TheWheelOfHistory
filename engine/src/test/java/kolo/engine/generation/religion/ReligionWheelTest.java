@@ -358,7 +358,8 @@ class ReligionWheelTest {
 
     private static ReligionContent religions(
             List<AspectDef> aspects, List<DogmaDef> dogmas, List<ReligionPolityDef> polities) {
-        return new ReligionContent(RELIGIONS.archetypes(), aspects, dogmas, polities, RELIGIONS.faithForms());
+        return new ReligionContent(
+                RELIGIONS.archetypes(), aspects, dogmas, polities, RELIGIONS.faithForms(), RELIGIONS.stateReligion());
     }
 
     private static <T> Map<String, Integer> weights(List<Sector<T>> sectors) {

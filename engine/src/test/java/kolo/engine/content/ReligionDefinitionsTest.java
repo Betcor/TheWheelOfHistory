@@ -175,17 +175,33 @@ class ReligionDefinitionsTest {
         ReligionContent base = TestReligions.content();
 
         assertFailsWith(
-                () -> new ReligionContent(List.of(), base.aspects(), base.dogmas(), base.polities(), base.faithForms()),
+                () -> new ReligionContent(
+                        List.of(),
+                        base.aspects(),
+                        base.dogmas(),
+                        base.polities(),
+                        base.faithForms(),
+                        base.stateReligion()),
                 ErrorCode.EMPTY_COLLECTION,
                 "archetypes");
         assertFailsWith(
                 () -> new ReligionContent(
-                        base.archetypes(), base.aspects(), base.dogmas(), List.of(), base.faithForms()),
+                        base.archetypes(),
+                        base.aspects(),
+                        base.dogmas(),
+                        List.of(),
+                        base.faithForms(),
+                        base.stateReligion()),
                 ErrorCode.EMPTY_COLLECTION,
                 "religion_polities");
         assertFailsWith(
                 () -> new ReligionContent(
-                        base.archetypes(), twice(base.aspects()), base.dogmas(), base.polities(), base.faithForms()),
+                        base.archetypes(),
+                        twice(base.aspects()),
+                        base.dogmas(),
+                        base.polities(),
+                        base.faithForms(),
+                        base.stateReligion()),
                 ErrorCode.DUPLICATE_ID,
                 "aspects");
     }
@@ -198,13 +214,19 @@ class ReligionDefinitionsTest {
         dogmas.add(dogma("asceticism", Map.of(), "prosperity"));
         assertFailsWith(
                 () -> new ReligionContent(
-                        base.archetypes(), base.aspects(), dogmas, base.polities(), base.faithForms()),
+                        base.archetypes(),
+                        base.aspects(),
+                        dogmas,
+                        base.polities(),
+                        base.faithForms(),
+                        base.stateReligion()),
                 ErrorCode.UNKNOWN_REFERENCE,
                 "dogma.asceticism.incompatible");
 
         List<FaithFormDef> forms = List.of(path(List.of(MONOTHEISM, POLYTHEISM, new ArchetypeId("animism"))));
         assertFailsWith(
-                () -> new ReligionContent(base.archetypes(), base.aspects(), base.dogmas(), base.polities(), forms),
+                () -> new ReligionContent(
+                        base.archetypes(), base.aspects(), base.dogmas(), base.polities(), forms, base.stateReligion()),
                 ErrorCode.UNKNOWN_REFERENCE,
                 "faith_form.path.archetypes");
     }
@@ -218,7 +240,8 @@ class ReligionDefinitionsTest {
                         base.aspects(),
                         base.dogmas(),
                         base.polities(),
-                        List.of(temple(List.of(POLYTHEISM)))))
+                        List.of(temple(List.of(POLYTHEISM))),
+                        base.stateReligion()))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.MISSING_DEFINITION);
                     assertThat(e.details())
@@ -235,7 +258,12 @@ class ReligionDefinitionsTest {
         aspects.add(aspect("death", Map.of("dogma_holy_war", 10)));
         assertFailsWith(
                 () -> new ReligionContent(
-                        base.archetypes(), aspects, base.dogmas(), base.polities(), base.faithForms()),
+                        base.archetypes(),
+                        aspects,
+                        base.dogmas(),
+                        base.polities(),
+                        base.faithForms(),
+                        base.stateReligion()),
                 ErrorCode.UNKNOWN_REFERENCE,
                 "aspect.death.weight_tags");
 
@@ -243,7 +271,12 @@ class ReligionDefinitionsTest {
         dogmas.add(dogma("charity", Map.of("polity_communities", 10)));
         assertFailsWith(
                 () -> new ReligionContent(
-                        base.archetypes(), base.aspects(), dogmas, base.polities(), base.faithForms()),
+                        base.archetypes(),
+                        base.aspects(),
+                        dogmas,
+                        base.polities(),
+                        base.faithForms(),
+                        base.stateReligion()),
                 ErrorCode.UNKNOWN_REFERENCE,
                 "dogma.charity.weight_tags");
 
@@ -251,7 +284,12 @@ class ReligionDefinitionsTest {
         polities.add(polity("no_clergy", Map.of("unknown_tag", 10)));
         assertFailsWith(
                 () -> new ReligionContent(
-                        base.archetypes(), base.aspects(), base.dogmas(), polities, base.faithForms()),
+                        base.archetypes(),
+                        base.aspects(),
+                        base.dogmas(),
+                        polities,
+                        base.faithForms(),
+                        base.stateReligion()),
                 ErrorCode.UNKNOWN_REFERENCE,
                 "religion_polity.no_clergy.weight_tags");
 
@@ -260,9 +298,62 @@ class ReligionDefinitionsTest {
         allowed.add(polity(
                 "no_clergy",
                 Map.of("archetype_monotheism", 1, "religion_sea", 1, "dogma_pacifism", 1, "polity_communities", 1)));
-        assertThat(new ReligionContent(base.archetypes(), base.aspects(), base.dogmas(), allowed, base.faithForms())
+        assertThat(new ReligionContent(
+                                base.archetypes(),
+                                base.aspects(),
+                                base.dogmas(),
+                                allowed,
+                                base.faithForms(),
+                                base.stateReligion())
                         .polities())
                 .hasSize(3);
+    }
+
+    @Test
+    void secularStateFieldsAreChecked() {
+        TagCondition none = TagCondition.NONE;
+        assertFailsWith(
+                () -> new SecularStateDef(" ", "Опис", 100, new TreeMap<>(), none, List.of()),
+                ErrorCode.BLANK_VALUE,
+                "state_religion.secular.name");
+        assertFailsWith(
+                () -> new SecularStateDef("Світська", "Опис", 0, new TreeMap<>(), none, List.of()),
+                ErrorCode.VALUE_OUT_OF_RANGE,
+                "state_religion.secular.weight");
+        assertFailsWith(
+                () -> new SecularStateDef(
+                        "Світська", "Опис", 100, new TreeMap<>(), none, List.of("secular", "secular")),
+                ErrorCode.DUPLICATE_ID,
+                "state_religion.secular.tags");
+        assertFailsWith(
+                () -> new StateReligionDef(0, TestReligions.STATE_RELIGION.secular()),
+                ErrorCode.VALUE_OUT_OF_RANGE,
+                "state_religion.religion_weight");
+        assertFailsWith(
+                () -> new StateReligionDef(10_001, TestReligions.STATE_RELIGION.secular()),
+                ErrorCode.VALUE_OUT_OF_RANGE,
+                "state_religion.religion_weight");
+    }
+
+    @Test
+    void secularWeightDependsOnTagsAndCondition() {
+        SecularStateDef secular = TestReligions.secular(
+                50,
+                Map.of("socialist", 150, "monarchic", -80),
+                new TagCondition(List.of(), List.of(), List.of("theocratic")));
+
+        assertThat(secular.weightFor(Set.of())).isEqualTo(50);
+        assertThat(secular.weightFor(Set.of("socialist"))).isEqualTo(200);
+        assertThat(secular.weightFor(Set.of("monarchic"))).isZero();
+        assertThat(secular.weightFor(Set.of("socialist", "theocratic"))).isZero();
+        assertThat(secular.referencedTags()).containsExactly("monarchic", "socialist", "theocratic");
+    }
+
+    @Test
+    void producedTagsIncludeSecularState() {
+        assertThat(TestReligions.content().producedTags())
+                .contains("secular", "archetype_monotheism", "religion_war", "dogma_holy_war", "polity_communities");
+        assertThat(TestReligions.content().stateReligion()).isEqualTo(TestReligions.STATE_RELIGION);
     }
 
     @Test

@@ -41,6 +41,8 @@ import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ReligionCountDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.SecularStateDef;
+import kolo.engine.content.StateReligionDef;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
 import kolo.engine.content.StreakRewardId;
@@ -1167,6 +1169,56 @@ class ContentLoaderTest {
                 Files.RELIGIONS.substring(0, Files.RELIGIONS.indexOf("polities:")) + "polities: []\n"
                         + Files.RELIGIONS.substring(Files.RELIGIONS.indexOf("faith_forms:")),
                 Map.of("location", "polities", "cause", "empty_collection"));
+    }
+
+    @Test
+    void loadsStateReligion() {
+        StateReligionDef stateReligion =
+                ContentLoader.load(Files.valid().source()).religions().stateReligion();
+
+        assertThat(stateReligion.religionWeight()).isEqualTo(100);
+        SecularStateDef secular = stateReligion.secular();
+        assertThat(secular.name()).isEqualTo("Світська держава");
+        assertThat(secular.tags()).containsExactly("secular");
+        assertThat(secular.weightFor(Set.of("democratic"))).isEqualTo(100);
+        assertThat(secular.weightFor(Set.of("democratic", "revanchism"))).isZero();
+    }
+
+    @Test
+    void religionTagsAreBackstoryTagSources() {
+        String backstory = Files.BACKSTORY.replace(
+                "excludes: [nuclear_power]",
+                "excludes: [nuclear_power, secular]\n    weight_tags: { dogma_holy_war: 50 }");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+    }
+
+    @Test
+    void invalidStateReligionIsReportedAtItsPosition() {
+        assertReligionsError(
+                Files.RELIGIONS.substring(0, Files.RELIGIONS.indexOf("state_religion:")),
+                Map.of("location", "state_religion", "cause", "blank_value", "field", "state_religion"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("  religion_weight: 100\n", ""),
+                Map.of("location", "state_religion", "cause", "blank_value", "field", "religion_weight"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("    weight: 50\n", ""),
+                Map.of("location", "state_religion.secular", "cause", "blank_value", "field", "weight"));
+        // backward — мітка рівня розвиненості: колесо розвиненості крутиться вже після колеса релігії.
+        assertReligionsError(
+                Files.RELIGIONS.replace("weight_tags: { democratic: 50 }", "weight_tags: { backward: 50 }"),
+                Map.of("location", "state_religion.secular", "cause", "unknown_reference", "value", "backward"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("excludes: [revanchism]", "excludes: [theocratic]"),
+                Map.of("location", "state_religion.secular", "cause", "unknown_reference", "value", "theocratic"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("excludes: [revanchism]", "requires: [revanchism]\n    excludes: [revanchism]"),
+                Map.of("location", "state_religion.secular", "cause", "duplicate_id", "value", "revanchism"));
     }
 
     @Test

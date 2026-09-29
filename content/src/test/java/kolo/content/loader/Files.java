@@ -328,6 +328,15 @@ final class Files {
                   instrumental: "Шляхом {figure}"
                   locative: "Шляху {figure}"
                   vocative: "Шляху {figure}"
+            state_religion:
+              religion_weight: 100
+              secular:
+                name: Світська держава
+                description: Без державної релігії.
+                weight: 50
+                weight_tags: { democratic: 50 }
+                excludes: [revanchism]
+                tags: [secular]
             """;
 
     static final String STREAKS = """
