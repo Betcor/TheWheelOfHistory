@@ -93,6 +93,13 @@ final class Files {
               - { id: high, name: Високий розвиток, description: Довге життя., hdi: 80, tier: crit_success, weight: 30, quality: 80, tags: [educated] }
             """;
 
+    static final String ARMY = """
+            sizes:
+              - { id: small, name: Мала армія, description: Кілька бригад., share_bp: 40, tier: crit_fail, weight: 30, quality: 30, tags: [small_army] }
+              - { id: regular, name: Звичайна армія, description: Армія мирного часу., share_bp: 150, tier: partial, weight: 40, quality: 50 }
+              - { id: large, name: Велика армія, description: Загальний призов., share_bp: 300, tier: crit_success, weight: 30, quality: 60, tags: [large_army] }
+            """;
+
     static final String PEOPLE = """
             kinds:
               - { id: scientist, name: Вчений, description: Прискорює дослідження. }
@@ -232,6 +239,7 @@ final class Files {
               nuclear_energy_advantage: 10
               gdp_development_advantage: 10
               hdi_gdp_advantage: 15
+              army_size_gdp_advantage: 10
             """;
 
     private final TreeMap<String, String> files = new TreeMap<>();
@@ -244,6 +252,7 @@ final class Files {
         files.put(ContentLoader.NUCLEAR, NUCLEAR);
         files.put(ContentLoader.GDP, GDP);
         files.put(ContentLoader.HDI, HDI);
+        files.put(ContentLoader.ARMY, ARMY);
         files.put(ContentLoader.PEOPLE, PEOPLE);
         files.put(ContentLoader.NAMES, NAMES);
         files.put(ContentLoader.BACKSTORY, BACKSTORY);

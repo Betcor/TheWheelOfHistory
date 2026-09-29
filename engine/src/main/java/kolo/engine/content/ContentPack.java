@@ -37,6 +37,8 @@ public final class ContentPack {
     private final SortedMap<GdpLevelId, GdpLevelDef> gdpLevelsById;
     private final List<HdiLevelDef> hdiLevels;
     private final SortedMap<HdiLevelId, HdiLevelDef> hdiLevelsById;
+    private final List<ArmySizeDef> armySizes;
+    private final SortedMap<ArmySizeId, ArmySizeDef> armySizesById;
     private final SortedMap<PersonKind, PersonKindDef> personKinds;
     private final SortedMap<TraitId, TraitDef> traits;
     private final NameContent names;
@@ -52,15 +54,16 @@ public final class ContentPack {
      * @param nuclearStatuses рівно по одному визначенню на кожен {@link NuclearStatus}
      * @param gdpLevels рівні ВВП на душу від найбіднішого до найбагатшого (порядок секторів колеса ВВП)
      * @param hdiLevels рівні ІЛР від найнижчого до найвищого (порядок секторів колеса ІЛР)
+     * @param armySizes рівні розміру армії від найменшої до найбільшої (порядок секторів колеса розміру армії)
      * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
-     *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП чи ІЛР, фрагмент або словник міток коліс
-     *     генерації
+     *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, ІЛР чи розміру армії, фрагмент або словник
+     *     міток коліс генерації
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
-     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП чи ІЛР не
-     *     впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
+     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР чи розміру
+     *     армії не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
      *     підкласифікацію, підкласифікації не доступна жодна форма або фрагмент передісторії залежить від мітки без
      *     джерела
@@ -75,6 +78,7 @@ public final class ContentPack {
             List<NuclearStatusDef> nuclearStatuses,
             List<GdpLevelDef> gdpLevels,
             List<HdiLevelDef> hdiLevels,
+            List<ArmySizeDef> armySizes,
             List<PersonKindDef> personKinds,
             List<TraitDef> traits,
             NameContent names,
@@ -154,6 +158,18 @@ public final class ContentPack {
         this.hdiLevels = List.copyOf(hdiLevels);
         this.hdiLevelsById = Collections.unmodifiableSortedMap(hdiMap);
 
+        TreeMap<ArmySizeId, ArmySizeDef> armyMap = new TreeMap<>();
+        ArmySizeDef previousArmy = null;
+        for (ArmySizeDef army : nonEmpty("army_sizes", armySizes)) {
+            put("army_size.id", armyMap, army.id(), army);
+            if (previousArmy != null) {
+                ArmySizeDef.checkFollows(previousArmy, army);
+            }
+            previousArmy = army;
+        }
+        this.armySizes = List.copyOf(armySizes);
+        this.armySizesById = Collections.unmodifiableSortedMap(armyMap);
+
         TreeMap<PersonKind, PersonKindDef> kindMap = new TreeMap<>();
         for (PersonKindDef kind : personKinds) {
             put("person_kind.id", kindMap, kind.kind(), kind.kind().key(), kind);
@@ -213,6 +229,7 @@ public final class ContentPack {
         nuclearMap.values().forEach(status -> known.addAll(status.tags()));
         gdpMap.values().forEach(gdp -> known.addAll(gdp.tags()));
         hdiMap.values().forEach(hdi -> known.addAll(hdi.tags()));
+        armyMap.values().forEach(army -> known.addAll(army.tags()));
         for (BackstoryFragmentDef fragment : backstory.fragments().values()) {
             for (String tag : fragment.referencedTags()) {
                 if (!known.contains(tag)) {
@@ -312,6 +329,15 @@ public final class ContentPack {
 
     public Optional<HdiLevelDef> hdiLevel(HdiLevelId id) {
         return Optional.ofNullable(hdiLevelsById.get(Objects.requireNonNull(id, "id")));
+    }
+
+    /** Рівні розміру армії від найменшої до найбільшої — порядок секторів колеса розміру армії; хоча б один. */
+    public List<ArmySizeDef> armySizes() {
+        return armySizes;
+    }
+
+    public Optional<ArmySizeDef> armySize(ArmySizeId id) {
+        return Optional.ofNullable(armySizesById.get(Objects.requireNonNull(id, "id")));
     }
 
     /** Типи постатей у порядку enum; визначено кожен. */

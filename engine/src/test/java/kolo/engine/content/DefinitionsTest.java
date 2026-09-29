@@ -222,6 +222,65 @@ class DefinitionsTest {
     }
 
     @Test
+    void armySizeShareIsAPartOfPopulation() {
+        ArmySizeDef regular = army("regular", 150, OutcomeTier.PARTIAL, 28, 50);
+        assertThat(regular)
+                .extracting(ArmySizeDef::shareBp, ArmySizeDef::tier, ArmySizeDef::weight, ArmySizeDef::quality)
+                .containsExactly(150, OutcomeTier.PARTIAL, 28, 50);
+        assertThat(army("tiny", 1, OutcomeTier.CRIT_FAIL, 1, 0).shareBp()).isEqualTo(1);
+        assertThat(army("everyone", ArmySizeDef.MAX_SHARE_BP, OutcomeTier.CRIT_SUCCESS, ArmySizeDef.MAX_WEIGHT, 100)
+                        .shareBp())
+                .isEqualTo(ArmySizeDef.MAX_SHARE_BP);
+        assertFails(() -> army("regular", 0, OutcomeTier.PARTIAL, 28, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> army("regular", ArmySizeDef.MAX_SHARE_BP + 1, OutcomeTier.PARTIAL, 28, 50),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> army("regular", 150, OutcomeTier.PARTIAL, 0, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> army("regular", 150, OutcomeTier.PARTIAL, ArmySizeDef.MAX_WEIGHT + 1, 50),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> army("regular", 150, OutcomeTier.PARTIAL, 28, 101), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new ArmySizeDef(
+                        new ArmySizeId("regular"), " ", "Опис", 150, OutcomeTier.PARTIAL, 28, 50, List.of()),
+                ErrorCode.BLANK_VALUE);
+        assertFails(
+                () -> new ArmySizeDef(
+                        new ArmySizeId("regular"),
+                        "Звичайна",
+                        "Опис",
+                        150,
+                        OutcomeTier.PARTIAL,
+                        28,
+                        50,
+                        List.of("Large Army")),
+                ErrorCode.INVALID_KEY_FORMAT);
+        assertThatThrownBy(() ->
+                        new ArmySizeDef(new ArmySizeId("regular"), "Звичайна", "Опис", 150, null, 28, 50, List.of()))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void armySizeFollowsSmallerArmyWithLargerShareAndNoLowerTier() {
+        ArmySizeDef small = army("small", 40, OutcomeTier.FAIL, 10, 30);
+
+        ArmySizeDef.checkFollows(small, army("modest", 80, OutcomeTier.FAIL, 10, 40));
+        ArmySizeDef.checkFollows(small, army("mass", 500, OutcomeTier.CRIT_SUCCESS, 10, 80));
+        assertThatThrownBy(() -> ArmySizeDef.checkFollows(small, army("same", 40, OutcomeTier.SUCCESS, 10, 50)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "army_size.same.share_bp"), entry("value", 40));
+                });
+        assertThatThrownBy(() -> ArmySizeDef.checkFollows(small, army("worse", 80, OutcomeTier.CRIT_FAIL, 10, 5)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "army_size.worse.tier"), entry("value", "crit_fail"));
+                });
+    }
+
+    @Test
     void personKindNeedsNameAndDescription() {
         assertThat(new PersonKindDef(PersonKind.GENERAL, "Генерал", "Командує фронтом.", List.of("military")).tags())
                 .containsExactly("military");
@@ -277,6 +336,10 @@ class DefinitionsTest {
 
         assertThat(iron.tags()).containsExactly("metal");
         assertThatThrownBy(() -> iron.tags().add("x")).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    private static ArmySizeDef army(String id, int shareBp, OutcomeTier tier, int weight, int quality) {
+        return new ArmySizeDef(new ArmySizeId(id), "Рівень", "Опис", shareBp, tier, weight, quality, List.of());
     }
 
     private static HdiLevelDef hdi(String id, int hdi, OutcomeTier tier, int weight, int quality) {

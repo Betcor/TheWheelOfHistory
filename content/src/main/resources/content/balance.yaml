@@ -47,3 +47,7 @@ generation:
   # Перевага колеса ІЛР за кожен крок рівня результату рівня ВВП від partial (0..100):
   # crit_fail → −2·x, fail → −x, success → +x, crit_success → +2·x.
   hdi_gdp_advantage: 15
+  # Перевага колеса розміру армії за кожен крок рівня результату рівня ВВП від partial (0..100):
+  # crit_fail → −2·x, fail → −x, success → +x, crit_success → +2·x. Багатша держава утримує
+  # більшу армію.
+  army_size_gdp_advantage: 10
