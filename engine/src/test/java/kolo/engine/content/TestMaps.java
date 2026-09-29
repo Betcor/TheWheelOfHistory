@@ -45,8 +45,11 @@ public final class TestMaps {
     /** Море — від 5 комірок, зони по 20 комірок. */
     public static final SeaDef SEA = new SeaDef(5, 20);
 
+    /** Річка — від стоку 300 (басейн щонайменше з кількох вологих комірок) і від двох комірок у системі. */
+    public static final RiverDef RIVERS = new RiverDef(300, 2);
+
     public static final MapContent CONTENT =
-            new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA);
+            new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS);
 
     /** NPC: мало 0–1, звичайно 2–4, багато 10–20; 60–100 провінцій на державу з кроком 20; 5–15% нічийних; 100–3000. */
     public static final WorldBalanceDef BALANCE = world(new CountRange(100, 3000));
@@ -73,22 +76,27 @@ public final class TestMaps {
 
     /** Контент {@link #CONTENT} з іншими шаблонами й числами материків. */
     public static MapContent content(List<MapTemplateDef> templates, ContinentsDef continents) {
-        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE, SEA);
+        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE, SEA, RIVERS);
     }
 
     /** Контент {@link #CONTENT} з іншим рельєфом. */
     public static MapContent content(ReliefDef relief) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE, SEA);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE, SEA, RIVERS);
     }
 
     /** Контент {@link #CONTENT} з іншим кліматом. */
     public static MapContent content(ClimateDef climate) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate, SEA);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate, SEA, RIVERS);
     }
 
     /** Контент {@link #CONTENT} з іншими числами моря. */
     public static MapContent content(SeaDef sea) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, sea);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, sea, RIVERS);
+    }
+
+    /** Контент {@link #CONTENT} з іншими числами річок. */
+    public static MapContent content(RiverDef rivers) {
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, rivers);
     }
 
     /** Клімат {@link #CLIMATE} з іншими кліматами світу. */

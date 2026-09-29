@@ -79,6 +79,7 @@ import kolo.engine.content.ReligionPolityDef;
 import kolo.engine.content.ReligionPolityId;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.RiverDef;
 import kolo.engine.content.SeaDef;
 import kolo.engine.content.SecularStateDef;
 import kolo.engine.content.StateFormDef;
@@ -1281,7 +1282,8 @@ public final class ContentLoader {
         ReliefDef relief = relief(yaml.relief());
         ClimateDef climate = climate(yaml.climate());
         SeaDef sea = at(MAP, "sea", () -> sea(yaml.sea()));
-        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate, sea));
+        RiverDef rivers = at(MAP, "rivers", () -> rivers(yaml.rivers()));
+        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate, sea, rivers));
     }
 
     private static ClimateDef climate(ContentYaml.Climate climate) {
@@ -1426,6 +1428,13 @@ public final class ContentLoader {
             throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "sea"));
         }
         return new SeaDef(required("min_cells", sea.minCells()), required("zone_cells", sea.zoneCells()));
+    }
+
+    private static RiverDef rivers(ContentYaml.Rivers rivers) {
+        if (rivers == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "rivers"));
+        }
+        return new RiverDef(required("min_flow", rivers.minFlow()), required("min_cells", rivers.minCells()));
     }
 
     private static ContinentsDef continents(ContentYaml.Continents continents) {

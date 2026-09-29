@@ -93,6 +93,29 @@ class MapDefinitionsTest {
     }
 
     @Test
+    void riverKeepsItsThresholds() {
+        RiverDef rivers = new RiverDef(300, 3);
+
+        assertThat(rivers.minFlow()).isEqualTo(300);
+        assertThat(rivers.minCells()).isEqualTo(3);
+        assertThat(rivers.enoughFlow(299)).isFalse();
+        assertThat(rivers.enoughFlow(300)).isTrue();
+        assertThat(rivers.enoughFlow(Integer.MAX_VALUE)).isTrue();
+    }
+
+    @Test
+    void riverRejectsThresholdsOutsideLimits() {
+        // Одна комірка дає щонайбільше 100 вологи — поріг до 100 зробив би річкою кожну вологу провінцію.
+        assertFails(() -> new RiverDef(ClimateDef.MAX_VALUE, 1), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new RiverDef(RiverDef.MAX_MIN_FLOW + 1, 1), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new RiverDef(300, 0), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new RiverDef(300, RiverDef.MAX_MIN_CELLS + 1), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThat(new RiverDef(ClimateDef.MAX_VALUE + 1, 1)).isEqualTo(new RiverDef(101, 1));
+        assertThat(new RiverDef(RiverDef.MAX_MIN_FLOW, RiverDef.MAX_MIN_CELLS).minFlow())
+                .isEqualTo(RiverDef.MAX_MIN_FLOW);
+    }
+
+    @Test
     void continentsKeepTheirValues() {
         ContinentsDef continents = new ContinentsDef(new CountRange(1, 4), 20, 50, 6);
 
@@ -206,13 +229,20 @@ class MapDefinitionsTest {
         assertThat(content.relief()).isEqualTo(TestMaps.RELIEF);
         assertThat(content.climate()).isEqualTo(TestMaps.CLIMATE);
         assertThat(content.sea()).isEqualTo(TestMaps.SEA);
+        assertThat(content.rivers()).isEqualTo(TestMaps.RIVERS);
     }
 
     @Test
     void mapContentRejectsEmptyAndDuplicateTemplates() {
         assertFails(
                 () -> new MapContent(
-                        List.of(), TestMaps.GRID, TestMaps.CONTINENTS, TestMaps.RELIEF, TestMaps.CLIMATE, TestMaps.SEA),
+                        List.of(),
+                        TestMaps.GRID,
+                        TestMaps.CONTINENTS,
+                        TestMaps.RELIEF,
+                        TestMaps.CLIMATE,
+                        TestMaps.SEA,
+                        TestMaps.RIVERS),
                 ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
@@ -221,7 +251,8 @@ class MapDefinitionsTest {
                         TestMaps.CONTINENTS,
                         TestMaps.RELIEF,
                         TestMaps.CLIMATE,
-                        TestMaps.SEA),
+                        TestMaps.SEA,
+                        TestMaps.RIVERS),
                 ErrorCode.DUPLICATE_ID);
     }
 

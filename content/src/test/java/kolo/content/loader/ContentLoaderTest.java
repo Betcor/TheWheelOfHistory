@@ -52,6 +52,7 @@ import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ReligionCountDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.RiverDef;
 import kolo.engine.content.SeaDef;
 import kolo.engine.content.SecularStateDef;
 import kolo.engine.content.StateReligionDef;
@@ -1328,6 +1329,7 @@ class ContentLoaderTest {
         assertThat(pack.map().grid()).isEqualTo(new MapGridDef(100, 2, 1, 2));
         assertThat(pack.map().continents()).isEqualTo(new ContinentsDef(new CountRange(1, 4), 20, 50, 6));
         assertThat(pack.map().sea()).isEqualTo(new SeaDef(8, 30));
+        assertThat(pack.map().rivers()).isEqualTo(new RiverDef(400, 2));
         ReliefDef relief = pack.map().relief();
         assertThat(relief.ridges()).isEqualTo(new CountRange(1, 3));
         assertThat(List.of(
@@ -1430,6 +1432,25 @@ class ContentLoaderTest {
         assertMapError(
                 Files.MAP.replace("min_cells: 8", "min_cells: 1001"),
                 Map.of("location", "sea", "cause", "value_out_of_range", "field", "sea.min_cells"));
+    }
+
+    @Test
+    void invalidRiversAreReportedAtTheirPosition() {
+        assertMapError(
+                Files.MAP.replace("rivers:\n  min_flow: 400\n  min_cells: 2\n", ""),
+                Map.of("location", "rivers", "cause", "blank_value", "field", "rivers"));
+        assertMapError(
+                Files.MAP.replace("  min_flow: 400\n", ""),
+                Map.of("location", "rivers", "cause", "blank_value", "field", "min_flow"));
+        assertMapError(
+                Files.MAP.replace("min_flow: 400", "min_flow: 100"),
+                Map.of("location", "rivers", "cause", "value_out_of_range", "field", "rivers.min_flow"));
+        assertMapError(
+                Files.MAP.replace("  min_cells: 2\n", ""),
+                Map.of("location", "rivers", "cause", "blank_value", "field", "min_cells"));
+        assertMapError(
+                Files.MAP.replace("min_cells: 2", "min_cells: 0"),
+                Map.of("location", "rivers", "cause", "value_out_of_range", "field", "rivers.min_cells"));
     }
 
     @Test
