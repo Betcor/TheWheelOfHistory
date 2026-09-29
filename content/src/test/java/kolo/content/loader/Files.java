@@ -295,6 +295,9 @@ final class Files {
             sea:
               min_cells: 8
               zone_cells: 30
+            rivers:
+              min_flow: 400
+              min_cells: 2
             relief:
               ridges: { min: 1, max: 3 }
               ridge_min_provinces: 40

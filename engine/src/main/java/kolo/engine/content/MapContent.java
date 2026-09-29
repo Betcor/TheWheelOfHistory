@@ -11,7 +11,7 @@ import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 
 /**
- * Контент карти (GD §3.3–3.5): шаблони, сітка комірок, материки, рельєф, клімат і море; родовища додадуться з
+ * Контент карти (GD §3.3–3.5): шаблони, сітка комірок, материки, рельєф, клімат, море й річки; родовища додадуться з
  * генератором карти.
  */
 public final class MapContent {
@@ -23,6 +23,7 @@ public final class MapContent {
     private final ReliefDef relief;
     private final ClimateDef climate;
     private final SeaDef sea;
+    private final RiverDef rivers;
 
     /**
      * @param templates шаблони в порядку контенту (порядок секторів колеса шаблону)
@@ -31,6 +32,7 @@ public final class MapContent {
      * @param relief числа генерації рельєфу й рівні рельєфу
      * @param climate числа генерації клімату, пояси й покриви
      * @param sea числа генерації моря й морських зон
+     * @param rivers числа генерації річок
      * @throws ValidationException якщо шаблонів немає або id повторюється
      */
     public MapContent(
@@ -39,7 +41,8 @@ public final class MapContent {
             ContinentsDef continents,
             ReliefDef relief,
             ClimateDef climate,
-            SeaDef sea) {
+            SeaDef sea,
+            RiverDef rivers) {
         if (templates.isEmpty()) {
             throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", "map_templates"));
         }
@@ -58,6 +61,7 @@ public final class MapContent {
         this.relief = Objects.requireNonNull(relief, "relief");
         this.climate = Objects.requireNonNull(climate, "climate");
         this.sea = Objects.requireNonNull(sea, "sea");
+        this.rivers = Objects.requireNonNull(rivers, "rivers");
     }
 
     /** Шаблони в порядку контенту — порядок секторів колеса шаблону. */
@@ -87,5 +91,9 @@ public final class MapContent {
 
     public SeaDef sea() {
         return sea;
+    }
+
+    public RiverDef rivers() {
+        return rivers;
     }
 }

@@ -601,7 +601,13 @@ final class ContentYaml {
     record Step(Integer min, Integer max, Integer step) {}
 
     record MapFile(
-            List<MapTemplate> templates, MapGrid grid, Continents continents, Relief relief, Climate climate, Sea sea) {
+            List<MapTemplate> templates,
+            MapGrid grid,
+            Continents continents,
+            Relief relief,
+            Climate climate,
+            Sea sea,
+            Rivers rivers) {
         MapFile {
             templates = orEmpty(templates);
         }
@@ -620,6 +626,10 @@ final class ContentYaml {
     record Sea(
             @JsonProperty("min_cells") Integer minCells,
             @JsonProperty("zone_cells") Integer zoneCells) {}
+
+    record Rivers(
+            @JsonProperty("min_flow") Integer minFlow,
+            @JsonProperty("min_cells") Integer minCells) {}
 
     record Relief(
             Count ridges,
