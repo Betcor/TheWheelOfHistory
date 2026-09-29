@@ -30,6 +30,8 @@ import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MapTemplateDef;
+import kolo.engine.content.MapTemplateId;
 import kolo.engine.content.MedianRange;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.NameFinalDef;
@@ -43,6 +45,7 @@ import kolo.engine.content.ReligionCountDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.SecularStateDef;
 import kolo.engine.content.StateReligionDef;
+import kolo.engine.content.StepRange;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
 import kolo.engine.content.StreakRewardId;
@@ -54,11 +57,13 @@ import kolo.engine.content.TagCondition;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
+import kolo.engine.content.WorldBalanceDef;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
+import kolo.engine.state.NpcShare;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
@@ -1291,6 +1296,81 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsMapTemplatesAndWorldBalance() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.map().templates())
+                .extracting(
+                        MapTemplateDef::id,
+                        MapTemplateDef::name,
+                        MapTemplateDef::weight,
+                        MapTemplateDef::provincesPct,
+                        MapTemplateDef::continents)
+                .containsExactly(
+                        tuple(new MapTemplateId("pangaea"), "Пангея", 20, 90, new CountRange(1, 1)),
+                        tuple(new MapTemplateId("archipelago"), "Архіпелаг", 15, 120, new CountRange(5, 8)));
+        WorldBalanceDef world = pack.balance().world();
+        assertThat(world.npcExtra(NpcShare.FEW)).isEqualTo(new CountRange(1, 3));
+        assertThat(world.npcExtra(NpcShare.NORMAL)).isEqualTo(new CountRange(2, 6));
+        assertThat(world.npcExtra(NpcShare.MANY)).isEqualTo(new CountRange(4, 10));
+        assertThat(world.provincesPerCountry()).isEqualTo(new StepRange(60, 100, 5));
+        assertThat(world.unclaimedBp()).isEqualTo(new StepRange(500, 1500, 100));
+        assertThat(world.provinces()).isEqualTo(new CountRange(400, 3500));
+    }
+
+    @Test
+    void invalidMapIsReportedAtItsPosition() {
+        assertMapError(
+                Files.MAP.replace("id: archipelago", "id: pangaea"),
+                Map.of("location", "templates[1]", "cause", "duplicate_id", "value", "pangaea"));
+        assertMapError(
+                Files.MAP.replace("    weight: 15\n", ""),
+                Map.of("location", "templates[1]", "cause", "blank_value", "field", "weight"));
+        assertMapError(
+                Files.MAP.replace("continents: { min: 5, max: 8 }", "continents: { min: 0, max: 8 }"),
+                Map.of(
+                        "location",
+                        "templates[1]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "map_template.archipelago.continents.min"));
+        assertMapError(
+                Files.MAP.replace("continents: { min: 5, max: 8 }", "continents: { min: 5 }"),
+                Map.of("location", "templates[1].continents", "cause", "blank_value", "field", "max"));
+        assertMapError("templates: []\n", Map.of("location", "templates", "cause", "empty_collection"));
+    }
+
+    @Test
+    void invalidWorldBalanceIsReportedAtItsPosition() {
+        assertContentError(
+                balance(Files.BALANCE.substring(0, Files.BALANCE.indexOf("world:"))),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "world", "cause", "blank_value", "field", "world"));
+        assertContentError(
+                balance(Files.BALANCE.replace("    few: {", "    some: {")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "world.npc_extra.some", "cause", "unknown_reference", "value", "some"));
+        assertContentError(
+                balance(Files.BALANCE.replace("    many: { min: 4, max: 10 }\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "world.npc_extra", "cause", "missing_definition", "value", "many"));
+        assertContentError(
+                balance(Files.BALANCE.replace("{ min: 60, max: 100, step: 5 }", "{ min: 60, max: 100, step: 7 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "world.provinces_per_country", "cause", "value_out_of_range", "step", 7));
+        assertContentError(
+                balance(Files.BALANCE.replace("{ min: 500, max: 1500, step: 100 }", "{ min: 500, max: 1500 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "world.unclaimed_bp", "cause", "blank_value", "field", "step"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "{ min: 500, max: 1500, step: 100 }", "{ min: 500, max: 6000, step: 100 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "world", "cause", "value_out_of_range", "field", "world.unclaimed_bp.max"));
+    }
+
+    @Test
     void strengthOverridesAreOptional() {
         BalanceDef balance = ContentLoader.load(Files.valid()
                         .with(ContentLoader.BALANCE, Files.BALANCE.replace("  strength:\n    economic_cycle: 80\n", ""))
@@ -1704,6 +1784,14 @@ class ContentLoaderTest {
                 Files.valid().with(ContentLoader.RELIGIONS, religions).source(),
                 ErrorCode.INVALID_CONTENT,
                 withFile(ContentLoader.RELIGIONS, expected));
+    }
+
+    private static void assertMapError(String map, Map<String, ?> expected) {
+        assertThat(map).isNotEqualTo(Files.MAP);
+        assertContentError(
+                Files.valid().with(ContentLoader.MAP, map).source(),
+                ErrorCode.INVALID_CONTENT,
+                withFile(ContentLoader.MAP, expected));
     }
 
     private static Map<String, ?> withFile(String file, Map<String, ?> expected) {

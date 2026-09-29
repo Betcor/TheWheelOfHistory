@@ -529,7 +529,8 @@ final class ContentYaml {
             Streaks streaks,
             @JsonProperty("power_corridors") List<PowerCorridor> powerCorridors,
             Generation generation,
-            Religion religion) {
+            Religion religion,
+            World world) {
         BalanceFile {
             powerCorridors = orEmpty(powerCorridors);
         }
@@ -585,6 +586,33 @@ final class ContentYaml {
     record ReligionCount(@JsonProperty("max_countries") Integer maxCountries, Integer min, Integer max) {}
 
     record Count(Integer min, Integer max) {}
+
+    /** @param npcExtra ключ частки NPC ({@code few}, {@code normal}, {@code many}) → діапазон колеса */
+    record World(
+            @JsonProperty("npc_extra") Map<String, Count> npcExtra,
+            @JsonProperty("provinces_per_country") Step provincesPerCountry,
+            @JsonProperty("unclaimed_bp") Step unclaimedBp,
+            Count provinces) {
+        World {
+            npcExtra = npcExtra == null ? Map.of() : npcExtra;
+        }
+    }
+
+    record Step(Integer min, Integer max, Integer step) {}
+
+    record MapFile(List<MapTemplate> templates) {
+        MapFile {
+            templates = orEmpty(templates);
+        }
+    }
+
+    record MapTemplate(
+            String id,
+            String name,
+            String description,
+            Integer weight,
+            @JsonProperty("provinces_pct") Integer provincesPct,
+            Count continents) {}
 
     /** По рядку на відмінок; порядок полів — порядок {@link kolo.engine.state.GrammaticalCase}. */
     record Cases(

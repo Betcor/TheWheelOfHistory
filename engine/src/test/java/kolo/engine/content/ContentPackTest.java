@@ -54,9 +54,12 @@ class ContentPackTest {
                 TestContent.backstory(),
                 TestContent.streaks(),
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 TestContent.balance());
 
         assertThat(pack.hash()).isEqualTo(HASH);
+        assertThat(pack.map()).isSameAs(TestMaps.CONTENT);
+        assertThat(pack.balance().world()).isSameAs(TestMaps.BALANCE);
         assertThat(pack.ideologies().keySet()).extracting(IdeologyId::value).containsExactly("democracy", "socialism");
         assertThat(pack.doctrines().keySet()).extracting(DoctrineId::value).containsExactly("armored", "mountain");
         assertThat(pack.resources().keySet()).extracting(ResourceId::value).containsExactly("coal", "uranium");
@@ -107,6 +110,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()),
                 "tech_branches",
                 "energy_science");
@@ -129,6 +133,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()),
                 "development_levels",
                 -3);
@@ -151,6 +156,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()),
                 "nuclear_statuses",
                 "program");
@@ -179,6 +185,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
@@ -236,6 +243,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()))
                 .isInstanceOf(ValidationException.class);
     }
@@ -265,6 +273,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()),
                 "ideologies");
         assertEmpty(
@@ -286,6 +295,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()),
                 "doctrines");
         assertEmpty(
@@ -307,6 +317,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()),
                 "resources");
         assertThatThrownBy(() -> new ContentPack(
@@ -327,6 +338,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()))
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BLANK_VALUE));
@@ -417,6 +429,7 @@ class ContentPackTest {
                         TestContent.backstory(),
                         TestContent.streaks(),
                         TestReligions.content(),
+                        TestMaps.CONTENT,
                         TestContent.balance()),
                 "person_kinds",
                 "pretender");
@@ -855,6 +868,7 @@ class ContentPackTest {
                 backstory,
                 TestContent.streaks(),
                 religions,
+                TestMaps.CONTENT,
                 TestContent.balance());
     }
 
@@ -878,6 +892,7 @@ class ContentPackTest {
                 backstory,
                 streaks,
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 TestContent.balance());
     }
 
@@ -906,6 +921,7 @@ class ContentPackTest {
                 backstory,
                 TestContent.streaks(),
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 TestContent.balance());
     }
 
@@ -934,6 +950,7 @@ class ContentPackTest {
                 backstory,
                 TestContent.streaks(),
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 TestContent.balance());
     }
 
@@ -970,6 +987,7 @@ class ContentPackTest {
                 TestContent.backstory(),
                 TestContent.streaks(),
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 TestContent.balance());
     }
 
@@ -992,6 +1010,7 @@ class ContentPackTest {
                 TestContent.backstory(),
                 TestContent.streaks(),
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 TestContent.balance());
     }
 

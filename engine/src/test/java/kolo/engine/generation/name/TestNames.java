@@ -24,6 +24,7 @@ import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MapContent;
 import kolo.engine.content.MedianRange;
 import kolo.engine.content.NameContent;
 import kolo.engine.content.NameFinalDef;
@@ -48,11 +49,13 @@ import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TestMaps;
 import kolo.engine.content.TestReligions;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.content.WheelBalanceDef;
+import kolo.engine.content.WorldBalanceDef;
 import kolo.engine.generation.country.TestStreaks;
 import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalGender;
@@ -203,15 +206,25 @@ public final class TestNames {
 
     /** Пакет з {@code nameCandidates} назвами-кандидатами на колесі назви. */
     public static ContentPack pack(int nameCandidates) {
-        return pack(nameCandidates, TestReligions.content(), TestReligions.BALANCE);
+        return pack(nameCandidates, TestReligions.content(), TestReligions.BALANCE, TestMaps.CONTENT, TestMaps.BALANCE);
     }
 
     /** Пакет з цим шаблоном релігій і їхнім балансом; решта — як у {@link #PACK}. */
     public static ContentPack pack(ReligionContent religions, ReligionBalanceDef religionBalance) {
-        return pack(5, religions, religionBalance);
+        return pack(5, religions, religionBalance, TestMaps.CONTENT, TestMaps.BALANCE);
     }
 
-    private static ContentPack pack(int nameCandidates, ReligionContent religions, ReligionBalanceDef religionBalance) {
+    /** Пакет з цим контентом карти й балансом розміру світу; решта — як у {@link #PACK}. */
+    public static ContentPack pack(MapContent map, WorldBalanceDef world) {
+        return pack(5, TestReligions.content(), TestReligions.BALANCE, map, world);
+    }
+
+    private static ContentPack pack(
+            int nameCandidates,
+            ReligionContent religions,
+            ReligionBalanceDef religionBalance,
+            MapContent map,
+            WorldBalanceDef world) {
         return new ContentPack(
                 "0".repeat(64),
                 List.of(
@@ -247,10 +260,11 @@ public final class TestNames {
                 backstory(),
                 TestStreaks.CONTENT,
                 religions,
-                balance(nameCandidates, religionBalance));
+                map,
+                balance(nameCandidates, religionBalance, world));
     }
 
-    private static BalanceDef balance(int nameCandidates, ReligionBalanceDef religionBalance) {
+    private static BalanceDef balance(int nameCandidates, ReligionBalanceDef religionBalance, WorldBalanceDef world) {
         return BalanceDef.of(
                 new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                 new StreakRulesDef(85, 15, 3),
@@ -271,7 +285,8 @@ public final class TestNames {
                         new CountRange(1, 3),
                         new CountRange(25, 70),
                         nameCandidates),
-                religionBalance);
+                religionBalance,
+                world);
     }
 
     private static BackstoryContent backstory() {

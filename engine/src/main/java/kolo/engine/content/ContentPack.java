@@ -47,6 +47,7 @@ public final class ContentPack {
     private final BackstoryContent backstory;
     private final StreakContent streaks;
     private final ReligionContent religions;
+    private final MapContent map;
     private final BalanceDef balance;
 
     /**
@@ -71,6 +72,7 @@ public final class ContentPack {
      * @param streaks колеса стріків генерації
      * @param religions шаблон релігій світу: архетипи, аспекти, догмати, устрої, форми назви віри, колесо релігії
      *     держави; мітки релігій — джерело міток передісторії й типів постатей
+     * @param map контент карти: шаблони
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР, розміру армії
      *     чи вишколу не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
@@ -96,6 +98,7 @@ public final class ContentPack {
             BackstoryContent backstory,
             StreakContent streaks,
             ReligionContent religions,
+            MapContent map,
             BalanceDef balance) {
         this.hash = Checks.notBlank("content.hash", hash);
 
@@ -282,6 +285,7 @@ public final class ContentPack {
             }
         }
 
+        this.map = Objects.requireNonNull(map, "map");
         this.balance = Objects.requireNonNull(balance, "balance");
     }
 
@@ -468,7 +472,12 @@ public final class ContentPack {
         return religions;
     }
 
-    /** Числа балансу: колеса, стріки, коридор сили, кількості генерації. */
+    /** Контент карти: шаблони. */
+    public MapContent map() {
+        return map;
+    }
+
+    /** Числа балансу: колеса, стріки, коридор сили, кількості генерації, розмір світу. */
     public BalanceDef balance() {
         return balance;
     }

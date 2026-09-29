@@ -286,7 +286,8 @@ final class TestContent {
                         new CountRange(1, 3),
                         new CountRange(25, 70),
                         5),
-                TestReligions.BALANCE);
+                TestReligions.BALANCE,
+                TestMaps.BALANCE);
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {
@@ -308,6 +309,7 @@ final class TestContent {
                 backstory(),
                 streaks(),
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 balance());
     }
 }
