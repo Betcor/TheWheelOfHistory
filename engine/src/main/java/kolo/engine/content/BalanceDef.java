@@ -11,7 +11,7 @@ import kolo.engine.state.PowerCorridor;
 
 /**
  * Числа балансу, що не належать жодному окремому визначенню: колеса, стріки, коридор сили, кількості генерації
- * країн і релігій.
+ * країн і релігій, розмір світу.
  *
  * <p>Правила гри (межі переваги, мінімум КП/КУ, ліміт жетонів долі) — не тут, а в коді: вони не налаштовуються.
  *
@@ -22,13 +22,15 @@ public record BalanceDef(
         StreakRulesDef streaks,
         SortedMap<PowerCorridor, PowerCorridorDef> corridors,
         GenerationBalanceDef generation,
-        ReligionBalanceDef religion) {
+        ReligionBalanceDef religion,
+        WorldBalanceDef world) {
 
     public BalanceDef {
         Objects.requireNonNull(wheel, "wheel");
         Objects.requireNonNull(streaks, "streaks");
         Objects.requireNonNull(generation, "generation");
         Objects.requireNonNull(religion, "religion");
+        Objects.requireNonNull(world, "world");
         TreeMap<PowerCorridor, PowerCorridorDef> copy = new TreeMap<>();
         corridors.forEach((key, def) -> {
             if (key != Objects.requireNonNull(def, "power_corridor").corridor()) {
@@ -51,7 +53,8 @@ public record BalanceDef(
             StreakRulesDef streaks,
             List<PowerCorridorDef> corridors,
             GenerationBalanceDef generation,
-            ReligionBalanceDef religion) {
+            ReligionBalanceDef religion,
+            WorldBalanceDef world) {
         TreeMap<PowerCorridor, PowerCorridorDef> map = new TreeMap<>();
         for (PowerCorridorDef def : corridors) {
             Objects.requireNonNull(def, "power_corridor");
@@ -65,7 +68,7 @@ public record BalanceDef(
                                 def.corridor().key()));
             }
         }
-        return new BalanceDef(wheel, streaks, map, generation, religion);
+        return new BalanceDef(wheel, streaks, map, generation, religion, world);
     }
 
     public PowerCorridorDef corridor(PowerCorridor corridor) {

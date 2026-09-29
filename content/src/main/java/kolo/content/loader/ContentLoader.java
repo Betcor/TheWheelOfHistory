@@ -47,6 +47,9 @@ import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MapContent;
+import kolo.engine.content.MapTemplateDef;
+import kolo.engine.content.MapTemplateId;
 import kolo.engine.content.MedianRange;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.NameContent;
@@ -71,6 +74,7 @@ import kolo.engine.content.SecularStateDef;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
 import kolo.engine.content.StateReligionDef;
+import kolo.engine.content.StepRange;
 import kolo.engine.content.StreakContent;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
@@ -86,6 +90,7 @@ import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.content.WheelBalanceDef;
+import kolo.engine.content.WorldBalanceDef;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
@@ -93,6 +98,7 @@ import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
+import kolo.engine.state.NpcShare;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
@@ -124,6 +130,7 @@ public final class ContentLoader {
     public static final String BACKSTORY = "backstory.yaml";
     public static final String STREAKS = "streaks.yaml";
     public static final String RELIGIONS = "religions.yaml";
+    public static final String MAP = "map.yaml";
     public static final String BALANCE = "balance.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
@@ -141,6 +148,7 @@ public final class ContentLoader {
             BACKSTORY,
             STREAKS,
             RELIGIONS,
+            MAP,
             BALANCE);
 
     private static final YAMLMapper MAPPER = createMapper();
@@ -189,6 +197,7 @@ public final class ContentLoader {
                 training);
         checkPersonKindTags(
                 kinds, knownTags(backstory, streaks, religions, ideologies, levels, nuclear, gdp, hdi, army, training));
+        MapContent map = map(parse(files, MAP, ContentYaml.MapFile.class));
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -214,6 +223,7 @@ public final class ContentLoader {
                         backstory,
                         streaks,
                         religions,
+                        map,
                         balance));
     }
 
@@ -1209,7 +1219,48 @@ public final class ContentLoader {
         ReligionBalanceDef religion =
                 at(BALANCE, "religion", () -> new ReligionBalanceDef(religionCount, aspects, dogmas));
 
-        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation, religion));
+        ContentYaml.World worldYaml = section("world", yaml.world());
+        TreeMap<NpcShare, CountRange> npcExtra = new TreeMap<>();
+        worldYaml.npcExtra().forEach((key, range) -> {
+            String location = "world.npc_extra." + key;
+            NpcShare share =
+                    at(BALANCE, location, () -> ContentKeys.parse("npc_share", NpcShare.values(), NpcShare::key, key));
+            npcExtra.put(share, at(BALANCE, location, () -> count(range)));
+        });
+        complete(
+                BALANCE,
+                "world.npc_extra",
+                new TreeSet<>(npcExtra.keySet()),
+                List.of(NpcShare.values()),
+                NpcShare::key);
+        StepRange provincesPerCountry =
+                at(BALANCE, "world.provinces_per_country", () -> step(worldYaml.provincesPerCountry()));
+        StepRange unclaimed = at(BALANCE, "world.unclaimed_bp", () -> step(worldYaml.unclaimedBp()));
+        CountRange provinces = at(BALANCE, "world.provinces", () -> count(worldYaml.provinces()));
+        WorldBalanceDef world =
+                at(BALANCE, "world", () -> new WorldBalanceDef(npcExtra, provincesPerCountry, unclaimed, provinces));
+
+        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation, religion, world));
+    }
+
+    private static MapContent map(ContentYaml.MapFile yaml) {
+        TreeSet<MapTemplateId> ids = new TreeSet<>();
+        List<MapTemplateDef> templates =
+                list(MAP, "templates", nonEmpty(MAP, "templates", yaml.templates()), (location, template) -> {
+                    MapTemplateId id = at(MAP, location, () -> unique(ids, new MapTemplateId(template.id())));
+                    CountRange continents = at(MAP, location + ".continents", () -> count(template.continents()));
+                    return at(
+                            MAP,
+                            location,
+                            () -> new MapTemplateDef(
+                                    id,
+                                    template.name(),
+                                    template.description(),
+                                    required("weight", template.weight()),
+                                    required("provinces_pct", template.provincesPct()),
+                                    continents));
+                });
+        return at(MAP, "", () -> new MapContent(templates));
     }
 
     /** Розділ файлу балансу; пропущений — помилка з назвою розділу як місцем. */
@@ -1234,6 +1285,13 @@ public final class ContentLoader {
             throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "count"));
         }
         return new CountRange(required("min", count.min()), required("max", count.max()));
+    }
+
+    private static StepRange step(ContentYaml.Step step) {
+        if (step == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "step_range"));
+        }
+        return new StepRange(required("min", step.min()), required("max", step.max()), required("step", step.step()));
     }
 
     private static int required(String field, Integer value) {

@@ -41,6 +41,7 @@ import kolo.engine.content.SubIdeologyDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TestMaps;
 import kolo.engine.content.TestReligions;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
@@ -226,6 +227,7 @@ final class TestChain {
                 new BackstoryContent(Map.of(), FRAGMENTS),
                 STREAKS,
                 TestReligions.content(),
+                TestMaps.CONTENT,
                 BalanceDef.of(
                         new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                         new StreakRulesDef(85, 15, 3),
@@ -246,7 +248,8 @@ final class TestChain {
                                 new CountRange(1, 1),
                                 new CountRange(25, 70),
                                 5),
-                        TestReligions.BALANCE));
+                        TestReligions.BALANCE,
+                        TestMaps.BALANCE));
     }
 
     private static IdeologyDef ideology(String id, String... subs) {

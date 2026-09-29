@@ -257,6 +257,30 @@ final class Files {
                 - { max_countries: 40, min: 4, max: 6 }
               aspects: { min: 2, max: 3 }
               dogmas: { min: 2, max: 4 }
+            world:
+              npc_extra:
+                few: { min: 1, max: 3 }
+                normal: { min: 2, max: 6 }
+                many: { min: 4, max: 10 }
+              provinces_per_country: { min: 60, max: 100, step: 5 }
+              unclaimed_bp: { min: 500, max: 1500, step: 100 }
+              provinces: { min: 400, max: 3500 }
+            """;
+
+    static final String MAP = """
+            templates:
+              - id: pangaea
+                name: Пангея
+                description: Один материк.
+                weight: 20
+                provinces_pct: 90
+                continents: { min: 1, max: 1 }
+              - id: archipelago
+                name: Архіпелаг
+                description: Багато островів.
+                weight: 15
+                provinces_pct: 120
+                continents: { min: 5, max: 8 }
             """;
 
     static final String RELIGIONS = """
@@ -386,6 +410,7 @@ final class Files {
         files.put(ContentLoader.BACKSTORY, BACKSTORY);
         files.put(ContentLoader.STREAKS, STREAKS);
         files.put(ContentLoader.RELIGIONS, RELIGIONS);
+        files.put(ContentLoader.MAP, MAP);
         files.put(ContentLoader.BALANCE, BALANCE);
     }
 
