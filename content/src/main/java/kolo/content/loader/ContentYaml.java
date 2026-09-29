@@ -412,9 +412,20 @@ final class ContentYaml {
         }
     }
 
-    /** @param figure роль постаті, чиїм ім'ям зветься віра */
-    record Archetype(String id, String name, String description, String figure, Integer weight, List<String> tags) {
+    /**
+     * @param figure роль постаті, чиїм ім'ям зветься віра
+     * @param figureSexes ключі статей постаті, напр. {@code male}
+     */
+    record Archetype(
+            String id,
+            String name,
+            String description,
+            String figure,
+            @JsonProperty("figure_sexes") List<String> figureSexes,
+            Integer weight,
+            List<String> tags) {
         Archetype {
+            figureSexes = orEmpty(figureSexes);
             tags = orEmpty(tags);
         }
     }
@@ -541,7 +552,14 @@ final class ContentYaml {
             @JsonProperty("person_age") Count personAge,
             @JsonProperty("name_candidates") Integer nameCandidates) {}
 
-    record Religion(Count aspects, Count dogmas) {}
+    /** @param count таблиця кількості релігій за кількістю держав */
+    record Religion(List<ReligionCount> count, Count aspects, Count dogmas) {
+        Religion {
+            count = orEmpty(count);
+        }
+    }
+
+    record ReligionCount(@JsonProperty("max_countries") Integer maxCountries, Integer min, Integer max) {}
 
     record Count(Integer min, Integer max) {}
 

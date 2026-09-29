@@ -36,6 +36,8 @@ import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.PowerCorridorDef;
+import kolo.engine.content.ReligionBalanceDef;
+import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
@@ -180,6 +182,15 @@ public final class TestNames {
 
     /** Пакет з {@code nameCandidates} назвами-кандидатами на колесі назви. */
     public static ContentPack pack(int nameCandidates) {
+        return pack(nameCandidates, TestReligions.content(), TestReligions.BALANCE);
+    }
+
+    /** Пакет з цим шаблоном релігій і їхнім балансом; решта — як у {@link #PACK}. */
+    public static ContentPack pack(ReligionContent religions, ReligionBalanceDef religionBalance) {
+        return pack(5, religions, religionBalance);
+    }
+
+    private static ContentPack pack(int nameCandidates, ReligionContent religions, ReligionBalanceDef religionBalance) {
         return new ContentPack(
                 "0".repeat(64),
                 List.of(
@@ -218,11 +229,11 @@ public final class TestNames {
                         List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE)),
                 backstory(),
                 TestStreaks.CONTENT,
-                TestReligions.content(),
-                balance(nameCandidates));
+                religions,
+                balance(nameCandidates, religionBalance));
     }
 
-    private static BalanceDef balance(int nameCandidates) {
+    private static BalanceDef balance(int nameCandidates, ReligionBalanceDef religionBalance) {
         return BalanceDef.of(
                 new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                 new StreakRulesDef(85, 15, 3),
@@ -243,7 +254,7 @@ public final class TestNames {
                         new CountRange(1, 3),
                         new CountRange(25, 70),
                         nameCandidates),
-                TestReligions.BALANCE);
+                religionBalance);
     }
 
     private static BackstoryContent backstory() {

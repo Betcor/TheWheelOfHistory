@@ -105,4 +105,33 @@ class PersonNamesTest {
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE));
     }
+
+    @Test
+    void givenNameIsTheFirstPartOfFullName() {
+        for (Sex sex : Sex.values()) {
+            for (long seed = 0; seed < 50; seed++) {
+                NounPhrase given = PersonNames.given(Rng.of(seed), PACK, NORTHERN.id(), sex);
+                LocalizedName full = PersonNames.generate(Rng.of(seed), PACK, NORTHERN.id(), sex);
+
+                // Ім'я — перші кидки повного імені: той самий seed дає те саме ім'я в кожному відмінку.
+                assertThat(given.gender()).isEqualTo(sex.gender());
+                for (GrammaticalCase grammaticalCase : GrammaticalCase.values()) {
+                    assertThat(full.fullName().form(grammaticalCase))
+                            .isEqualTo(given.form(grammaticalCase) + " "
+                                    + full.shortName().form(grammaticalCase));
+                }
+            }
+        }
+    }
+
+    @Test
+    void givenNameDeclinesAsAnimateNoun() {
+        NounPhrase given = PersonNames.given(Rng.of(1), PACK, SOUTHERN.id(), Sex.MALE);
+
+        assertThat(given.forms())
+                .containsExactly("Салан", "Салана", "Саланові", "Салана", "Саланом", "Саланові", "Салане");
+        assertThatThrownBy(() -> PersonNames.given(Rng.of(1), PACK, new NameStyleId("eastern"), Sex.MALE))
+                .isInstanceOfSatisfying(
+                        ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE));
+    }
 }

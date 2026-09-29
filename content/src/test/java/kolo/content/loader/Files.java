@@ -252,6 +252,9 @@ final class Files {
               person_age: { min: 25, max: 70 }
               name_candidates: 5
             religion:
+              count:
+                - { max_countries: 8, min: 3, max: 4 }
+                - { max_countries: 40, min: 4, max: 6 }
               aspects: { min: 2, max: 3 }
               dogmas: { min: 2, max: 4 }
             """;
@@ -262,12 +265,14 @@ final class Files {
                 name: Монотеїзм
                 description: Віра в єдиного бога.
                 figure: Єдиний Бог
+                figure_sexes: [male]
                 weight: 20
                 tags: [archetype_monotheism]
               - id: polytheism
                 name: Політеїзм
                 description: Віра в багатьох богів.
                 figure: Верховне божество
+                figure_sexes: [male, female]
                 weight: 20
                 tags: [archetype_polytheism]
             aspects:

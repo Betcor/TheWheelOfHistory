@@ -19,6 +19,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
+import kolo.engine.state.Sex;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
@@ -31,20 +32,32 @@ class ReligionDefinitionsTest {
 
     @Test
     void archetypeFieldsAreChecked() {
-        ArchetypeDef archetype = archetype("dualism", "Два начала");
+        ArchetypeDef archetype = archetype("dualism", "Два начала", Sex.FEMALE, Sex.MALE);
         assertThat(archetype.figure()).isEqualTo("Два начала");
+        assertThat(archetype.figureSexes()).containsExactly(Sex.FEMALE, Sex.MALE);
         assertThat(archetype.tags()).containsExactly("archetype_dualism");
 
+        List<Sex> male = List.of(Sex.MALE);
         assertFails(
-                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", " ", 100, List.of()), ErrorCode.BLANK_VALUE);
+                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", " ", male, 100, List.of()),
+                ErrorCode.BLANK_VALUE);
         assertFails(
-                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", "Бог", 0, List.of()),
+                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", "Бог", male, 0, List.of()),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(
-                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", "Бог", ArchetypeDef.MAX_WEIGHT + 1, List.of()),
+                () -> new ArchetypeDef(
+                        MONOTHEISM, "Монотеїзм", "Опис", "Бог", male, ArchetypeDef.MAX_WEIGHT + 1, List.of()),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(
-                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", "Бог", 100, List.of("a", "a")),
+                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", "Бог", male, 100, List.of("a", "a")),
+                ErrorCode.DUPLICATE_ID);
+        // Постать без статі не можна назвати; повтор статі — майже напевно помилка в контенті.
+        assertFails(
+                () -> new ArchetypeDef(MONOTHEISM, "Монотеїзм", "Опис", "Бог", List.of(), 100, List.of()),
+                ErrorCode.EMPTY_COLLECTION);
+        assertFails(
+                () -> new ArchetypeDef(
+                        MONOTHEISM, "Монотеїзм", "Опис", "Бог", List.of(Sex.MALE, Sex.MALE), 100, List.of()),
                 ErrorCode.DUPLICATE_ID);
     }
 
@@ -255,17 +268,62 @@ class ReligionDefinitionsTest {
     @Test
     void religionBalanceLimitsCounts() {
         assertThat(TestReligions.BALANCE.aspects()).isEqualTo(new CountRange(2, 3));
+        List<ReligionCountDef> count = List.of(TestReligions.FEW_COUNTRIES);
         assertFails(
-                () -> new ReligionBalanceDef(new CountRange(0, 2), new CountRange(1, 2)), ErrorCode.VALUE_OUT_OF_RANGE);
+                () -> new ReligionBalanceDef(count, new CountRange(0, 2), new CountRange(1, 2)),
+                ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(
-                () -> new ReligionBalanceDef(new CountRange(1, 2), new CountRange(1, ReligionBalanceDef.MAX_PARTS + 1)),
+                () -> new ReligionBalanceDef(
+                        count, new CountRange(1, 2), new CountRange(1, ReligionBalanceDef.MAX_PARTS + 1)),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertThat(new ReligionBalanceDef(
+                                count,
                                 new CountRange(ReligionBalanceDef.MAX_PARTS, ReligionBalanceDef.MAX_PARTS),
                                 new CountRange(1, 1))
                         .aspects()
                         .max())
                 .isEqualTo(ReligionBalanceDef.MAX_PARTS);
+    }
+
+    @Test
+    void religionCountRowLimitsCounts() {
+        assertThat(new ReligionCountDef(1, new CountRange(1, ReligionCountDef.MAX_RELIGIONS)).religions())
+                .isEqualTo(new CountRange(1, ReligionCountDef.MAX_RELIGIONS));
+        assertFails(() -> new ReligionCountDef(0, new CountRange(3, 4)), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new ReligionCountDef(8, new CountRange(0, 4)), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new ReligionCountDef(8, new CountRange(3, ReligionCountDef.MAX_RELIGIONS + 1)),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void religionCountTableMustGrow() {
+        CountRange parts = new CountRange(1, 2);
+        assertFails(() -> new ReligionBalanceDef(List.of(), parts, parts), ErrorCode.EMPTY_COLLECTION);
+        ReligionCountDef eight = new ReligionCountDef(8, new CountRange(3, 4));
+        assertFails(
+                () -> new ReligionBalanceDef(
+                        List.of(eight, new ReligionCountDef(8, new CountRange(4, 5))), parts, parts),
+                ErrorCode.OUT_OF_ORDER);
+        assertFails(
+                () -> new ReligionBalanceDef(
+                        List.of(eight, new ReligionCountDef(5, new CountRange(4, 5))), parts, parts),
+                ErrorCode.OUT_OF_ORDER);
+    }
+
+    @Test
+    void religionsForCountriesTakeFirstFittingRow() {
+        ReligionBalanceDef balance = TestReligions.BALANCE;
+        CountRange few = TestReligions.FEW_COUNTRIES.religions();
+        CountRange many = TestReligions.MANY_COUNTRIES.religions();
+
+        assertThat(balance.religions(1)).isEqualTo(few);
+        assertThat(balance.religions(8)).isEqualTo(few);
+        assertThat(balance.religions(9)).isEqualTo(many);
+        assertThat(balance.religions(20)).isEqualTo(many);
+        // Більше держав, ніж в останньому рядку, — як в останньому.
+        assertThat(balance.religions(1000)).isEqualTo(many);
+        assertFails(() -> balance.religions(0), ErrorCode.VALUE_OUT_OF_RANGE);
     }
 
     private static FaithFormDef form(List<String> templates, List<ArchetypeId> archetypes) {

@@ -11,6 +11,8 @@ import kolo.engine.content.NameStyleId;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.generation.name.CountryNames;
 import kolo.engine.generation.name.PersonNames;
+import kolo.engine.generation.religion.StartReligions;
+import kolo.engine.generation.religion.WorldReligionsWheel;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.LocalizedName;
 import kolo.engine.state.Sex;
@@ -55,6 +57,23 @@ class ContentSmokeTest {
         LocalizedName name = PersonNames.generate(Rng.of(42), pack, style, Sex.FEMALE);
 
         assertThat(name.fullName().nominative()).endsWith(" " + name.shortName().nominative());
+    }
+
+    @Test
+    void bundledContentCreatesWorldReligions() {
+        ContentPack pack = ContentLoader.loadBundled();
+
+        StartReligions world = WorldReligionsWheel.generate(Rng.of(42), pack, 12);
+
+        assertThat(world.religions()).isNotEmpty();
+        assertThat(world.religions())
+                .allSatisfy(religion -> assertThat(religion.name().nominative())
+                        .endsWith(" "
+                                + religion.figure()
+                                        .form(pack.religions()
+                                                .faithForm(religion.faithForm())
+                                                .orElseThrow()
+                                                .figureCase())));
     }
 
     @Test
