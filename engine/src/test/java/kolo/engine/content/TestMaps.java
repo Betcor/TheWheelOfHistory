@@ -1,7 +1,10 @@
 package kolo.engine.content;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.TreeMap;
+import kolo.engine.state.Climate;
+import kolo.engine.state.Cover;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.Relief;
 
@@ -10,6 +13,9 @@ import kolo.engine.state.Relief;
  * і «Архіпелаг» (3–5 материків, коефіцієнт 150, суходолу 30%); баланс розміру світу — {@link #BALANCE}.
  */
 public final class TestMaps {
+
+    /** Вологі пояси, де бувають ліс і болото. */
+    private static final List<Climate> WET = List.of(Climate.BOREAL, Climate.TEMPERATE, Climate.TROPICAL);
 
     public static final MapTemplateDef PANGAEA = template("pangaea", 100, 100, 50, 1, 1);
     public static final MapTemplateDef ARCHIPELAGO = template("archipelago", 100, 150, 30, 3, 5);
@@ -26,7 +32,18 @@ public final class TestMaps {
      */
     public static final ReliefDef RELIEF = relief(new CountRange(1, 2), 20, 40, 70);
 
-    public static final MapContent CONTENT = new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF);
+    /**
+     * Світи: холодний −10 (вага 1), помірний 0 (вага 2), теплий +10 (вага 1). Температура: екватор 90, полюс 0,
+     * охолодження 30% висоти, шум ±10; волога: берег 80, −10 за крок, шум ±20; плями по 3 комірки. Пороги: полярний
+     * нижче 15, бореальний нижче 35, посушливий — волога нижче 30, тропічний з 70. Покриви в порядку перевірки: тундра
+     * (полярний), болото (вологий рівнинний низ: волога ≥ 80, висота ≤ 30), пустеля (посушливий, волога ≤ 15), ліс
+     * (волога ≥ 55).
+     */
+    public static final ClimateDef CLIMATE =
+            climate(List.of(world("cold", 1, -10), world("temperate", 2, 0), world("warm", 1, 10)));
+
+    public static final MapContent CONTENT =
+            new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE);
 
     /** NPC: мало 0–1, звичайно 2–4, багато 10–20; 60–100 провінцій на державу з кроком 20; 5–15% нічийних; 100–3000. */
     public static final WorldBalanceDef BALANCE = world(new CountRange(100, 3000));
@@ -53,12 +70,73 @@ public final class TestMaps {
 
     /** Контент {@link #CONTENT} з іншими шаблонами й числами материків. */
     public static MapContent content(List<MapTemplateDef> templates, ContinentsDef continents) {
-        return new MapContent(templates, GRID, continents, RELIEF);
+        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE);
     }
 
     /** Контент {@link #CONTENT} з іншим рельєфом. */
     public static MapContent content(ReliefDef relief) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE);
+    }
+
+    /** Контент {@link #CONTENT} з іншим кліматом. */
+    public static MapContent content(ClimateDef climate) {
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate);
+    }
+
+    /** Клімат {@link #CLIMATE} з іншими кліматами світу. */
+    public static ClimateDef climate(List<WorldClimateDef> worlds) {
+        return climate(
+                worlds,
+                List.of(
+                        cover(Cover.TUNDRA, List.of(Climate.POLAR), List.of(Relief.PLAIN, Relief.HILLS), 0, 100, 100),
+                        cover(Cover.SWAMP, WET, List.of(Relief.PLAIN), 80, 100, 30),
+                        cover(Cover.DESERT, List.of(Climate.ARID), List.of(Relief.PLAIN, Relief.HILLS), 0, 15, 100),
+                        cover(Cover.FOREST, WET, List.of(Relief.PLAIN, Relief.HILLS), 55, 100, 100)));
+    }
+
+    /** Клімат {@link #CLIMATE} з іншими кліматами світу й покривами. */
+    public static ClimateDef climate(List<WorldClimateDef> worlds, List<CoverDef> covers) {
+        return new ClimateDef(
+                worlds,
+                new ClimateTemperatureDef(90, 0, 30, 10),
+                new ClimateMoistureDef(80, 10, 20),
+                3,
+                15,
+                35,
+                70,
+                30,
+                zones(),
+                covers);
+    }
+
+    public static WorldClimateDef world(String id, int weight, int shift) {
+        return new WorldClimateDef(
+                new WorldClimateId(id), "Клімат світу " + id, "Опис клімату світу " + id, weight, shift);
+    }
+
+    /** Пояси в порядку {@link Climate}. */
+    public static List<ClimateZoneDef> zones() {
+        return Arrays.stream(Climate.values())
+                .map(climate -> new ClimateZoneDef(climate, "Пояс " + climate.key(), "Опис поясу " + climate.key()))
+                .toList();
+    }
+
+    /** Покрив з вологою {@code minMoisture..maxMoisture} і висотою до {@code maxHeight}. */
+    public static CoverDef cover(
+            Cover cover,
+            List<Climate> climates,
+            List<Relief> reliefs,
+            int minMoisture,
+            int maxMoisture,
+            int maxHeight) {
+        return new CoverDef(
+                cover,
+                "Покрив " + cover.key(),
+                "Опис покриву " + cover.key(),
+                climates,
+                reliefs,
+                new CountRange(minMoisture, maxMoisture),
+                new CountRange(0, maxHeight));
     }
 
     /** Рельєф {@link #RELIEF} з іншою кількістю хребтів і порогами. */

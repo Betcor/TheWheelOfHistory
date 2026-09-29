@@ -18,9 +18,14 @@ import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BalanceDef;
+import kolo.engine.content.ClimateDef;
+import kolo.engine.content.ClimateMoistureDef;
+import kolo.engine.content.ClimateTemperatureDef;
+import kolo.engine.content.ClimateZoneDef;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
+import kolo.engine.content.CoverDef;
 import kolo.engine.content.DogmaDef;
 import kolo.engine.content.DogmaId;
 import kolo.engine.content.FaithFormDef;
@@ -62,9 +67,13 @@ import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.content.WorldBalanceDef;
+import kolo.engine.content.WorldClimateDef;
+import kolo.engine.content.WorldClimateId;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.modifier.ModifierTarget;
+import kolo.engine.state.Climate;
+import kolo.engine.state.Cover;
 import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NpcShare;
@@ -1435,6 +1444,107 @@ class ContentLoaderTest {
         assertMapError(
                 Files.MAP.replace(mountains, ""),
                 Map.of("location", "relief.levels", "cause", "missing_definition", "value", "mountains"));
+    }
+
+    @Test
+    void loadsClimate() {
+        ClimateDef climate = ContentLoader.load(Files.valid().source()).map().climate();
+
+        assertThat(climate.worlds())
+                .extracting(WorldClimateDef::id, WorldClimateDef::weight, WorldClimateDef::temperatureShift)
+                .containsExactly(
+                        tuple(new WorldClimateId("cold"), 25, -8), tuple(new WorldClimateId("temperate"), 50, 0));
+        assertThat(climate.temperature()).isEqualTo(new ClimateTemperatureDef(90, 0, 30, 10));
+        assertThat(climate.moisture()).isEqualTo(new ClimateMoistureDef(80, 6, 30));
+        assertThat(List.of(
+                        climate.noiseCells(),
+                        climate.polarBelow(),
+                        climate.borealBelow(),
+                        climate.tropicalFrom(),
+                        climate.aridBelow()))
+                .containsExactly(8, 15, 35, 70, 30);
+        assertThat(climate.zones())
+                .extracting(ClimateZoneDef::climate, ClimateZoneDef::name)
+                .containsExactly(
+                        tuple(Climate.POLAR, "Полярний"),
+                        tuple(Climate.BOREAL, "Бореальний"),
+                        tuple(Climate.TEMPERATE, "Помірний"),
+                        tuple(Climate.ARID, "Посушливий"),
+                        tuple(Climate.TROPICAL, "Тропічний"));
+        assertThat(climate.covers())
+                .extracting(CoverDef::cover)
+                .containsExactly(Cover.TUNDRA, Cover.SWAMP, Cover.DESERT, Cover.FOREST);
+        CoverDef swamp = climate.coverDef(Cover.SWAMP);
+        assertThat(swamp.climates()).containsExactly(Climate.BOREAL, Climate.TEMPERATE, Climate.TROPICAL);
+        assertThat(swamp.reliefs()).containsExactly(Relief.PLAIN);
+        assertThat(swamp.moisture()).isEqualTo(new CountRange(80, 100));
+        assertThat(swamp.height()).isEqualTo(new CountRange(0, 30));
+    }
+
+    @Test
+    void invalidClimateIsReportedAtItsPosition() {
+        String climate = Files.MAP.substring(Files.MAP.indexOf("climate:\n"));
+        assertMapError(
+                Files.MAP.replace(climate, ""),
+                Map.of("location", "climate", "cause", "blank_value", "field", "climate"));
+        assertMapError(
+                Files.MAP.replace("id: temperate\n      name: Помірний світ", "id: cold\n      name: Помірний світ"),
+                Map.of("location", "climate.worlds[1]", "cause", "duplicate_id", "value", "cold"));
+        assertMapError(
+                Files.MAP.replace("      temperature_shift: 0\n", ""),
+                Map.of("location", "climate.worlds[1]", "cause", "blank_value", "field", "temperature_shift"));
+        assertMapError(
+                Files.MAP.replace("temperature_shift: -8", "temperature_shift: -51"),
+                Map.of(
+                        "location",
+                        "climate.worlds[0]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "world_climate.cold.temperature_shift"));
+        assertMapError(
+                Files.MAP.replace(
+                        "  temperature: { equator: 90, pole: 0, height_cooling: 30, noise_amplitude: 10 }\n", ""),
+                Map.of("location", "climate", "cause", "blank_value", "field", "temperature"));
+        assertMapError(
+                Files.MAP.replace("inland_drying: 6, ", ""),
+                Map.of("location", "climate", "cause", "blank_value", "field", "inland_drying"));
+        assertMapError(
+                Files.MAP.replace("  boreal_below: 35\n", ""),
+                Map.of("location", "climate", "cause", "blank_value", "field", "boreal_below"));
+        assertMapError(
+                Files.MAP.replace("boreal_below: 35", "boreal_below: 15"),
+                Map.of("location", "climate", "cause", "out_of_order", "field", "climate.boreal_below"));
+        assertMapError(
+                Files.MAP.replace("- id: arid", "- id: desert"),
+                Map.of("location", "climate.zones[3]", "cause", "unknown_reference", "value", "desert"));
+        assertMapError(
+                Files.MAP.replace("- id: arid", "- id: polar"),
+                Map.of("location", "climate.zones[3]", "cause", "duplicate_id", "value", "polar"));
+        assertMapError(
+                Files.MAP.replace("- id: swamp", "- id: jungle"),
+                Map.of("location", "climate.covers[1]", "cause", "unknown_reference", "value", "jungle"));
+        assertMapError(
+                Files.MAP.replace("climates: [polar]", "climates: [polar, arctic]"),
+                Map.of("location", "climate.covers[0].climates[1]", "cause", "unknown_reference", "value", "arctic"));
+        assertMapError(
+                Files.MAP.replace("reliefs: [plain]", "reliefs: [plain, mountains]"),
+                Map.of(
+                        "location",
+                        "climate.covers[1]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "cover.swamp.reliefs",
+                        "value",
+                        "mountains"));
+        assertMapError(
+                Files.MAP.replace("moisture: { min: 80, max: 100 }", "moisture: { min: 80 }"),
+                Map.of("location", "climate.covers[1].moisture", "cause", "blank_value", "field", "max"));
+        String forest = Files.MAP.substring(Files.MAP.indexOf("    - id: forest"));
+        assertMapError(
+                Files.MAP.replace(forest, ""),
+                Map.of("location", "climate.covers", "cause", "missing_definition", "value", "forest"));
     }
 
     @Test

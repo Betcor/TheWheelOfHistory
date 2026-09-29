@@ -182,19 +182,21 @@ class MapDefinitionsTest {
         assertThat(content.template(new MapTemplateId("ring_world"))).isEmpty();
         assertThat(content.continents()).isEqualTo(TestMaps.CONTINENTS);
         assertThat(content.relief()).isEqualTo(TestMaps.RELIEF);
+        assertThat(content.climate()).isEqualTo(TestMaps.CLIMATE);
     }
 
     @Test
     void mapContentRejectsEmptyAndDuplicateTemplates() {
         assertFails(
-                () -> new MapContent(List.of(), TestMaps.GRID, TestMaps.CONTINENTS, TestMaps.RELIEF),
+                () -> new MapContent(List.of(), TestMaps.GRID, TestMaps.CONTINENTS, TestMaps.RELIEF, TestMaps.CLIMATE),
                 ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
                         List.of(TestMaps.PANGAEA, TestMaps.template("pangaea", 1, 100, 1, 1)),
                         TestMaps.GRID,
                         TestMaps.CONTINENTS,
-                        TestMaps.RELIEF),
+                        TestMaps.RELIEF,
+                        TestMaps.CLIMATE),
                 ErrorCode.DUPLICATE_ID);
     }
 

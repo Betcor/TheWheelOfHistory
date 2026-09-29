@@ -31,9 +31,14 @@ import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BackstoryText;
 import kolo.engine.content.BalanceDef;
+import kolo.engine.content.ClimateDef;
+import kolo.engine.content.ClimateMoistureDef;
+import kolo.engine.content.ClimateTemperatureDef;
+import kolo.engine.content.ClimateZoneDef;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
+import kolo.engine.content.CoverDef;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
@@ -95,10 +100,14 @@ import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.content.WheelBalanceDef;
 import kolo.engine.content.WorldBalanceDef;
+import kolo.engine.content.WorldClimateDef;
+import kolo.engine.content.WorldClimateId;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
+import kolo.engine.state.Climate;
+import kolo.engine.state.Cover;
 import kolo.engine.state.Development;
 import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
@@ -1269,7 +1278,103 @@ public final class ContentLoader {
         MapGridDef grid = at(MAP, "grid", () -> grid(yaml.grid()));
         ContinentsDef continents = at(MAP, "continents", () -> continents(yaml.continents()));
         ReliefDef relief = relief(yaml.relief());
-        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief));
+        ClimateDef climate = climate(yaml.climate());
+        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate));
+    }
+
+    private static ClimateDef climate(ContentYaml.Climate climate) {
+        at(MAP, "climate", () -> {
+            if (climate == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "climate"));
+            }
+            return climate;
+        });
+        TreeSet<WorldClimateId> worldIds = new TreeSet<>();
+        List<WorldClimateDef> worlds =
+                list(MAP, "climate.worlds", nonEmpty(MAP, "climate.worlds", climate.worlds()), (location, world) -> {
+                    WorldClimateId id = at(MAP, location, () -> unique(worldIds, new WorldClimateId(world.id())));
+                    return at(
+                            MAP,
+                            location,
+                            () -> new WorldClimateDef(
+                                    id,
+                                    world.name(),
+                                    world.description(),
+                                    required("weight", world.weight()),
+                                    required("temperature_shift", world.temperatureShift())));
+                });
+        TreeSet<Climate> seenZones = new TreeSet<>();
+        List<ClimateZoneDef> zones =
+                list(MAP, "climate.zones", nonEmpty(MAP, "climate.zones", climate.zones()), (location, zone) -> {
+                    Climate key =
+                            at(MAP, location, () -> unique(seenZones, climateKey("climate", zone.id()), Climate::key));
+                    return at(MAP, location, () -> new ClimateZoneDef(key, zone.name(), zone.description()));
+                });
+        complete(MAP, "climate.zones", seenZones, List.of(Climate.values()), Climate::key);
+        TreeSet<Cover> seenCovers = new TreeSet<>();
+        List<CoverDef> covers =
+                list(MAP, "climate.covers", nonEmpty(MAP, "climate.covers", climate.covers()), (location, cover) -> {
+                    Cover key = at(
+                            MAP,
+                            location,
+                            () -> unique(
+                                    seenCovers,
+                                    ContentKeys.parse("cover", Cover.values(), Cover::key, cover.id()),
+                                    Cover::key));
+                    List<Climate> climates = list(
+                            MAP,
+                            location + ".climates",
+                            cover.climates(),
+                            (where, value) -> at(MAP, where, () -> climateKey("climate", value)));
+                    List<Relief> reliefs = list(
+                            MAP,
+                            location + ".reliefs",
+                            cover.reliefs(),
+                            (where, value) -> at(
+                                    MAP,
+                                    where,
+                                    () -> ContentKeys.parse("relief", Relief.values(), Relief::key, value)));
+                    CountRange moisture = at(MAP, location + ".moisture", () -> count(cover.moisture()));
+                    CountRange height = at(MAP, location + ".height", () -> count(cover.height()));
+                    return at(
+                            MAP,
+                            location,
+                            () -> new CoverDef(
+                                    key, cover.name(), cover.description(), climates, reliefs, moisture, height));
+                });
+        complete(MAP, "climate.covers", seenCovers, List.of(Cover.values()), Cover::key);
+        return at(MAP, "climate", () -> {
+            ContentYaml.ClimateTemperature temperature = climate.temperature();
+            if (temperature == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "temperature"));
+            }
+            ContentYaml.ClimateMoisture moisture = climate.moisture();
+            if (moisture == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "moisture"));
+            }
+            return new ClimateDef(
+                    worlds,
+                    new ClimateTemperatureDef(
+                            required("equator", temperature.equator()),
+                            required("pole", temperature.pole()),
+                            required("height_cooling", temperature.heightCooling()),
+                            required("noise_amplitude", temperature.noiseAmplitude())),
+                    new ClimateMoistureDef(
+                            required("coast", moisture.coast()),
+                            required("inland_drying", moisture.inlandDrying()),
+                            required("noise_amplitude", moisture.noiseAmplitude())),
+                    required("noise_cells", climate.noiseCells()),
+                    required("polar_below", climate.polarBelow()),
+                    required("boreal_below", climate.borealBelow()),
+                    required("tropical_from", climate.tropicalFrom()),
+                    required("arid_below", climate.aridBelow()),
+                    zones,
+                    covers);
+        });
+    }
+
+    private static Climate climateKey(String field, String key) {
+        return ContentKeys.parse(field, Climate.values(), Climate::key, key);
     }
 
     private static ReliefDef relief(ContentYaml.Relief relief) {

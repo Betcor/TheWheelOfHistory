@@ -600,7 +600,7 @@ final class ContentYaml {
 
     record Step(Integer min, Integer max, Integer step) {}
 
-    record MapFile(List<MapTemplate> templates, MapGrid grid, Continents continents, Relief relief) {
+    record MapFile(List<MapTemplate> templates, MapGrid grid, Continents continents, Relief relief, Climate climate) {
         MapFile {
             templates = orEmpty(templates);
         }
@@ -637,6 +637,58 @@ final class ContentYaml {
             String name,
             String description,
             @JsonProperty("min_height") Integer minHeight) {}
+
+    record Climate(
+            List<WorldClimate> worlds,
+            ClimateTemperature temperature,
+            ClimateMoisture moisture,
+            @JsonProperty("noise_cells") Integer noiseCells,
+            @JsonProperty("polar_below") Integer polarBelow,
+            @JsonProperty("boreal_below") Integer borealBelow,
+            @JsonProperty("tropical_from") Integer tropicalFrom,
+            @JsonProperty("arid_below") Integer aridBelow,
+            List<ClimateZone> zones,
+            List<Cover> covers) {
+        Climate {
+            worlds = orEmpty(worlds);
+            zones = orEmpty(zones);
+            covers = orEmpty(covers);
+        }
+    }
+
+    record WorldClimate(
+            String id,
+            String name,
+            String description,
+            Integer weight,
+            @JsonProperty("temperature_shift") Integer temperatureShift) {}
+
+    record ClimateTemperature(
+            Integer equator,
+            Integer pole,
+            @JsonProperty("height_cooling") Integer heightCooling,
+            @JsonProperty("noise_amplitude") Integer noiseAmplitude) {}
+
+    record ClimateMoisture(
+            Integer coast,
+            @JsonProperty("inland_drying") Integer inlandDrying,
+            @JsonProperty("noise_amplitude") Integer noiseAmplitude) {}
+
+    record ClimateZone(String id, String name, String description) {}
+
+    record Cover(
+            String id,
+            String name,
+            String description,
+            List<String> climates,
+            List<String> reliefs,
+            Count moisture,
+            Count height) {
+        Cover {
+            climates = orEmpty(climates);
+            reliefs = orEmpty(reliefs);
+        }
+    }
 
     record MapTemplate(
             String id,
