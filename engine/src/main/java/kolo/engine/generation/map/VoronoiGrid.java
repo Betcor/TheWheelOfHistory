@@ -34,7 +34,7 @@ import org.locationtech.jts.triangulate.quadedge.QuadEdgeSubdivision;
 public final class VoronoiGrid {
 
     /** З запасом на море навколо 3500 провінцій суходолу. */
-    public static final int MAX_CELLS = 20_000;
+    public static final int MAX_CELLS = MapGridDef.MAX_CELLS;
 
     /**
      * Початкові центри не ближчі за чверть сторони комірки. Круг виключення займає ~5% площі на комірку, тож

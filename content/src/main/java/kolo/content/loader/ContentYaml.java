@@ -600,7 +600,7 @@ final class ContentYaml {
 
     record Step(Integer min, Integer max, Integer step) {}
 
-    record MapFile(List<MapTemplate> templates, MapGrid grid) {
+    record MapFile(List<MapTemplate> templates, MapGrid grid, Continents continents) {
         MapFile {
             templates = orEmpty(templates);
         }
@@ -610,12 +610,19 @@ final class ContentYaml {
 
     record MapAspect(Integer width, Integer height) {}
 
+    record Continents(
+            @JsonProperty("size_weight") Count sizeWeight,
+            @JsonProperty("min_provinces") Integer minProvinces,
+            Integer roughness,
+            @JsonProperty("noise_cells") Integer noiseCells) {}
+
     record MapTemplate(
             String id,
             String name,
             String description,
             Integer weight,
             @JsonProperty("provinces_pct") Integer provincesPct,
+            @JsonProperty("land_pct") Integer landPct,
             Count continents) {}
 
     /** По рядку на відмінок; порядок полів — порядок {@link kolo.engine.state.GrammaticalCase}. */
