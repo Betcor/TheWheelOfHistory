@@ -17,6 +17,8 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.content.CountRange;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
+import kolo.engine.content.HdiLevelDef;
+import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MedianRange;
@@ -615,6 +617,76 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsHdiLevelsInContentOrder() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.hdiLevels())
+                .extracting(HdiLevelDef::id, HdiLevelDef::hdi, HdiLevelDef::tier, HdiLevelDef::weight)
+                .containsExactly(
+                        tuple(new HdiLevelId("low"), 30, OutcomeTier.CRIT_FAIL, 30),
+                        tuple(new HdiLevelId("middle"), 60, OutcomeTier.PARTIAL, 40),
+                        tuple(new HdiLevelId("high"), 80, OutcomeTier.CRIT_SUCCESS, 30));
+        HdiLevelDef high = pack.hdiLevel(new HdiLevelId("high")).orElseThrow();
+        assertThat(high.name()).isEqualTo("Високий розвиток");
+        assertThat(high.quality()).isEqualTo(80);
+        assertThat(high.tags()).containsExactly("educated");
+        assertThat(pack.hdiLevel(new HdiLevelId("middle")).orElseThrow().tags()).isEmpty();
+    }
+
+    @Test
+    void invalidHdiLevelIsReportedAtItsPosition() {
+        assertHdiError(
+                Files.HDI.replace("hdi: 60, ", ""),
+                Map.of("location", "levels[1]", "cause", "blank_value", "field", "hdi"));
+        assertHdiError(
+                Files.HDI.replace("tier: partial", "tier: average"),
+                Map.of("location", "levels[1]", "cause", "unknown_reference", "field", "tier", "value", "average"));
+        assertHdiError(
+                Files.HDI.replace("hdi: 80", "hdi: 101"),
+                Map.of("location", "levels[2]", "cause", "value_out_of_range", "field", "hdi_level.high.hdi"));
+        assertHdiError(
+                Files.HDI.replace("id: high", "id: middle"), Map.of("location", "levels[2]", "cause", "duplicate_id"));
+        assertHdiError("levels: []\n", Map.of("location", "levels", "cause", "empty_collection"));
+    }
+
+    @Test
+    void hdiLevelsMustGoFromLowToHigh() {
+        assertHdiError(
+                Files.HDI.replace("hdi: 80", "hdi: 60"),
+                Map.of("location", "levels[2]", "cause", "out_of_order", "field", "hdi_level.high.hdi", "value", 60));
+        assertHdiError(
+                Files.HDI.replace("tier: crit_success", "tier: fail"),
+                Map.of(
+                        "location",
+                        "levels[2]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "hdi_level.high.tier",
+                        "value",
+                        "fail"));
+    }
+
+    @Test
+    void hdiLevelTagIsASourceForBackstoryConditions() {
+        String backstory = Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, educated]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.HDI, Files.HDI.replace(", tags: [educated]", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "educated"));
+    }
+
+    @Test
     void loadsBalance() {
         BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
 
@@ -628,6 +700,8 @@ class ContentLoaderTest {
         assertThat(balance.generation().notablePeople()).isEqualTo(new CountRange(1, 3));
         assertThat(balance.generation().warheads()).isEqualTo(new CountRange(2, 10));
         assertThat(balance.generation().nuclearEnergyAdvantage()).isEqualTo(10);
+        assertThat(balance.generation().gdpDevelopmentAdvantage()).isEqualTo(10);
+        assertThat(balance.generation().hdiGdpAdvantage()).isEqualTo(15);
     }
 
     @Test
@@ -692,6 +766,10 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("gdp_development_advantage: 10", "gdp_development_advantage: -1")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.gdp_development_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("hdi_gdp_advantage: 15", "hdi_gdp_advantage: 101")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.hdi_gdp_advantage"));
     }
 
     @Test
@@ -728,6 +806,16 @@ class ContentLoaderTest {
                         "blank_value",
                         "field",
                         "gdp_development_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  hdi_gdp_advantage: 15\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "generation.hdi_gdp_advantage",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "hdi_gdp_advantage"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,
@@ -930,6 +1018,14 @@ class ContentLoaderTest {
                 Files.valid().with(ContentLoader.GDP, gdp).source(),
                 ErrorCode.INVALID_CONTENT,
                 withFile(ContentLoader.GDP, expected));
+    }
+
+    private static void assertHdiError(String hdi, Map<String, ?> expected) {
+        assertThat(hdi).isNotEqualTo(Files.HDI);
+        assertContentError(
+                Files.valid().with(ContentLoader.HDI, hdi).source(),
+                ErrorCode.INVALID_CONTENT,
+                withFile(ContentLoader.HDI, expected));
     }
 
     private static Map<String, ?> withFile(String file, Map<String, ?> expected) {

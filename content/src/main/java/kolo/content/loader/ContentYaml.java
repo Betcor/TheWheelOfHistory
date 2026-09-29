@@ -119,6 +119,30 @@ final class ContentYaml {
         }
     }
 
+    record HdiFile(List<HdiLevel> levels) {
+        HdiFile {
+            levels = orEmpty(levels);
+        }
+    }
+
+    /**
+     * @param hdi стартовий ІЛР держави на рівні, 0..100
+     * @param tier ключ рівня результату, як у {@link GdpLevel}
+     */
+    record HdiLevel(
+            String id,
+            String name,
+            String description,
+            Integer hdi,
+            String tier,
+            Integer weight,
+            Integer quality,
+            List<String> tags) {
+        HdiLevel {
+            tags = orEmpty(tags);
+        }
+    }
+
     record PeopleFile(List<PersonKind> kinds, List<Trait> traits) {
         PeopleFile {
             kinds = orEmpty(kinds);
@@ -324,7 +348,8 @@ final class ContentYaml {
             @JsonProperty("notable_people") Count notablePeople,
             Count warheads,
             @JsonProperty("nuclear_energy_advantage") Integer nuclearEnergyAdvantage,
-            @JsonProperty("gdp_development_advantage") Integer gdpDevelopmentAdvantage) {}
+            @JsonProperty("gdp_development_advantage") Integer gdpDevelopmentAdvantage,
+            @JsonProperty("hdi_gdp_advantage") Integer hdiGdpAdvantage) {}
 
     record Count(Integer min, Integer max) {}
 

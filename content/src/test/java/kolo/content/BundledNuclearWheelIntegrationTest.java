@@ -17,6 +17,7 @@ import kolo.engine.generation.country.Backstory;
 import kolo.engine.generation.country.BackstoryWheel;
 import kolo.engine.generation.country.DevelopmentWheel;
 import kolo.engine.generation.country.GdpWheel;
+import kolo.engine.generation.country.HdiWheel;
 import kolo.engine.generation.country.NuclearWheel;
 import kolo.engine.generation.country.Regime;
 import kolo.engine.generation.country.RegimeWheel;
@@ -80,6 +81,7 @@ class BundledNuclearWheelIntegrationTest {
         Arrays.stream(TechBranch.values()).map(DevelopmentWheel::kind).forEach(kinds::add);
         kinds.add(NuclearWheel.KIND);
         kinds.add(GdpWheel.KIND);
+        kinds.add(HdiWheel.KIND);
         int nuclear = 0;
         for (IdeologyDef ideology : PACK.ideologies().values()) {
             List<ModifierDef> all = new ArrayList<>(ideology.modifiers());

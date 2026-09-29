@@ -32,6 +32,8 @@ import kolo.engine.content.DoctrineId;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
+import kolo.engine.content.HdiLevelDef;
+import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MedianRange;
@@ -88,14 +90,15 @@ public final class ContentLoader {
     public static final String DEVELOPMENT = "development.yaml";
     public static final String NUCLEAR = "nuclear.yaml";
     public static final String GDP = "gdp.yaml";
+    public static final String HDI = "hdi.yaml";
     public static final String PEOPLE = "people.yaml";
     public static final String NAMES = "names.yaml";
     public static final String BACKSTORY = "backstory.yaml";
     public static final String BALANCE = "balance.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
-    public static final List<String> FILES =
-            List.of(IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, GDP, PEOPLE, NAMES, BACKSTORY, BALANCE);
+    public static final List<String> FILES = List.of(
+            IDEOLOGIES, DOCTRINES, RESOURCES, DEVELOPMENT, NUCLEAR, GDP, HDI, PEOPLE, NAMES, BACKSTORY, BALANCE);
 
     private static final YAMLMapper MAPPER = createMapper();
 
@@ -120,12 +123,13 @@ public final class ContentLoader {
         List<DevelopmentLevelDef> levels = developmentLevels(development);
         List<NuclearStatusDef> nuclear = nuclearStatuses(parse(files, NUCLEAR, ContentYaml.NuclearFile.class));
         List<GdpLevelDef> gdp = gdpLevels(parse(files, GDP, ContentYaml.GdpFile.class));
+        List<HdiLevelDef> hdi = hdiLevels(parse(files, HDI, ContentYaml.HdiFile.class));
         ContentYaml.PeopleFile people = parse(files, PEOPLE, ContentYaml.PeopleFile.class);
         List<PersonKindDef> kinds = personKinds(people);
         List<TraitDef> traits = traits(people);
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
-        BackstoryContent backstory =
-                backstory(parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, levels, nuclear, gdp);
+        BackstoryContent backstory = backstory(
+                parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, levels, nuclear, gdp, hdi);
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -142,6 +146,7 @@ public final class ContentLoader {
                         levels,
                         nuclear,
                         gdp,
+                        hdi,
                         kinds,
                         traits,
                         names,
@@ -329,6 +334,35 @@ public final class ContentLoader {
             GdpLevelDef next = levels.get(i);
             at(GDP, "levels[" + i + "]", () -> {
                 GdpLevelDef.checkFollows(previous, next);
+                return next;
+            });
+        }
+        return levels;
+    }
+
+    private static List<HdiLevelDef> hdiLevels(ContentYaml.HdiFile yaml) {
+        TreeSet<HdiLevelId> ids = new TreeSet<>();
+        List<HdiLevelDef> levels = list(HDI, "levels", nonEmpty(HDI, "levels", yaml.levels()), (location, level) -> {
+            HdiLevelId id = at(HDI, location, () -> unique(ids, new HdiLevelId(level.id())));
+            return at(
+                    HDI,
+                    location,
+                    () -> new HdiLevelDef(
+                            id,
+                            level.name(),
+                            level.description(),
+                            required("hdi", level.hdi()),
+                            ContentKeys.parse("tier", OutcomeTier.values(), OutcomeTier::key, level.tier()),
+                            required("weight", level.weight()),
+                            required("quality", level.quality()),
+                            level.tags()));
+        });
+        // Порядок перевіряється тут, щоб помилка вказувала на рівень, що стоїть не на своєму місці.
+        for (int i = 1; i < levels.size(); i++) {
+            HdiLevelDef previous = levels.get(i - 1);
+            HdiLevelDef next = levels.get(i);
+            at(HDI, "levels[" + i + "]", () -> {
+                HdiLevelDef.checkFollows(previous, next);
                 return next;
             });
         }
@@ -579,7 +613,7 @@ public final class ContentLoader {
     }
 
     /**
-     * @param ideologies уже завантажені ідеології, рівні розвиненості, ядерні статуси й рівні ВВП: їхні мітки —
+     * @param ideologies уже завантажені ідеології, рівні розвиненості, ядерні статуси, рівні ВВП та ІЛР: їхні мітки —
      *     джерела міток в умовах фрагментів
      */
     private static BackstoryContent backstory(
@@ -587,7 +621,8 @@ public final class ContentLoader {
             List<IdeologyDef> ideologies,
             List<DevelopmentLevelDef> levels,
             List<NuclearStatusDef> nuclear,
-            List<GdpLevelDef> gdp) {
+            List<GdpLevelDef> gdp,
+            List<HdiLevelDef> hdi) {
         TreeSet<BackstoryFragmentId> ids = new TreeSet<>();
         List<BackstoryFragmentDef> fragments = list(
                 BACKSTORY, "fragments", nonEmpty(BACKSTORY, "fragments", yaml.fragments()), (location, fragment) -> {
@@ -607,6 +642,7 @@ public final class ContentLoader {
         levels.forEach(level -> known.addAll(level.tags()));
         nuclear.forEach(status -> known.addAll(status.tags()));
         gdp.forEach(level -> known.addAll(level.tags()));
+        hdi.forEach(level -> known.addAll(level.tags()));
         for (int i = 0; i < fragments.size(); i++) {
             for (String tag : fragments.get(i).referencedTags()) {
                 if (!known.contains(tag)) {
@@ -700,10 +736,15 @@ public final class ContentLoader {
                 BALANCE,
                 "generation.gdp_development_advantage",
                 () -> required("gdp_development_advantage", generationYaml.gdpDevelopmentAdvantage()));
+        int hdiAdvantage = at(
+                BALANCE,
+                "generation.hdi_gdp_advantage",
+                () -> required("hdi_gdp_advantage", generationYaml.hdiGdpAdvantage()));
         GenerationBalanceDef generation = at(
                 BALANCE,
                 "generation",
-                () -> new GenerationBalanceDef(fragments, people, warheads, energyAdvantage, gdpAdvantage));
+                () -> new GenerationBalanceDef(
+                        fragments, people, warheads, energyAdvantage, gdpAdvantage, hdiAdvantage));
 
         return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation));
     }

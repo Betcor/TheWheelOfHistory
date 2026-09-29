@@ -79,6 +79,18 @@ final class TestContent {
                 gdpLevel("rich", 3500, OutcomeTier.CRIT_SUCCESS, List.of()));
     }
 
+    static HdiLevelDef hdiLevel(String id, int hdi, OutcomeTier tier, List<String> tags) {
+        return new HdiLevelDef(new HdiLevelId(id), "Рівень " + id, "Опис рівня " + id, hdi, tier, 100, 50, tags);
+    }
+
+    /** Три рівні ІЛР від низького до високого. */
+    static List<HdiLevelDef> hdiLevels() {
+        return List.of(
+                hdiLevel("low", 30, OutcomeTier.CRIT_FAIL, List.of()),
+                hdiLevel("middle", 60, OutcomeTier.PARTIAL, List.of()),
+                hdiLevel("high", 80, OutcomeTier.CRIT_SUCCESS, List.of()));
+    }
+
     /** По визначенню на кожен тип постаті. */
     static List<PersonKindDef> personKinds() {
         return Arrays.stream(PersonKind.values())
@@ -204,7 +216,8 @@ final class TestContent {
                 new WheelBalanceDef(50, new TreeMap<>(), List.of(20, 10, 5)),
                 new StreakRulesDef(85, 15, 3),
                 Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList(),
-                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10));
+                new GenerationBalanceDef(
+                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15));
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {
@@ -217,6 +230,7 @@ final class TestContent {
                 levels(),
                 nuclearStatuses(),
                 gdpLevels(),
+                hdiLevels(),
                 personKinds(),
                 traits(),
                 names(ideologies),

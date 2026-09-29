@@ -166,6 +166,62 @@ class DefinitionsTest {
     }
 
     @Test
+    void hdiLevelFieldsAreBoundedByHdiStat() {
+        HdiLevelDef middle = hdi("middle", 60, OutcomeTier.PARTIAL, 24, 50);
+        assertThat(middle)
+                .extracting(HdiLevelDef::hdi, HdiLevelDef::tier, HdiLevelDef::weight, HdiLevelDef::quality)
+                .containsExactly(60, OutcomeTier.PARTIAL, 24, 50);
+        assertThat(hdi("lowest", 0, OutcomeTier.CRIT_FAIL, 1, 0).hdi()).isZero();
+        assertThat(hdi("highest", 100, OutcomeTier.CRIT_SUCCESS, HdiLevelDef.MAX_WEIGHT, 100)
+                        .hdi())
+                .isEqualTo(100);
+        assertFails(() -> hdi("middle", -1, OutcomeTier.PARTIAL, 24, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> hdi("middle", 101, OutcomeTier.PARTIAL, 24, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> hdi("middle", 60, OutcomeTier.PARTIAL, 0, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> hdi("middle", 60, OutcomeTier.PARTIAL, HdiLevelDef.MAX_WEIGHT + 1, 50),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> hdi("middle", 60, OutcomeTier.PARTIAL, 24, 101), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new HdiLevelDef(
+                        new HdiLevelId("middle"), "Середній", " ", 60, OutcomeTier.PARTIAL, 24, 50, List.of()),
+                ErrorCode.BLANK_VALUE);
+        assertFails(
+                () -> new HdiLevelDef(
+                        new HdiLevelId("middle"),
+                        "Середній",
+                        "Опис",
+                        60,
+                        OutcomeTier.PARTIAL,
+                        24,
+                        50,
+                        List.of("Educated")),
+                ErrorCode.INVALID_KEY_FORMAT);
+        assertThatThrownBy(() ->
+                        new HdiLevelDef(new HdiLevelId("middle"), "Середній", "Опис", 60, null, 24, 50, List.of()))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void hdiLevelFollowsLowerLevelWithHigherHdiAndNoLowerTier() {
+        HdiLevelDef low = hdi("low", 30, OutcomeTier.FAIL, 10, 20);
+
+        HdiLevelDef.checkFollows(low, hdi("lower_middle", 45, OutcomeTier.FAIL, 10, 40));
+        HdiLevelDef.checkFollows(low, hdi("high", 75, OutcomeTier.CRIT_SUCCESS, 10, 80));
+        assertThatThrownBy(() -> HdiLevelDef.checkFollows(low, hdi("same", 30, OutcomeTier.SUCCESS, 10, 50)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+                    assertThat(e.details()).containsExactly(entry("field", "hdi_level.same.hdi"), entry("value", 30));
+                });
+        assertThatThrownBy(() -> HdiLevelDef.checkFollows(low, hdi("worse", 45, OutcomeTier.CRIT_FAIL, 10, 5)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "hdi_level.worse.tier"), entry("value", "crit_fail"));
+                });
+    }
+
+    @Test
     void personKindNeedsNameAndDescription() {
         assertThat(new PersonKindDef(PersonKind.GENERAL, "Генерал", "Командує фронтом.", List.of("military")).tags())
                 .containsExactly("military");
@@ -221,6 +277,10 @@ class DefinitionsTest {
 
         assertThat(iron.tags()).containsExactly("metal");
         assertThatThrownBy(() -> iron.tags().add("x")).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    private static HdiLevelDef hdi(String id, int hdi, OutcomeTier tier, int weight, int quality) {
+        return new HdiLevelDef(new HdiLevelId(id), "Рівень", "Опис", hdi, tier, weight, quality, List.of());
     }
 
     private static GdpLevelDef gdp(String id, int perCapita, OutcomeTier tier, int weight, int quality) {

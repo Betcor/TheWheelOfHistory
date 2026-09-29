@@ -17,6 +17,8 @@ import kolo.engine.content.DoctrineId;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
+import kolo.engine.content.HdiLevelDef;
+import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MedianRange;
@@ -211,7 +213,7 @@ final class TestBackstory {
                 10);
     }
 
-    /** Мінімальний валідний пакет з усім, що задають тести коліс генерації, зокрема рівнями ВВП. */
+    /** Мінімальний валідний пакет з цими рівнями ВВП і одним рівнем ІЛР. */
     static ContentPack pack(
             List<IdeologyDef> ideologies,
             List<BackstoryFragmentDef> fragments,
@@ -223,6 +225,36 @@ final class TestBackstory {
             int nuclearEnergyAdvantage,
             List<GdpLevelDef> gdpLevels,
             int gdpDevelopmentAdvantage) {
+        return pack(
+                ideologies,
+                fragments,
+                count,
+                levels,
+                resources,
+                nuclear,
+                warheads,
+                nuclearEnergyAdvantage,
+                gdpLevels,
+                gdpDevelopmentAdvantage,
+                List.of(new HdiLevelDef(
+                        new HdiLevelId("middle"), "Рівень", "Опис", 60, OutcomeTier.PARTIAL, 100, 50, List.of())),
+                15);
+    }
+
+    /** Мінімальний валідний пакет з усім, що задають тести коліс генерації, зокрема рівнями ВВП та ІЛР. */
+    static ContentPack pack(
+            List<IdeologyDef> ideologies,
+            List<BackstoryFragmentDef> fragments,
+            CountRange count,
+            List<DevelopmentLevelDef> levels,
+            List<ResourceDef> resources,
+            List<NuclearStatusDef> nuclear,
+            CountRange warheads,
+            int nuclearEnergyAdvantage,
+            List<GdpLevelDef> gdpLevels,
+            int gdpDevelopmentAdvantage,
+            List<HdiLevelDef> hdiLevels,
+            int hdiGdpAdvantage) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -270,6 +302,7 @@ final class TestBackstory {
                 levels,
                 nuclear,
                 gdpLevels,
+                hdiLevels,
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -288,7 +321,8 @@ final class TestBackstory {
                                 new CountRange(1, 3),
                                 warheads,
                                 nuclearEnergyAdvantage,
-                                gdpDevelopmentAdvantage)));
+                                gdpDevelopmentAdvantage,
+                                hdiGdpAdvantage)));
     }
 
     /** Чоловічий рід, тверда група: «Велор, Велору, …» — і для короткої, і для повної назви. */

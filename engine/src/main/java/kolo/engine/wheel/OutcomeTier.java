@@ -16,6 +16,14 @@ public enum OutcomeTier {
         return name().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * На скільки рівнів результат вищий за частковий: від {@code −2} (критичний провал) до {@code +2} (критичний
+     * успіх). Так результат одного колеса стає внеском у перевагу наступного.
+     */
+    public int step() {
+        return ordinal() - PARTIAL.ordinal();
+    }
+
     /** Сектор росте з додатною перевагою. */
     public boolean isSuccess() {
         return this == SUCCESS || this == CRIT_SUCCESS;

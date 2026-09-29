@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import kolo.engine.error.ValidationException;
 import org.junit.jupiter.api.Test;
@@ -78,6 +79,12 @@ class WheelValuesTest {
         assertThat(OutcomeTier.PARTIAL.isCritical()).isFalse();
         assertThat(OutcomeTier.CRIT_FAIL.isCritical()).isTrue();
         assertThat(OutcomeTier.CRIT_SUCCESS.isCritical()).isTrue();
+    }
+
+    @Test
+    void tierStepCountsFromPartial() {
+        assertThat(Arrays.stream(OutcomeTier.values()).mapToInt(OutcomeTier::step))
+                .containsExactly(-2, -1, 0, 1, 2);
     }
 
     @Test

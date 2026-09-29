@@ -15,13 +15,17 @@ import kolo.engine.wheel.Advantage;
  *     +2} — удвічі більше
  * @param gdpDevelopmentAdvantage перевага колеса ВВП за кожен рівень розвиненості економіки й суспільства
  *     відносно світового (окремо за кожну з двох галузей), {@code 0..}{@value Advantage#MAX}
+ * @param hdiGdpAdvantage перевага колеса ІЛР за кожен крок рівня результату рівня ВВП від часткового ({@link
+ *     kolo.engine.wheel.OutcomeTier#step()}), {@code 0..}{@value Advantage#MAX}: найбідніший рівень дає {@code
+ *     −2·x}, найбагатший — {@code +2·x}
  */
 public record GenerationBalanceDef(
         CountRange backstoryFragments,
         CountRange notablePeople,
         CountRange warheads,
         int nuclearEnergyAdvantage,
-        int gdpDevelopmentAdvantage) {
+        int gdpDevelopmentAdvantage,
+        int hdiGdpAdvantage) {
 
     /** Більше фрагментів чи постатей перевантажили б картку країни. */
     public static final int MAX_COUNT = 10;
@@ -35,6 +39,7 @@ public record GenerationBalanceDef(
         check("generation.warheads", warheads, MAX_WARHEADS);
         Checks.inRange("generation.nuclear_energy_advantage", nuclearEnergyAdvantage, 0, Advantage.MAX);
         Checks.inRange("generation.gdp_development_advantage", gdpDevelopmentAdvantage, 0, Advantage.MAX);
+        Checks.inRange("generation.hdi_gdp_advantage", hdiGdpAdvantage, 0, Advantage.MAX);
     }
 
     private static void check(String field, CountRange range, int max) {
