@@ -15,6 +15,7 @@ import kolo.engine.rng.Rng;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
 import org.assertj.core.data.Percentage;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,14 +40,13 @@ class BundledMapGridIntegrationTest {
     }
 
     @Test
+    @Tag("budget")
     void largestMapHasExpectedSizeAndFitsBudget() {
         MapGridDef def = PACK.map().grid();
         int cells = BundledContinentsIntegrationTest.largestGrid();
-        VoronoiGrid.generate(Rng.of(0), def, cells);
-
-        long start = System.nanoTime();
-        MapGrid grid = VoronoiGrid.generate(Rng.of(1), def, cells);
-        long millis = (System.nanoTime() - start) / 1_000_000;
+        Budget.Timed<MapGrid> timed = Budget.best(() -> VoronoiGrid.generate(Rng.of(1), def, cells));
+        MapGrid grid = timed.result();
+        long millis = timed.millis();
 
         assertThat((long) grid.width() * grid.height())
                 .isCloseTo((long) cells * def.cellSize() * def.cellSize(), Percentage.withPercentage(1));

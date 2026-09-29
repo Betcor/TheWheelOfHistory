@@ -27,6 +27,7 @@ import kolo.engine.state.NpcShare;
 import kolo.engine.state.Relief;
 import kolo.engine.state.Terrain;
 import kolo.engine.state.WorldLimits;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -98,6 +99,7 @@ class BundledClimateIntegrationTest {
     }
 
     @Test
+    @Tag("budget")
     void largestMapWithClimateFitsBudget() {
         MapTemplateDef template = PACK.map().templates().stream()
                 .min((a, b) -> Integer.compare(a.landPct(), b.landPct()))
@@ -113,18 +115,14 @@ class BundledClimateIntegrationTest {
                 500,
                 List.of());
         int cells = template.gridCells(provinces);
-        // Прогрів JIT.
-        MapGrid warm = VoronoiGrid.generate(Rng.of(0), PACK.map().grid(), cells);
-        ContinentMap warmContinents = ContinentGenerator.generate(Rng.of(0), PACK, size, warm);
-        ClimateGenerator.generate(
-                Rng.of(0), PACK, warm, warmContinents, ReliefGenerator.generate(Rng.of(0), PACK, warm, warmContinents));
-
-        long start = System.nanoTime();
-        MapGrid grid = VoronoiGrid.generate(Rng.of(1), PACK.map().grid(), cells);
-        ContinentMap continents = ContinentGenerator.generate(Rng.of(1), PACK, size, grid);
-        ReliefMap relief = ReliefGenerator.generate(Rng.of(1), PACK, grid, continents);
-        ClimateMap climate = ClimateGenerator.generate(Rng.of(1), PACK, grid, continents, relief);
-        long millis = (System.nanoTime() - start) / 1_000_000;
+        Budget.Timed<ClimateMap> timed = Budget.best(() -> {
+            MapGrid grid = VoronoiGrid.generate(Rng.of(1), PACK.map().grid(), cells);
+            ContinentMap continents = ContinentGenerator.generate(Rng.of(1), PACK, size, grid);
+            ReliefMap relief = ReliefGenerator.generate(Rng.of(1), PACK, grid, continents);
+            return ClimateGenerator.generate(Rng.of(1), PACK, grid, continents, relief);
+        });
+        ClimateMap climate = timed.result();
+        long millis = timed.millis();
 
         assertThat(climate.terrains()).hasSize(provinces);
         // Бюджет усієї генерації карти — 2 с; сітка, материки, рельєф і клімат — лише її частина, із запасом на CI.

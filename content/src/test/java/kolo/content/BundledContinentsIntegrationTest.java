@@ -20,6 +20,7 @@ import kolo.engine.generation.map.WorldSizeWheel;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -71,6 +72,7 @@ class BundledContinentsIntegrationTest {
     }
 
     @Test
+    @Tag("budget")
     void largestMapWithContinentsFitsBudget() {
         MapTemplateDef template = PACK.map().templates().stream()
                 .min((a, b) -> Integer.compare(a.landPct(), b.landPct()))
@@ -85,17 +87,13 @@ class BundledContinentsIntegrationTest {
                 provinces,
                 500,
                 List.of());
-        // Прогрів JIT.
-        ContinentGenerator.generate(
-                Rng.of(0),
+        Budget.Timed<ContinentMap> timed = Budget.best(() -> ContinentGenerator.generate(
+                Rng.of(1),
                 PACK,
                 size,
-                VoronoiGrid.generate(Rng.of(0), PACK.map().grid(), largestGrid()));
-
-        long start = System.nanoTime();
-        MapGrid grid = VoronoiGrid.generate(Rng.of(1), PACK.map().grid(), largestGrid());
-        ContinentMap map = ContinentGenerator.generate(Rng.of(1), PACK, size, grid);
-        long millis = (System.nanoTime() - start) / 1_000_000;
+                VoronoiGrid.generate(Rng.of(1), PACK.map().grid(), largestGrid())));
+        ContinentMap map = timed.result();
+        long millis = timed.millis();
 
         assertThat(map.landCells()).isEqualTo(provinces);
         // Бюджет усієї генерації карти — 2 с; сітка й материки — лише її частина, із запасом на повільний CI.

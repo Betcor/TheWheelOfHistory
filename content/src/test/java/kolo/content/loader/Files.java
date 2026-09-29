@@ -292,6 +292,9 @@ final class Files {
               min_provinces: 20
               roughness: 50
               noise_cells: 6
+            sea:
+              min_cells: 8
+              zone_cells: 30
             relief:
               ridges: { min: 1, max: 3 }
               ridge_min_provinces: 40

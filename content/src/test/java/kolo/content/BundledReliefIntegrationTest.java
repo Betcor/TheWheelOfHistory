@@ -24,6 +24,7 @@ import kolo.engine.rng.Rng;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.Relief;
 import kolo.engine.state.WorldLimits;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -78,6 +79,7 @@ class BundledReliefIntegrationTest {
     }
 
     @Test
+    @Tag("budget")
     void largestMapWithReliefFitsBudget() {
         MapTemplateDef template = PACK.map().templates().stream()
                 .min((a, b) -> Integer.compare(a.landPct(), b.landPct()))
@@ -93,15 +95,13 @@ class BundledReliefIntegrationTest {
                 500,
                 List.of());
         int cells = template.gridCells(provinces);
-        // Прогрів JIT.
-        MapGrid warm = VoronoiGrid.generate(Rng.of(0), PACK.map().grid(), cells);
-        ReliefGenerator.generate(Rng.of(0), PACK, warm, ContinentGenerator.generate(Rng.of(0), PACK, size, warm));
-
-        long start = System.nanoTime();
-        MapGrid grid = VoronoiGrid.generate(Rng.of(1), PACK.map().grid(), cells);
-        ContinentMap continents = ContinentGenerator.generate(Rng.of(1), PACK, size, grid);
-        ReliefMap relief = ReliefGenerator.generate(Rng.of(1), PACK, grid, continents);
-        long millis = (System.nanoTime() - start) / 1_000_000;
+        Budget.Timed<ReliefMap> timed = Budget.best(() -> {
+            MapGrid grid = VoronoiGrid.generate(Rng.of(1), PACK.map().grid(), cells);
+            ContinentMap continents = ContinentGenerator.generate(Rng.of(1), PACK, size, grid);
+            return ReliefGenerator.generate(Rng.of(1), PACK, grid, continents);
+        });
+        ReliefMap relief = timed.result();
+        long millis = timed.millis();
 
         assertThat(relief.heights()).hasSize(provinces);
         // Бюджет усієї генерації карти — 2 с; сітка, материки й рельєф — лише її частина, із запасом на повільний CI.

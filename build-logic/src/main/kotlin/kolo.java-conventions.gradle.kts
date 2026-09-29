@@ -47,6 +47,28 @@ tasks.withType<Test>().configureEach {
     }
 }
 
+// Тести бюджетів продуктивності (тег `budget`) міряють час, тож не мусять ділити процесор з іншими тестами: при
+// org.gradle.parallel модулі тестуються одночасно, і на повільному CI замір ловить чуже навантаження. Звичайний `test`
+// їх пропускає, а `budgetTest` запускається після `test` усіх модулів.
+tasks.named<Test>("test") {
+    useJUnitPlatform { excludeTags("budget") }
+}
+
+val budgetTest = tasks.register<Test>("budgetTest") {
+    description = "Тести бюджетів продуктивності — окремо від решти тестів."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("budget") }
+    // Без тестів із тегом у модулі задача нічого не запускає — це не помилка.
+    filter.isFailOnNoMatchingTests = false
+    mustRunAfter(rootProject.allprojects.map { other -> other.tasks.withType<Test>().matching { it.name == "test" } })
+}
+
+tasks.named("check") {
+    dependsOn(budgetTest)
+}
+
 spotless {
     java {
         palantirJavaFormat(libs.findVersion("palantir-java-format").get().requiredVersion)

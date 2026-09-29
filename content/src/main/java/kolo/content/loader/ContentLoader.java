@@ -79,6 +79,7 @@ import kolo.engine.content.ReligionPolityDef;
 import kolo.engine.content.ReligionPolityId;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.SeaDef;
 import kolo.engine.content.SecularStateDef;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
@@ -1279,7 +1280,8 @@ public final class ContentLoader {
         ContinentsDef continents = at(MAP, "continents", () -> continents(yaml.continents()));
         ReliefDef relief = relief(yaml.relief());
         ClimateDef climate = climate(yaml.climate());
-        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate));
+        SeaDef sea = at(MAP, "sea", () -> sea(yaml.sea()));
+        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate, sea));
     }
 
     private static ClimateDef climate(ContentYaml.Climate climate) {
@@ -1417,6 +1419,13 @@ public final class ContentLoader {
                     required("noise_cells", relief.noiseCells()),
                     levels);
         });
+    }
+
+    private static SeaDef sea(ContentYaml.Sea sea) {
+        if (sea == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "sea"));
+        }
+        return new SeaDef(required("min_cells", sea.minCells()), required("zone_cells", sea.zoneCells()));
     }
 
     private static ContinentsDef continents(ContentYaml.Continents continents) {

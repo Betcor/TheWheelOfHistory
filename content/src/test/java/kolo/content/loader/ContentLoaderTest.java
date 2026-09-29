@@ -52,6 +52,7 @@ import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ReligionCountDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.SeaDef;
 import kolo.engine.content.SecularStateDef;
 import kolo.engine.content.StateReligionDef;
 import kolo.engine.content.StepRange;
@@ -1326,6 +1327,7 @@ class ContentLoaderTest {
                         tuple(new MapTemplateId("archipelago"), "Архіпелаг", 15, 120, 30, new CountRange(5, 8)));
         assertThat(pack.map().grid()).isEqualTo(new MapGridDef(100, 2, 1, 2));
         assertThat(pack.map().continents()).isEqualTo(new ContinentsDef(new CountRange(1, 4), 20, 50, 6));
+        assertThat(pack.map().sea()).isEqualTo(new SeaDef(8, 30));
         ReliefDef relief = pack.map().relief();
         assertThat(relief.ridges()).isEqualTo(new CountRange(1, 3));
         assertThat(List.of(
@@ -1409,6 +1411,25 @@ class ContentLoaderTest {
         assertMapError(
                 Files.MAP.replace("noise_cells: 6", "noise_cells: 0"),
                 Map.of("location", "continents", "cause", "value_out_of_range", "field", "continents.noise_cells"));
+    }
+
+    @Test
+    void invalidSeaIsReportedAtItsPosition() {
+        assertMapError(
+                Files.MAP.replace("sea:\n  min_cells: 8\n  zone_cells: 30\n", ""),
+                Map.of("location", "sea", "cause", "blank_value", "field", "sea"));
+        assertMapError(
+                Files.MAP.replace("  min_cells: 8\n", ""),
+                Map.of("location", "sea", "cause", "blank_value", "field", "min_cells"));
+        assertMapError(
+                Files.MAP.replace("  zone_cells: 30\n", ""),
+                Map.of("location", "sea", "cause", "blank_value", "field", "zone_cells"));
+        assertMapError(
+                Files.MAP.replace("zone_cells: 30", "zone_cells: 0"),
+                Map.of("location", "sea", "cause", "value_out_of_range", "field", "sea.zone_cells"));
+        assertMapError(
+                Files.MAP.replace("min_cells: 8", "min_cells: 1001"),
+                Map.of("location", "sea", "cause", "value_out_of_range", "field", "sea.min_cells"));
     }
 
     @Test
