@@ -292,6 +292,29 @@ final class Files {
               min_provinces: 20
               roughness: 50
               noise_cells: 6
+            relief:
+              ridges: { min: 1, max: 3 }
+              ridge_min_provinces: 40
+              ridge_length_pct: 70
+              ridge_wander: 30
+              ridge_height: 70
+              ridge_falloff: 20
+              base_height: 20
+              noise_amplitude: 25
+              noise_cells: 4
+              levels:
+                - id: plain
+                  name: Рівнина
+                  description: Відкрита місцевість.
+                  min_height: 0
+                - id: hills
+                  name: Пагорби
+                  description: Горбиста місцевість.
+                  min_height: 40
+                - id: mountains
+                  name: Гори
+                  description: Гірські хребти.
+                  min_height: 70
             """;
 
     static final String RELIGIONS = """

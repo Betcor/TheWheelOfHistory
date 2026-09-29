@@ -21,4 +21,9 @@ public record MapGrid(int width, int height, List<MapCell> cells) {
             }
         }
     }
+
+    /** Середня сторона комірки: корінь з площі карти на комірку, щонайменше 1. Від неї — масштаб плям шуму. */
+    public int cellSide() {
+        return Math.max(1, (int) Math.sqrt((double) width * height / cells.size()));
+    }
 }

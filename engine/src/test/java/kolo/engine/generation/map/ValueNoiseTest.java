@@ -67,6 +67,27 @@ class ValueNoiseTest {
     }
 
     @Test
+    void signedNoiseIsCenteredStretchedAndClamped() {
+        ValueNoise noise = new ValueNoise(11);
+        int min = Integer.MAX_VALUE;
+        int max = Integer.MIN_VALUE;
+        for (int y = 0; y < 2_000; y += 7) {
+            for (int x = 0; x < 4_000; x += 11) {
+                int value = noise.signed(x, y, 400, 3);
+                assertThat(value)
+                        .isEqualTo(Math.clamp(
+                                (2L * noise.sample(x, y, 400) - ValueNoise.MAX) * 3, -ValueNoise.MAX, ValueNoise.MAX));
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+            }
+        }
+
+        // Розтяг утричі доводить шум до обох меж.
+        assertThat(min).isEqualTo(-ValueNoise.MAX);
+        assertThat(max).isEqualTo(ValueNoise.MAX);
+    }
+
+    @Test
     void smoothstepKeepsEndsAndMiddle() {
         assertThat(ValueNoise.smooth(0)).isZero();
         assertThat(ValueNoise.smooth(ValueNoise.MAX)).isEqualTo(ValueNoise.MAX);

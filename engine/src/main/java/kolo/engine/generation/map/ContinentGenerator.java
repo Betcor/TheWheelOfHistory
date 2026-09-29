@@ -162,9 +162,7 @@ public final class ContinentGenerator {
             return Optional.empty();
         }
         ValueNoise noise = new ValueNoise(rng.fork("noise").nextLong());
-        // Середня сторона комірки: з неї — масштаб плям шуму і його внесок у ціну.
-        int side = Math.max(1, (int) Math.sqrt((double) grid.width() * grid.height() / cells));
-        int period = side * def.noiseCells();
+        int period = grid.cellSide() * def.noiseCells();
 
         int[] owners = new int[cells];
         Arrays.fill(owners, ContinentMap.SEA);
@@ -349,10 +347,7 @@ public final class ContinentGenerator {
             long dx = target.site().x() - from.x();
             long dy = target.site().y() - from.y();
             long distance = (long) Math.sqrt((double) (dx * dx + dy * dy));
-            long centered = Math.clamp(
-                    (2L * noise.sample(target.site().x(), target.site().y(), period) - ValueNoise.MAX) * NOISE_CONTRAST,
-                    -ValueNoise.MAX,
-                    ValueNoise.MAX);
+            long centered = noise.signed(target.site().x(), target.site().y(), period, NOISE_CONTRAST);
             long factorPct = 100 + def.roughness() * centered / ValueNoise.MAX;
             long cost = distance * factorPct;
             return target.edge() ? cost + EDGE_PENALTY : cost;

@@ -3,6 +3,7 @@ package kolo.engine.content;
 import java.util.List;
 import java.util.TreeMap;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.Relief;
 
 /**
  * Мінімальний валідний контент карти для тестових пакетів: шаблони «Пангея» (1 материк, коефіцієнт 100, суходолу 50%)
@@ -19,7 +20,13 @@ public final class TestMaps {
     /** Вага материка 1–3, щонайменше 10 провінцій, береги наполовину з шуму, плями по 4 комірки. */
     public static final ContinentsDef CONTINENTS = new ContinentsDef(new CountRange(1, 3), 10, 50, 4);
 
-    public static final MapContent CONTENT = new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS);
+    /**
+     * 1–2 хребти, щонайменше 20 провінцій на хребет, довжина — поперечник материка, звертає до 20°; хребет +60, спад
+     * 20 за крок, основа 20, шум ±20 плямами по 3 комірки; пагорби з 40, гори з 70.
+     */
+    public static final ReliefDef RELIEF = relief(new CountRange(1, 2), 20, 40, 70);
+
+    public static final MapContent CONTENT = new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF);
 
     /** NPC: мало 0–1, звичайно 2–4, багато 10–20; 60–100 провінцій на державу з кроком 20; 5–15% нічийних; 100–3000. */
     public static final WorldBalanceDef BALANCE = world(new CountRange(100, 3000));
@@ -46,7 +53,34 @@ public final class TestMaps {
 
     /** Контент {@link #CONTENT} з іншими шаблонами й числами материків. */
     public static MapContent content(List<MapTemplateDef> templates, ContinentsDef continents) {
-        return new MapContent(templates, GRID, continents);
+        return new MapContent(templates, GRID, continents, RELIEF);
+    }
+
+    /** Контент {@link #CONTENT} з іншим рельєфом. */
+    public static MapContent content(ReliefDef relief) {
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief);
+    }
+
+    /** Рельєф {@link #RELIEF} з іншою кількістю хребтів і порогами. */
+    public static ReliefDef relief(CountRange ridges, int ridgeMinProvinces, int hillsFrom, int mountainsFrom) {
+        return new ReliefDef(
+                ridges,
+                ridgeMinProvinces,
+                100,
+                20,
+                60,
+                20,
+                20,
+                20,
+                3,
+                List.of(
+                        level(Relief.PLAIN, 0),
+                        level(Relief.HILLS, hillsFrom),
+                        level(Relief.MOUNTAINS, mountainsFrom)));
+    }
+
+    public static ReliefLevelDef level(Relief relief, int minHeight) {
+        return new ReliefLevelDef(relief, "Рельєф " + relief.key(), "Опис рельєфу " + relief.key(), minHeight);
     }
 
     /** Баланс {@link #BALANCE} з іншими межами кількості провінцій. */

@@ -20,6 +20,7 @@ class VoronoiGridTest {
         // 200 × 100² = 2 000 000 = 2000 × 1000.
         assertThat(grid.width()).isEqualTo(2000);
         assertThat(grid.height()).isEqualTo(1000);
+        assertThat(grid.cellSide()).isEqualTo(100);
         GridChecks.assertValid(grid, 200);
     }
 

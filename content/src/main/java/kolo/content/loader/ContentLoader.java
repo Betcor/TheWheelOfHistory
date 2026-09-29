@@ -65,6 +65,8 @@ import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.PowerCorridorDef;
+import kolo.engine.content.ReliefDef;
+import kolo.engine.content.ReliefLevelDef;
 import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ReligionCountDef;
@@ -104,6 +106,7 @@ import kolo.engine.state.NpcShare;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
+import kolo.engine.state.Relief;
 import kolo.engine.state.Sex;
 import kolo.engine.state.TechBranch;
 import kolo.engine.state.Training;
@@ -1265,7 +1268,50 @@ public final class ContentLoader {
                 });
         MapGridDef grid = at(MAP, "grid", () -> grid(yaml.grid()));
         ContinentsDef continents = at(MAP, "continents", () -> continents(yaml.continents()));
-        return at(MAP, "", () -> new MapContent(templates, grid, continents));
+        ReliefDef relief = relief(yaml.relief());
+        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief));
+    }
+
+    private static ReliefDef relief(ContentYaml.Relief relief) {
+        at(MAP, "relief", () -> {
+            if (relief == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "relief"));
+            }
+            return relief;
+        });
+        TreeSet<Relief> seen = new TreeSet<>();
+        List<ReliefLevelDef> levels =
+                list(MAP, "relief.levels", nonEmpty(MAP, "relief.levels", relief.levels()), (location, level) -> {
+                    Relief key = at(
+                            MAP,
+                            location,
+                            () -> unique(
+                                    seen,
+                                    ContentKeys.parse("relief", Relief.values(), Relief::key, level.id()),
+                                    Relief::key));
+                    return at(
+                            MAP,
+                            location,
+                            () -> new ReliefLevelDef(
+                                    key, level.name(), level.description(), required("min_height", level.minHeight())));
+                });
+        complete(MAP, "relief.levels", seen, List.of(Relief.values()), Relief::key);
+        return at(MAP, "relief", () -> {
+            if (relief.ridges() == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "ridges"));
+            }
+            return new ReliefDef(
+                    count(relief.ridges()),
+                    required("ridge_min_provinces", relief.ridgeMinProvinces()),
+                    required("ridge_length_pct", relief.ridgeLengthPct()),
+                    required("ridge_wander", relief.ridgeWander()),
+                    required("ridge_height", relief.ridgeHeight()),
+                    required("ridge_falloff", relief.ridgeFalloff()),
+                    required("base_height", relief.baseHeight()),
+                    required("noise_amplitude", relief.noiseAmplitude()),
+                    required("noise_cells", relief.noiseCells()),
+                    levels);
+        });
     }
 
     private static ContinentsDef continents(ContentYaml.Continents continents) {

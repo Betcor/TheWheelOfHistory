@@ -9,6 +9,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.generation.name.TestNames;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.Relief;
 import kolo.engine.state.WorldLimits;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,79 @@ class MapDefinitionsTest {
     }
 
     @Test
+    void reliefGivesHighestLevelNotAboveHeight() {
+        ReliefDef relief = TestMaps.relief(new CountRange(1, 2), 20, 40, 70);
+
+        assertThat(relief.relief(0)).isEqualTo(Relief.PLAIN);
+        assertThat(relief.relief(39)).isEqualTo(Relief.PLAIN);
+        assertThat(relief.relief(40)).isEqualTo(Relief.HILLS);
+        assertThat(relief.relief(69)).isEqualTo(Relief.HILLS);
+        assertThat(relief.relief(70)).isEqualTo(Relief.MOUNTAINS);
+        assertThat(relief.relief(ReliefDef.MAX_HEIGHT)).isEqualTo(Relief.MOUNTAINS);
+        assertThat(relief.level(Relief.HILLS).minHeight()).isEqualTo(40);
+        assertFails(() -> relief.relief(ReliefDef.MAX_HEIGHT + 1), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief.relief(-1), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void reliefRejectsValuesOutsideLimits() {
+        assertFails(
+                () -> TestMaps.relief(new CountRange(0, ReliefDef.MAX_RIDGES + 1), 20, 40, 70),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> TestMaps.relief(new CountRange(1, 2), 0, 40, 70), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> TestMaps.relief(new CountRange(1, 2), ReliefDef.MAX_RIDGE_MIN_PROVINCES + 1, 40, 70),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief(0, 20, 60, 20, 20, 20, 3), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> relief(ReliefDef.MAX_RIDGE_LENGTH_PCT + 1, 20, 60, 20, 20, 20, 3), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief(100, ReliefDef.MAX_RIDGE_WANDER + 1, 60, 20, 20, 20, 3), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief(100, 20, ReliefDef.MAX_HEIGHT + 1, 20, 20, 20, 3), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief(100, 20, 60, 0, 20, 20, 3), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief(100, 20, 60, 20, -1, 20, 3), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief(100, 20, 60, 20, 20, ReliefDef.MAX_HEIGHT + 1, 3), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> relief(100, 20, 60, 20, 20, 20, 0), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void reliefLevelsMustBeCompleteUniqueAndOrdered() {
+        ReliefLevelDef plain = TestMaps.level(Relief.PLAIN, 0);
+        ReliefLevelDef hills = TestMaps.level(Relief.HILLS, 40);
+        ReliefLevelDef mountains = TestMaps.level(Relief.MOUNTAINS, 70);
+
+        assertThatThrownBy(() -> levels(List.of(plain, hills))).isInstanceOfSatisfying(ValidationException.class, e -> {
+            assertThat(e.code()).isEqualTo(ErrorCode.MISSING_DEFINITION);
+            assertThat(e.details()).containsEntry("value", "mountains");
+        });
+        assertFails(() -> levels(List.of(plain, hills, hills, mountains)), ErrorCode.DUPLICATE_ID);
+        assertFails(() -> levels(List.of(plain, mountains, hills)), ErrorCode.OUT_OF_ORDER);
+        // Пороги мусять строго зростати.
+        assertFails(() -> TestMaps.relief(new CountRange(1, 2), 20, 70, 70), ErrorCode.OUT_OF_ORDER);
+        // Рівнина — з нуля.
+        assertThatThrownBy(() -> levels(List.of(TestMaps.level(Relief.PLAIN, 10), hills, mountains)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE);
+                    assertThat(e.details()).containsEntry("field", "relief.plain.min_height");
+                });
+    }
+
+    @Test
+    void reliefLevelRequiresNameDescriptionAndHeightInRange() {
+        assertFails(() -> new ReliefLevelDef(Relief.HILLS, " ", "Опис", 40), ErrorCode.BLANK_VALUE);
+        assertFails(() -> new ReliefLevelDef(Relief.HILLS, "Пагорби", "", 40), ErrorCode.BLANK_VALUE);
+        assertFails(
+                () -> new ReliefLevelDef(Relief.HILLS, "Пагорби", "Опис", ReliefDef.MAX_HEIGHT + 1),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void reliefKeysAreSnakeCase() {
+        assertThat(Relief.PLAIN.key()).isEqualTo("plain");
+        assertThat(Relief.HILLS.key()).isEqualTo("hills");
+        assertThat(Relief.MOUNTAINS.key()).isEqualTo("mountains");
+    }
+
+    @Test
     void mapContentKeepsContentOrderAndFindsById() {
         MapContent content = TestMaps.CONTENT;
 
@@ -107,16 +181,20 @@ class MapDefinitionsTest {
         assertThat(content.template(new MapTemplateId("archipelago"))).contains(TestMaps.ARCHIPELAGO);
         assertThat(content.template(new MapTemplateId("ring_world"))).isEmpty();
         assertThat(content.continents()).isEqualTo(TestMaps.CONTINENTS);
+        assertThat(content.relief()).isEqualTo(TestMaps.RELIEF);
     }
 
     @Test
     void mapContentRejectsEmptyAndDuplicateTemplates() {
-        assertFails(() -> new MapContent(List.of(), TestMaps.GRID, TestMaps.CONTINENTS), ErrorCode.EMPTY_COLLECTION);
+        assertFails(
+                () -> new MapContent(List.of(), TestMaps.GRID, TestMaps.CONTINENTS, TestMaps.RELIEF),
+                ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
                         List.of(TestMaps.PANGAEA, TestMaps.template("pangaea", 1, 100, 1, 1)),
                         TestMaps.GRID,
-                        TestMaps.CONTINENTS),
+                        TestMaps.CONTINENTS,
+                        TestMaps.RELIEF),
                 ErrorCode.DUPLICATE_ID);
     }
 
@@ -211,6 +289,25 @@ class MapDefinitionsTest {
         assertThat(NpcShare.FEW.key()).isEqualTo("few");
         assertThat(NpcShare.NORMAL.key()).isEqualTo("normal");
         assertThat(NpcShare.MANY.key()).isEqualTo("many");
+    }
+
+    private static ReliefDef relief(
+            int lengthPct, int wander, int ridgeHeight, int falloff, int baseHeight, int amplitude, int noiseCells) {
+        return new ReliefDef(
+                new CountRange(1, 2),
+                20,
+                lengthPct,
+                wander,
+                ridgeHeight,
+                falloff,
+                baseHeight,
+                amplitude,
+                noiseCells,
+                TestMaps.RELIEF.levels());
+    }
+
+    private static ReliefDef levels(List<ReliefLevelDef> levels) {
+        return new ReliefDef(new CountRange(1, 2), 20, 100, 20, 60, 20, 20, 20, 3, levels);
     }
 
     private static WorldBalanceDef world(TreeMap<NpcShare, CountRange> npc, StepRange unclaimed, CountRange provinces) {
