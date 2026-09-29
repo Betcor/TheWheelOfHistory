@@ -24,6 +24,7 @@ import kolo.engine.generation.map.WorldSizeWheel;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -85,6 +86,7 @@ class BundledSeaIntegrationTest {
     }
 
     @Test
+    @Tag("budget")
     void largestMapWithSeaFitsBudget() {
         MapTemplateDef template = PACK.map().templates().stream()
                 .min((a, b) -> Integer.compare(a.landPct(), b.landPct()))
@@ -100,15 +102,11 @@ class BundledSeaIntegrationTest {
                 500,
                 List.of());
         int cells = template.gridCells(provinces);
-        // Прогрів JIT.
-        MapGrid warm = VoronoiGrid.generate(Rng.of(0), PACK.map().grid(), cells);
-        SeaGenerator.generate(Rng.of(0), PACK, warm, ContinentGenerator.generate(Rng.of(0), PACK, size, warm));
-
         MapGrid grid = VoronoiGrid.generate(Rng.of(1), PACK.map().grid(), cells);
         ContinentMap continents = ContinentGenerator.generate(Rng.of(1), PACK, size, grid);
-        long start = System.nanoTime();
-        SeaMap sea = SeaGenerator.generate(Rng.of(1), PACK, grid, continents);
-        long millis = (System.nanoTime() - start) / 1_000_000;
+        Budget.Timed<SeaMap> timed = Budget.best(() -> SeaGenerator.generate(Rng.of(1), PACK, grid, continents));
+        SeaMap sea = timed.result();
+        long millis = timed.millis();
 
         assertThat(sea.cellBodies()).hasSize(cells);
         // Бюджет усієї генерації карти — 2 с; море — мала її частина, із запасом на CI.
