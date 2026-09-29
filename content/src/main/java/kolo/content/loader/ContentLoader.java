@@ -62,6 +62,7 @@ import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.PowerCorridorDef;
 import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
+import kolo.engine.content.ReligionCountDef;
 import kolo.engine.content.ReligionPolityDef;
 import kolo.engine.content.ReligionPolityId;
 import kolo.engine.content.ResourceDef;
@@ -93,6 +94,7 @@ import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
+import kolo.engine.state.Sex;
 import kolo.engine.state.TechBranch;
 import kolo.engine.state.Training;
 import kolo.engine.wheel.OutcomeTier;
@@ -866,6 +868,14 @@ public final class ContentLoader {
                 (location, archetype) -> {
                     ArchetypeId id =
                             at(RELIGIONS, location, () -> unique(archetypeIds, new ArchetypeId(archetype.id())));
+                    List<Sex> sexes = list(
+                            RELIGIONS,
+                            location + ".figure_sexes",
+                            archetype.figureSexes(),
+                            (sexLocation, sex) -> at(
+                                    RELIGIONS,
+                                    sexLocation,
+                                    () -> ContentKeys.parse("figure_sex", Sex.values(), Sex::key, sex)));
                     return at(
                             RELIGIONS,
                             location,
@@ -874,6 +884,7 @@ public final class ContentLoader {
                                     archetype.name(),
                                     archetype.description(),
                                     archetype.figure(),
+                                    sexes,
                                     required("weight", archetype.weight()),
                                     archetype.tags()));
                 });
@@ -1137,7 +1148,17 @@ public final class ContentLoader {
         ContentYaml.Religion religionYaml = section("religion", yaml.religion());
         CountRange aspects = at(BALANCE, "religion.aspects", () -> count(religionYaml.aspects()));
         CountRange dogmas = at(BALANCE, "religion.dogmas", () -> count(religionYaml.dogmas()));
-        ReligionBalanceDef religion = at(BALANCE, "religion", () -> new ReligionBalanceDef(aspects, dogmas));
+        List<ReligionCountDef> religionCount =
+                list(BALANCE, "religion.count", religionYaml.count(), (location, row) -> {
+                    CountRange religions =
+                            at(BALANCE, location, () -> count(new ContentYaml.Count(row.min(), row.max())));
+                    return at(
+                            BALANCE,
+                            location,
+                            () -> new ReligionCountDef(required("max_countries", row.maxCountries()), religions));
+                });
+        ReligionBalanceDef religion =
+                at(BALANCE, "religion", () -> new ReligionBalanceDef(religionCount, aspects, dogmas));
 
         return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation, religion));
     }

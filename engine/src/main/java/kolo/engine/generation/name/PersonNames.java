@@ -41,29 +41,51 @@ public final class PersonNames {
      */
     public static LocalizedName generate(Rng rng, ContentPack content, NameStyleId style, Sex sex) {
         Objects.requireNonNull(rng, "rng");
-        Objects.requireNonNull(sex, "sex");
         NameContent names = content.names();
-        PersonNameStyleDef personStyle = names.personStyle(Objects.requireNonNull(style, "style"))
-                .orElseThrow(() -> new ValidationException(
-                        ErrorCode.UNKNOWN_REFERENCE, ErrorDetails.of("field", "person_name_style", "value", style)));
+        PersonNameStyleDef personStyle = personStyle(names, style);
 
-        String givenStem = NameParts.stem(
-                rng,
-                personStyle.given().starts(),
-                personStyle.given().middles(),
-                personStyle.given().middleChanceBp());
-        NameFinalDef givenFinal = NameParts.pick(rng, personStyle.givenFinals(sex));
+        // Ім'я — першими кидками, тож given() з того самого seed дає те саме ім'я.
+        NounPhrase given = given(rng, names, personStyle, sex);
         String surnameStem = NameParts.stem(
                 rng,
                 personStyle.surnames().starts(),
                 personStyle.surnames().middles(),
                 personStyle.surnames().middleChanceBp());
         SurnameFinalDef surnameFinal = NameParts.pick(rng, personStyle.surnameFinals());
-
-        NounPhrase given = NameParts.decline(givenStem, givenFinal.text(), paradigm(names, givenFinal.paradigm()));
         NounPhrase surname =
                 NameParts.decline(surnameStem, surnameFinal.text(), paradigm(names, surnameFinal.paradigm(sex)));
         return name(given, surname);
+    }
+
+    /**
+     * Лише ім'я без прізвища, напр. для постаті, чиїм ім'ям зветься віра («Шлях Оріна»). Відмінюється як ім'я істоти;
+     * рід відповідає статі.
+     *
+     * @param rng окремий потік генерації імені
+     * @param style мовний стиль імен людей
+     * @throws ValidationException з {@link ErrorCode#UNKNOWN_REFERENCE}, якщо стилю немає в контенті
+     */
+    public static NounPhrase given(Rng rng, ContentPack content, NameStyleId style, Sex sex) {
+        Objects.requireNonNull(rng, "rng");
+        NameContent names = content.names();
+        return given(rng, names, personStyle(names, style), sex);
+    }
+
+    private static NounPhrase given(Rng rng, NameContent names, PersonNameStyleDef personStyle, Sex sex) {
+        Objects.requireNonNull(sex, "sex");
+        String stem = NameParts.stem(
+                rng,
+                personStyle.given().starts(),
+                personStyle.given().middles(),
+                personStyle.given().middleChanceBp());
+        NameFinalDef ending = NameParts.pick(rng, personStyle.givenFinals(sex));
+        return NameParts.decline(stem, ending.text(), paradigm(names, ending.paradigm()));
+    }
+
+    private static PersonNameStyleDef personStyle(NameContent names, NameStyleId style) {
+        return names.personStyle(Objects.requireNonNull(style, "style"))
+                .orElseThrow(() -> new ValidationException(
+                        ErrorCode.UNKNOWN_REFERENCE, ErrorDetails.of("field", "person_name_style", "value", style)));
     }
 
     /**

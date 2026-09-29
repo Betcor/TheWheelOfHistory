@@ -39,6 +39,7 @@ import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
+import kolo.engine.content.ReligionCountDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
@@ -1074,12 +1075,43 @@ class ContentLoaderTest {
         assertThat(path.gender()).isEqualTo(GrammaticalGender.MASCULINE);
         assertThat(path.figureCase()).isEqualTo(GrammaticalCase.GENITIVE);
         assertThat(path.render(GrammaticalCase.DATIVE, "Оріна")).isEqualTo("Шляхові Оріна");
+        assertThat(religions
+                        .archetype(new ArchetypeId("polytheism"))
+                        .orElseThrow()
+                        .figureSexes())
+                .containsExactly(Sex.MALE, Sex.FEMALE);
         assertThat(pack.balance().religion())
-                .isEqualTo(new ReligionBalanceDef(new CountRange(2, 3), new CountRange(2, 4)));
+                .isEqualTo(new ReligionBalanceDef(
+                        List.of(
+                                new ReligionCountDef(8, new CountRange(3, 4)),
+                                new ReligionCountDef(40, new CountRange(4, 6))),
+                        new CountRange(2, 3),
+                        new CountRange(2, 4)));
     }
 
     @Test
     void invalidReligionsAreReportedAtTheirPosition() {
+        assertReligionsError(
+                Files.RELIGIONS.replace("figure_sexes: [male, female]", "figure_sexes: [male, other]"),
+                Map.of("location", "archetypes[1].figure_sexes[1]", "cause", "unknown_reference", "value", "other"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("figure_sexes: [male, female]", "figure_sexes: [female, female]"),
+                Map.of(
+                        "location",
+                        "archetypes[1]",
+                        "cause",
+                        "duplicate_id",
+                        "field",
+                        "archetype.polytheism.figure_sexes"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("    figure_sexes: [male]\n", ""),
+                Map.of(
+                        "location",
+                        "archetypes[0]",
+                        "cause",
+                        "empty_collection",
+                        "field",
+                        "archetype.monotheism.figure_sexes"));
         assertReligionsError(
                 Files.RELIGIONS.replace("id: polytheism", "id: monotheism"),
                 Map.of("location", "archetypes[1]", "cause", "duplicate_id", "value", "monotheism"));
@@ -1152,6 +1184,34 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("dogmas: { min: 2, max: 4 }", "dogmas: { min: 2, max: 7 }")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "religion", "cause", "value_out_of_range", "field", "religion.dogmas.max"));
+    }
+
+    @Test
+    void invalidReligionCountIsReportedAtItsPosition() {
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "    - { max_countries: 8, min: 3, max: 4 }\n    - { max_countries: 40, min: 4, max: 6 }\n",
+                        "    []\n")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion", "cause", "empty_collection", "field", "religion.count"));
+        assertContentError(
+                balance(Files.BALANCE.replace("max_countries: 40", "max_countries: 8")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion", "cause", "out_of_order", "field", "religion.count[1].max_countries"));
+        assertContentError(
+                balance(Files.BALANCE.replace("{ max_countries: 40, min: 4, max: 6 }", "{ min: 4, max: 6 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion.count[1]", "cause", "blank_value", "field", "max_countries"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "{ max_countries: 40, min: 4, max: 6 }", "{ max_countries: 40, min: 4 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion.count[1]", "cause", "blank_value", "field", "max"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "{ max_countries: 8, min: 3, max: 4 }", "{ max_countries: 8, min: 0, max: 4 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion.count[0]", "cause", "value_out_of_range", "field", "religion.count.min"));
     }
 
     @Test
