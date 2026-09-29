@@ -53,9 +53,6 @@ public final class NuclearWheel {
     /** Найнижчий рівень енергетики й науки, з яким можливий арсенал: з відставанням −2 і нижче — ні. */
     public static final int ARSENAL_MIN_ENERGY_LEVEL = -1;
 
-    /** Id внеску розвиненості в перевагу; ключ пояснення — {@code development.energy_science}. */
-    static final String ENERGY_SOURCE_ID = "development:" + TechBranch.ENERGY_SCIENCE.key();
-
     /** Кількість боєголовок нейтральна для держави: якість арсеналу вже врахована статусом. */
     static final int WARHEADS_QUALITY = 50;
 
@@ -128,12 +125,11 @@ public final class NuclearWheel {
     static Advantage advantage(ContentPack content, List<Modifier> modifiers, StartDevelopment development) {
         List<AppliedModifier> contributions =
                 new ArrayList<>(Modifiers.contributions(modifiers, ModifierTarget.wheel(KIND), TURN));
-        int energy = development.level(TechBranch.ENERGY_SCIENCE)
-                * content.balance().generation().nuclearEnergyAdvantage();
-        if (energy != 0) {
-            contributions.add(
-                    new AppliedModifier(ENERGY_SOURCE_ID, "development." + TechBranch.ENERGY_SCIENCE.key(), energy));
-        }
+        development
+                .advantage(
+                        TechBranch.ENERGY_SCIENCE,
+                        content.balance().generation().nuclearEnergyAdvantage())
+                .ifPresent(contributions::add);
         return Advantage.of(contributions);
     }
 

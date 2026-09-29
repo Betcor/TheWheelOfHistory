@@ -33,6 +33,8 @@ public final class ContentPack {
     private final SortedMap<TechBranch, TechBranchDef> techBranches;
     private final SortedMap<Integer, DevelopmentLevelDef> developmentLevels;
     private final SortedMap<NuclearStatus, NuclearStatusDef> nuclearStatuses;
+    private final List<GdpLevelDef> gdpLevels;
+    private final SortedMap<GdpLevelId, GdpLevelDef> gdpLevelsById;
     private final SortedMap<PersonKind, PersonKindDef> personKinds;
     private final SortedMap<TraitId, TraitDef> traits;
     private final NameContent names;
@@ -46,13 +48,16 @@ public final class ContentPack {
      * @param developmentLevels рівно по одному визначенню на кожен рівень {@link Development#MIN}..{@link
      *     Development#MAX}
      * @param nuclearStatuses рівно по одному визначенню на кожен {@link NuclearStatus}
+     * @param gdpLevels рівні ВВП на душу від найбіднішого до найбагатшого (порядок секторів колеса ВВП)
      * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
-     *     підкласифікацію, рівень розвиненості, ядерний статус, фрагмент або словник міток коліс генерації
+     *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, фрагмент або словник міток коліс
+     *     генерації
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
-     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, риса посилається на невідому рису,
+     *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП не впорядковано від
+     *     бідного до багатого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
      *     підкласифікацію, підкласифікації не доступна жодна форма або фрагмент передісторії залежить від мітки без
      *     джерела
@@ -65,6 +70,7 @@ public final class ContentPack {
             List<TechBranchDef> techBranches,
             List<DevelopmentLevelDef> developmentLevels,
             List<NuclearStatusDef> nuclearStatuses,
+            List<GdpLevelDef> gdpLevels,
             List<PersonKindDef> personKinds,
             List<TraitDef> traits,
             NameContent names,
@@ -119,6 +125,18 @@ public final class ContentPack {
         }
         this.nuclearStatuses =
                 Defs.complete("nuclear_statuses", nuclearMap, List.of(NuclearStatus.values()), NuclearStatus::key);
+
+        TreeMap<GdpLevelId, GdpLevelDef> gdpMap = new TreeMap<>();
+        GdpLevelDef previousGdp = null;
+        for (GdpLevelDef gdp : nonEmpty("gdp_levels", gdpLevels)) {
+            put("gdp_level.id", gdpMap, gdp.id(), gdp);
+            if (previousGdp != null) {
+                GdpLevelDef.checkFollows(previousGdp, gdp);
+            }
+            previousGdp = gdp;
+        }
+        this.gdpLevels = List.copyOf(gdpLevels);
+        this.gdpLevelsById = Collections.unmodifiableSortedMap(gdpMap);
 
         TreeMap<PersonKind, PersonKindDef> kindMap = new TreeMap<>();
         for (PersonKindDef kind : personKinds) {
@@ -177,6 +195,7 @@ public final class ContentPack {
         }
         levelMap.values().forEach(level -> known.addAll(level.tags()));
         nuclearMap.values().forEach(status -> known.addAll(status.tags()));
+        gdpMap.values().forEach(gdp -> known.addAll(gdp.tags()));
         for (BackstoryFragmentDef fragment : backstory.fragments().values()) {
             for (String tag : fragment.referencedTags()) {
                 if (!known.contains(tag)) {
@@ -258,6 +277,15 @@ public final class ContentPack {
 
     public NuclearStatusDef nuclearStatus(NuclearStatus status) {
         return nuclearStatuses.get(Objects.requireNonNull(status, "status"));
+    }
+
+    /** Рівні ВВП на душу від найбіднішого до найбагатшого — порядок секторів колеса ВВП; хоча б один. */
+    public List<GdpLevelDef> gdpLevels() {
+        return gdpLevels;
+    }
+
+    public Optional<GdpLevelDef> gdpLevel(GdpLevelId id) {
+        return Optional.ofNullable(gdpLevelsById.get(Objects.requireNonNull(id, "id")));
     }
 
     /** Типи постатей у порядку enum; визначено кожен. */

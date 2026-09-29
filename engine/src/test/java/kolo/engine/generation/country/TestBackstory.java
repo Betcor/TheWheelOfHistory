@@ -14,6 +14,8 @@ import kolo.engine.content.CountRange;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
+import kolo.engine.content.GdpLevelDef;
+import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
@@ -50,6 +52,7 @@ import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.OutcomeTier;
 
 /** Контент для тестів колеса передісторії: невеликий набір фрагментів з умовами, сусідами й різними роками. */
 final class TestBackstory {
@@ -194,6 +197,32 @@ final class TestBackstory {
             List<NuclearStatusDef> nuclear,
             CountRange warheads,
             int nuclearEnergyAdvantage) {
+        return pack(
+                ideologies,
+                fragments,
+                count,
+                levels,
+                resources,
+                nuclear,
+                warheads,
+                nuclearEnergyAdvantage,
+                List.of(new GdpLevelDef(
+                        new GdpLevelId("middle"), "Рівень", "Опис", 1000, OutcomeTier.PARTIAL, 100, 50, List.of())),
+                10);
+    }
+
+    /** Мінімальний валідний пакет з усім, що задають тести коліс генерації, зокрема рівнями ВВП. */
+    static ContentPack pack(
+            List<IdeologyDef> ideologies,
+            List<BackstoryFragmentDef> fragments,
+            CountRange count,
+            List<DevelopmentLevelDef> levels,
+            List<ResourceDef> resources,
+            List<NuclearStatusDef> nuclear,
+            CountRange warheads,
+            int nuclearEnergyAdvantage,
+            List<GdpLevelDef> gdpLevels,
+            int gdpDevelopmentAdvantage) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -240,6 +269,7 @@ final class TestBackstory {
                         .toList(),
                 levels,
                 nuclear,
+                gdpLevels,
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -253,7 +283,12 @@ final class TestBackstory {
                                 .map(corridor -> new PowerCorridorDef(
                                         corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
                                 .toList(),
-                        new GenerationBalanceDef(count, new CountRange(1, 3), warheads, nuclearEnergyAdvantage)));
+                        new GenerationBalanceDef(
+                                count,
+                                new CountRange(1, 3),
+                                warheads,
+                                nuclearEnergyAdvantage,
+                                gdpDevelopmentAdvantage)));
     }
 
     /** Чоловічий рід, тверда група: «Велор, Велору, …» — і для короткої, і для повної назви. */

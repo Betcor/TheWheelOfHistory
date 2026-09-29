@@ -1,0 +1,69 @@
+# ВВП на душу на старті (GD §4.1, колесо 8): умовні долари 1970 року на людину за рік.
+# Загальний ВВП держави = ВВП на душу × населення (населення — з картою).
+#
+# Колесо ВВП; сектори — рівні в порядку цього файлу. Рівні йдуть від найбіднішого до найбагатшого:
+# per_capita строго зростає, tier не спадає.
+# tier — як на рівень діє перевага: crit_fail / fail — бідніші (зменшуються з додатною перевагою),
+# partial — нейтральний, success / crit_success — багатші (ростуть); критичні не бувають рідше 1%.
+# Перевагу дають лад (wheel:generation_gdp в ideologies.yaml) і розвиненість економіки та суспільства
+# (generation.gdp_development_advantage у balance.yaml).
+# weight — базова вага сектора, відносна (1..10000); колесо нормалізує ваги до 100%.
+# quality — наскільки рівень добрий для держави (0..100), для стріків генерації (GD §4.10).
+# tags — мітки держави на цьому рівні (див. generation_tags у backstory.yaml): poor — нижче медіани
+# світу, rich — значно вище.
+
+levels:
+  - id: destitute
+    name: Злидні
+    description: Натуральне господарство й голод; держава ледь збирає податки.
+    per_capita: 100
+    tier: crit_fail
+    weight: 8
+    quality: 5
+    tags: [poor]
+  - id: poor
+    name: Бідність
+    description: Аграрна економіка, мало промисловості й міст.
+    per_capita: 250
+    tier: fail
+    weight: 14
+    quality: 20
+    tags: [poor]
+  - id: lower_middle
+    name: Дохід нижче середнього
+    description: Перші заводи й залізниці; більшість людей живе з землі.
+    per_capita: 500
+    tier: fail
+    weight: 20
+    quality: 40
+    tags: [poor]
+  - id: middle
+    name: Середній дохід
+    description: Індустріальна економіка з помітним містом і селом.
+    per_capita: 1000
+    tier: partial
+    weight: 24
+    quality: 50
+  - id: upper_middle
+    name: Дохід вище середнього
+    description: Розвинена промисловість і послуги, зростає споживання.
+    per_capita: 2000
+    tier: success
+    weight: 18
+    quality: 65
+  - id: rich
+    name: Заможність
+    description: Високі зарплати, сильна валюта, багато капіталу.
+    per_capita: 3500
+    tier: success
+    weight: 11
+    quality: 80
+    tags: [rich]
+  - id: very_rich
+    name: Багатство
+    description: Одна з найбагатших економік світу.
+    per_capita: 5000
+    tier: crit_success
+    weight: 5
+    quality: 95
+    tags: [rich]

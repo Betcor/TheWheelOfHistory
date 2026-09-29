@@ -14,6 +14,8 @@ import kolo.engine.content.CountRange;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
+import kolo.engine.content.GdpLevelDef;
+import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
@@ -48,6 +50,7 @@ import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.OutcomeTier;
 
 /** Контент для тестів генераторів назв та імен: дві ідеології, два стилі, три форми державності. */
 final class TestNames {
@@ -180,6 +183,8 @@ final class TestNames {
                 Arrays.stream(NuclearStatus.values())
                         .map(status -> new NuclearStatusDef(status, "Статус", 100, 50, List.of()))
                         .toList(),
+                List.of(new GdpLevelDef(
+                        new GdpLevelId("middle"), "Рівень", "Опис", 1000, OutcomeTier.PARTIAL, 100, 50, List.of())),
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -201,7 +206,7 @@ final class TestNames {
                         .map(corridor ->
                                 new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
                         .toList(),
-                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10));
+                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10));
     }
 
     private static BackstoryContent backstory() {

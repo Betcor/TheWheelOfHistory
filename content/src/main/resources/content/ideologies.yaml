@@ -12,6 +12,7 @@
 # economy, military, society або energy_science (development.yaml). Модифікатори ідеології й
 # підкласифікації складаються.
 # Перевага колеса ядерного статусу (GD §4.1, №14): wheel:generation_nuclear.
+# Перевага колеса ВВП на душу (GD §4.1, №8): wheel:generation_gdp.
 
 ideologies:
   - id: democracy
@@ -24,6 +25,7 @@ ideologies:
       - { target: "wheel:generation_development_economy", value: 10 }
       - { target: "wheel:generation_development_society", value: 10 }
       - { target: "wheel:generation_development_energy_science", value: 10 }
+      - { target: "wheel:generation_gdp", value: 10 }
     sub_ideologies:
       - id: liberal_democracy
         name: Ліберальна демократія
@@ -121,6 +123,7 @@ ideologies:
         modifiers:
           - { target: "stat:influence", value: -10 }
           - { target: "wheel:generation_development_economy", value: -10 }
+          - { target: "wheel:generation_gdp", value: -10 }
 
   - id: monarchy
     name: Монархія
@@ -141,6 +144,7 @@ ideologies:
           - { target: "stat:hdi", value: -5 }
           - { target: "wheel:generation_development_economy", value: -10 }
           - { target: "wheel:generation_development_society", value: -10 }
+          - { target: "wheel:generation_gdp", value: -10 }
       - id: hereditary_empire
         name: Спадкова імперія
         weight: 100
@@ -190,6 +194,8 @@ ideologies:
         name: Планова економіка
         weight: 100
         tags: [planned_economy]
+        modifiers:
+          - { target: "wheel:generation_gdp", value: -10 }
       - id: market_socialism
         name: Ринковий соціалізм
         weight: 100

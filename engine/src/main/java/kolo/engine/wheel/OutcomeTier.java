@@ -1,5 +1,7 @@
 package kolo.engine.wheel;
 
+import java.util.Locale;
+
 /** Рівень результату сектора: від критичного провалу до критичного успіху. */
 public enum OutcomeTier {
     CRIT_FAIL,
@@ -7,6 +9,12 @@ public enum OutcomeTier {
     PARTIAL,
     SUCCESS,
     CRIT_SUCCESS;
+
+    /** Ключ у контенті, напр. {@code crit_success}. */
+    public String key() {
+        // Locale.ROOT: інакше в турецькій локалі «I» перетворюється на «ı».
+        return name().toLowerCase(Locale.ROOT);
+    }
 
     /** Сектор росте з додатною перевагою. */
     public boolean isSuccess() {
