@@ -14,6 +14,7 @@
 # Перевага колеса ядерного статусу (GD §4.1, №14): wheel:generation_nuclear.
 # Перевага колеса ВВП на душу (GD §4.1, №8): wheel:generation_gdp.
 # Перевага колеса ІЛР (GD §4.1, №9): wheel:generation_hdi.
+# Перевага колеса розміру армії (GD §4.1, №10): wheel:generation_army_size.
 
 ideologies:
   - id: democracy
@@ -67,6 +68,7 @@ ideologies:
         modifiers:
           - { target: "stat:legitimacy", value: -10 }
           - { target: "wheel:generation_development_military", value: 15 }
+          - { target: "wheel:generation_army_size", value: 15 }
       - id: oligarchy
         name: Олігархія
         weight: 100
@@ -102,6 +104,7 @@ ideologies:
       - { target: "wheel:generation_development_energy_science", value: -10 }
       - { target: "wheel:generation_nuclear", value: 10 }
       - { target: "wheel:generation_hdi", value: -10 }
+      - { target: "wheel:generation_army_size", value: 10 }
     sub_ideologies:
       - id: personality_cult
         name: Культ особи
@@ -113,6 +116,8 @@ ideologies:
         name: Реваншизм
         weight: 100
         tags: [revanchism]
+        modifiers:
+          - { target: "wheel:generation_army_size", value: 10 }
       - id: militarism
         name: Мілітаризм
         weight: 100
@@ -121,6 +126,7 @@ ideologies:
           - { target: "stat:war_weariness", value: -5 }
           - { target: "wheel:generation_development_military", value: 15 }
           - { target: "wheel:generation_nuclear", value: 10 }
+          - { target: "wheel:generation_army_size", value: 15 }
       - id: isolationism
         name: Ізоляціонізм
         weight: 100
@@ -158,6 +164,7 @@ ideologies:
         modifiers:
           - { target: "stat:influence", value: 5 }
           - { target: "wheel:generation_development_military", value: 10 }
+          - { target: "wheel:generation_army_size", value: 10 }
 
   - id: theocracy
     name: Теократія

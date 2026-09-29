@@ -91,6 +91,18 @@ final class TestContent {
                 hdiLevel("high", 80, OutcomeTier.CRIT_SUCCESS, List.of()));
     }
 
+    static ArmySizeDef armySize(String id, int shareBp, OutcomeTier tier, List<String> tags) {
+        return new ArmySizeDef(new ArmySizeId(id), "Рівень " + id, "Опис рівня " + id, shareBp, tier, 100, 50, tags);
+    }
+
+    /** Три рівні розміру армії від малої до великої. */
+    static List<ArmySizeDef> armySizes() {
+        return List.of(
+                armySize("small", 40, OutcomeTier.CRIT_FAIL, List.of()),
+                armySize("regular", 150, OutcomeTier.PARTIAL, List.of()),
+                armySize("large", 300, OutcomeTier.CRIT_SUCCESS, List.of()));
+    }
+
     /** По визначенню на кожен тип постаті. */
     static List<PersonKindDef> personKinds() {
         return Arrays.stream(PersonKind.values())
@@ -217,7 +229,7 @@ final class TestContent {
                 new StreakRulesDef(85, 15, 3),
                 Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList(),
                 new GenerationBalanceDef(
-                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15));
+                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15, 10));
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {
@@ -231,6 +243,7 @@ final class TestContent {
                 nuclearStatuses(),
                 gdpLevels(),
                 hdiLevels(),
+                armySizes(),
                 personKinds(),
                 traits(),
                 names(ideologies),

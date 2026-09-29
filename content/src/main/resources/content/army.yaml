@@ -1,0 +1,74 @@
+# Розмір армії на старті (GD §4.1, колесо 10; GD §4.4: 0,2–8% населення під зброєю, рідкісні
+# крайні сектори «майже без армії» й «вся нація під зброєю»). Чисельність армії — частка × населення
+# (населення дасть колесо з картою).
+#
+# Колесо розміру армії; сектори — рівні в порядку цього файлу. Рівні йдуть від найменшої армії до
+# найбільшої: share_bp строго зростає, tier не спадає.
+# share_bp — частка населення під зброєю, базисні пункти (100 = 1%).
+# tier — як на рівень діє перевага: crit_fail / fail — менші армії (зменшуються з додатною
+# перевагою), partial — нейтральний, success / crit_success — більші (ростуть); критичні не бувають
+# рідше 1%.
+# Перевагу дають лад (wheel:generation_army_size в ideologies.yaml) і ВВП: крок рівня результату
+# рівня ВВП від partial (gdp.yaml: crit_fail −2 … crit_success +2) ×
+# generation.army_size_gdp_advantage у balance.yaml.
+# weight — базова вага сектора, відносна (1..10000); колесо нормалізує ваги до 100%.
+# quality — наскільки рівень добрий для держави (0..100), для стріків генерації (GD §4.10).
+# Величезна армія — тягар для економіки, тож найбільший рівень не «дуже добрий».
+# tags — мітки держави на цьому рівні (див. generation_tags у backstory.yaml): small_army — менше
+# 0,5% населення, large_army — не менше 3%.
+
+sizes:
+  - id: almost_none
+    name: Майже без армії
+    description: Лише почесна варта й прикордонники; оборону тримають на дипломатії.
+    share_bp: 20
+    tier: crit_fail
+    weight: 5
+    quality: 15
+    tags: [small_army]
+  - id: small
+    name: Мала армія
+    description: Кілька бригад, яких ледве вистачає, щоб прикрити столицю й кордони.
+    share_bp: 40
+    tier: fail
+    weight: 15
+    quality: 30
+    tags: [small_army]
+  - id: modest
+    name: Скромна армія
+    description: Невелике професійне військо без великих резервів.
+    share_bp: 80
+    tier: fail
+    weight: 22
+    quality: 40
+  - id: regular
+    name: Звичайна армія
+    description: Армія мирного часу, як у більшості держав світу.
+    share_bp: 150
+    tier: partial
+    weight: 28
+    quality: 50
+  - id: large
+    name: Велика армія
+    description: Загальний призов і численні дивізії на кордонах.
+    share_bp: 300
+    tier: success
+    weight: 18
+    quality: 60
+    tags: [large_army]
+  - id: mass
+    name: Масова армія
+    description: Кожен двадцятий під зброєю; військо — головна опора держави.
+    share_bp: 500
+    tier: success
+    weight: 9
+    quality: 70
+    tags: [large_army]
+  - id: nation_in_arms
+    name: Вся нація під зброєю
+    description: Мобілізоване суспільство, де армія поглинає робочі руки й бюджет.
+    share_bp: 800
+    tier: crit_success
+    weight: 3
+    quality: 80
+    tags: [large_army]

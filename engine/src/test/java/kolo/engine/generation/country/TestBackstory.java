@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import kolo.engine.content.ArmySizeDef;
+import kolo.engine.content.ArmySizeId;
 import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
@@ -241,7 +243,7 @@ final class TestBackstory {
                 15);
     }
 
-    /** Мінімальний валідний пакет з усім, що задають тести коліс генерації, зокрема рівнями ВВП та ІЛР. */
+    /** Мінімальний валідний пакет з цими рівнями ВВП та ІЛР і одним рівнем розміру армії. */
     static ContentPack pack(
             List<IdeologyDef> ideologies,
             List<BackstoryFragmentDef> fragments,
@@ -255,6 +257,42 @@ final class TestBackstory {
             int gdpDevelopmentAdvantage,
             List<HdiLevelDef> hdiLevels,
             int hdiGdpAdvantage) {
+        return pack(
+                ideologies,
+                fragments,
+                count,
+                levels,
+                resources,
+                nuclear,
+                warheads,
+                nuclearEnergyAdvantage,
+                gdpLevels,
+                gdpDevelopmentAdvantage,
+                hdiLevels,
+                hdiGdpAdvantage,
+                List.of(new ArmySizeDef(
+                        new ArmySizeId("regular"), "Рівень", "Опис", 150, OutcomeTier.PARTIAL, 100, 50, List.of())),
+                10);
+    }
+
+    /**
+     * Мінімальний валідний пакет з усім, що задають тести коліс генерації, зокрема рівнями ВВП, ІЛР і розміру армії.
+     */
+    static ContentPack pack(
+            List<IdeologyDef> ideologies,
+            List<BackstoryFragmentDef> fragments,
+            CountRange count,
+            List<DevelopmentLevelDef> levels,
+            List<ResourceDef> resources,
+            List<NuclearStatusDef> nuclear,
+            CountRange warheads,
+            int nuclearEnergyAdvantage,
+            List<GdpLevelDef> gdpLevels,
+            int gdpDevelopmentAdvantage,
+            List<HdiLevelDef> hdiLevels,
+            int hdiGdpAdvantage,
+            List<ArmySizeDef> armySizes,
+            int armySizeGdpAdvantage) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -303,6 +341,7 @@ final class TestBackstory {
                 nuclear,
                 gdpLevels,
                 hdiLevels,
+                armySizes,
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -322,7 +361,8 @@ final class TestBackstory {
                                 warheads,
                                 nuclearEnergyAdvantage,
                                 gdpDevelopmentAdvantage,
-                                hdiGdpAdvantage)));
+                                hdiGdpAdvantage,
+                                armySizeGdpAdvantage)));
     }
 
     /** Чоловічий рід, тверда група: «Велор, Велору, …» — і для короткої, і для повної назви. */

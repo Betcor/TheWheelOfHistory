@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import kolo.engine.content.ArmySizeDef;
+import kolo.engine.content.ArmySizeId;
 import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
@@ -189,6 +191,8 @@ final class TestNames {
                         new GdpLevelId("middle"), "Рівень", "Опис", 1000, OutcomeTier.PARTIAL, 100, 50, List.of())),
                 List.of(new HdiLevelDef(
                         new HdiLevelId("middle"), "Рівень", "Опис", 60, OutcomeTier.PARTIAL, 100, 50, List.of())),
+                List.of(new ArmySizeDef(
+                        new ArmySizeId("regular"), "Рівень", "Опис", 150, OutcomeTier.PARTIAL, 100, 50, List.of())),
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -211,7 +215,7 @@ final class TestNames {
                                 new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
                         .toList(),
                 new GenerationBalanceDef(
-                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15));
+                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15, 10));
     }
 
     private static BackstoryContent backstory() {

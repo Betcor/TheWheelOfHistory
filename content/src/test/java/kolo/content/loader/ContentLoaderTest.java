@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import kolo.engine.content.ArmySizeDef;
+import kolo.engine.content.ArmySizeId;
 import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
@@ -687,6 +689,86 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsArmySizesInContentOrder() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.armySizes())
+                .extracting(ArmySizeDef::id, ArmySizeDef::shareBp, ArmySizeDef::tier, ArmySizeDef::weight)
+                .containsExactly(
+                        tuple(new ArmySizeId("small"), 40, OutcomeTier.CRIT_FAIL, 30),
+                        tuple(new ArmySizeId("regular"), 150, OutcomeTier.PARTIAL, 40),
+                        tuple(new ArmySizeId("large"), 300, OutcomeTier.CRIT_SUCCESS, 30));
+        ArmySizeDef large = pack.armySize(new ArmySizeId("large")).orElseThrow();
+        assertThat(large.name()).isEqualTo("Велика армія");
+        assertThat(large.quality()).isEqualTo(60);
+        assertThat(large.tags()).containsExactly("large_army");
+        assertThat(pack.armySize(new ArmySizeId("regular")).orElseThrow().tags())
+                .isEmpty();
+    }
+
+    @Test
+    void invalidArmySizeIsReportedAtItsPosition() {
+        assertArmyError(
+                Files.ARMY.replace("share_bp: 150, ", ""),
+                Map.of("location", "sizes[1]", "cause", "blank_value", "field", "share_bp"));
+        assertArmyError(
+                Files.ARMY.replace("tier: partial", "tier: average"),
+                Map.of("location", "sizes[1]", "cause", "unknown_reference", "field", "tier", "value", "average"));
+        assertArmyError(
+                Files.ARMY.replace("share_bp: 300", "share_bp: 10001"),
+                Map.of("location", "sizes[2]", "cause", "value_out_of_range", "field", "army_size.large.share_bp"));
+        assertArmyError(
+                Files.ARMY.replace("id: large", "id: regular"),
+                Map.of("location", "sizes[2]", "cause", "duplicate_id"));
+        assertArmyError("sizes: []\n", Map.of("location", "sizes", "cause", "empty_collection"));
+    }
+
+    @Test
+    void armySizesMustGoFromSmallToLarge() {
+        assertArmyError(
+                Files.ARMY.replace("share_bp: 300", "share_bp: 150"),
+                Map.of(
+                        "location",
+                        "sizes[2]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "army_size.large.share_bp",
+                        "value",
+                        150));
+        assertArmyError(
+                Files.ARMY.replace("tier: crit_success", "tier: fail"),
+                Map.of(
+                        "location",
+                        "sizes[2]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "army_size.large.tier",
+                        "value",
+                        "fail"));
+    }
+
+    @Test
+    void armySizeTagIsASourceForBackstoryConditions() {
+        String backstory = Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, small_army]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.ARMY, Files.ARMY.replace(", tags: [small_army]", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "small_army"));
+    }
+
+    @Test
     void loadsBalance() {
         BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
 
@@ -702,6 +784,7 @@ class ContentLoaderTest {
         assertThat(balance.generation().nuclearEnergyAdvantage()).isEqualTo(10);
         assertThat(balance.generation().gdpDevelopmentAdvantage()).isEqualTo(10);
         assertThat(balance.generation().hdiGdpAdvantage()).isEqualTo(15);
+        assertThat(balance.generation().armySizeGdpAdvantage()).isEqualTo(10);
     }
 
     @Test
@@ -770,6 +853,10 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("hdi_gdp_advantage: 15", "hdi_gdp_advantage: 101")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.hdi_gdp_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("army_size_gdp_advantage: 10", "army_size_gdp_advantage: -1")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.army_size_gdp_advantage"));
     }
 
     @Test
@@ -816,6 +903,16 @@ class ContentLoaderTest {
                         "blank_value",
                         "field",
                         "hdi_gdp_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  army_size_gdp_advantage: 10\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "generation.army_size_gdp_advantage",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "army_size_gdp_advantage"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,
@@ -1026,6 +1123,14 @@ class ContentLoaderTest {
                 Files.valid().with(ContentLoader.HDI, hdi).source(),
                 ErrorCode.INVALID_CONTENT,
                 withFile(ContentLoader.HDI, expected));
+    }
+
+    private static void assertArmyError(String army, Map<String, ?> expected) {
+        assertThat(army).isNotEqualTo(Files.ARMY);
+        assertContentError(
+                Files.valid().with(ContentLoader.ARMY, army).source(),
+                ErrorCode.INVALID_CONTENT,
+                withFile(ContentLoader.ARMY, expected));
     }
 
     private static Map<String, ?> withFile(String file, Map<String, ?> expected) {

@@ -143,6 +143,30 @@ final class ContentYaml {
         }
     }
 
+    record ArmyFile(List<ArmySize> sizes) {
+        ArmyFile {
+            sizes = orEmpty(sizes);
+        }
+    }
+
+    /**
+     * @param shareBp частка населення під зброєю, базисні пункти
+     * @param tier ключ рівня результату, як у {@link GdpLevel}
+     */
+    record ArmySize(
+            String id,
+            String name,
+            String description,
+            @JsonProperty("share_bp") Integer shareBp,
+            String tier,
+            Integer weight,
+            Integer quality,
+            List<String> tags) {
+        ArmySize {
+            tags = orEmpty(tags);
+        }
+    }
+
     record PeopleFile(List<PersonKind> kinds, List<Trait> traits) {
         PeopleFile {
             kinds = orEmpty(kinds);
@@ -349,7 +373,8 @@ final class ContentYaml {
             Count warheads,
             @JsonProperty("nuclear_energy_advantage") Integer nuclearEnergyAdvantage,
             @JsonProperty("gdp_development_advantage") Integer gdpDevelopmentAdvantage,
-            @JsonProperty("hdi_gdp_advantage") Integer hdiGdpAdvantage) {}
+            @JsonProperty("hdi_gdp_advantage") Integer hdiGdpAdvantage,
+            @JsonProperty("army_size_gdp_advantage") Integer armySizeGdpAdvantage) {}
 
     record Count(Integer min, Integer max) {}
 

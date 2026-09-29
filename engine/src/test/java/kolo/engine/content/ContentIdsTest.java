@@ -20,7 +20,8 @@ class ContentIdsTest {
             () -> new ResourceId(null),
             () -> new TraitId("Brave"),
             () -> new GdpLevelId("Very Rich"),
-            () -> new HdiLevelId("very-high")
+            () -> new HdiLevelId("very-high"),
+            () -> new ArmySizeId("Nation In Arms")
         }) {
             assertThatThrownBy(invalid::run)
                     .isInstanceOfSatisfying(
@@ -42,5 +43,7 @@ class ContentIdsTest {
         assertThat(new GdpLevelId("middle")).isLessThan(new GdpLevelId("poor"));
         assertThat(new HdiLevelId("high")).hasToString("high");
         assertThat(new HdiLevelId("high")).isLessThan(new HdiLevelId("low"));
+        assertThat(new ArmySizeId("large")).hasToString("large");
+        assertThat(new ArmySizeId("large")).isLessThan(new ArmySizeId("small"));
     }
 }
