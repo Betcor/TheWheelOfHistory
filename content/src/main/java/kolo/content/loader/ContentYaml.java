@@ -600,11 +600,15 @@ final class ContentYaml {
 
     record Step(Integer min, Integer max, Integer step) {}
 
-    record MapFile(List<MapTemplate> templates) {
+    record MapFile(List<MapTemplate> templates, MapGrid grid) {
         MapFile {
             templates = orEmpty(templates);
         }
     }
+
+    record MapGrid(@JsonProperty("cell_size") Integer cellSize, MapAspect aspect, Integer relaxation) {}
+
+    record MapAspect(Integer width, Integer height) {}
 
     record MapTemplate(
             String id,

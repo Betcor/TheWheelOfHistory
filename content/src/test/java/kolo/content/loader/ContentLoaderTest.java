@@ -30,6 +30,7 @@ import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MapGridDef;
 import kolo.engine.content.MapTemplateDef;
 import kolo.engine.content.MapTemplateId;
 import kolo.engine.content.MedianRange;
@@ -1309,6 +1310,7 @@ class ContentLoaderTest {
                 .containsExactly(
                         tuple(new MapTemplateId("pangaea"), "Пангея", 20, 90, new CountRange(1, 1)),
                         tuple(new MapTemplateId("archipelago"), "Архіпелаг", 15, 120, new CountRange(5, 8)));
+        assertThat(pack.map().grid()).isEqualTo(new MapGridDef(100, 2, 1, 2));
         WorldBalanceDef world = pack.balance().world();
         assertThat(world.npcExtra(NpcShare.FEW)).isEqualTo(new CountRange(1, 3));
         assertThat(world.npcExtra(NpcShare.NORMAL)).isEqualTo(new CountRange(2, 6));
@@ -1339,6 +1341,25 @@ class ContentLoaderTest {
                 Files.MAP.replace("continents: { min: 5, max: 8 }", "continents: { min: 5 }"),
                 Map.of("location", "templates[1].continents", "cause", "blank_value", "field", "max"));
         assertMapError("templates: []\n", Map.of("location", "templates", "cause", "empty_collection"));
+    }
+
+    @Test
+    void invalidMapGridIsReportedAtItsPosition() {
+        String grid = Files.MAP.substring(Files.MAP.indexOf("grid:"));
+        assertMapError(
+                Files.MAP.replace(grid, ""), Map.of("location", "grid", "cause", "blank_value", "field", "grid"));
+        assertMapError(
+                Files.MAP.replace("cell_size: 100", "cell_size: 5"),
+                Map.of("location", "grid", "cause", "value_out_of_range", "field", "map_grid.cell_size"));
+        assertMapError(
+                Files.MAP.replace("aspect: { width: 2, height: 1 }", "aspect: { width: 2 }"),
+                Map.of("location", "grid", "cause", "blank_value", "field", "height"));
+        assertMapError(
+                Files.MAP.replace("  relaxation: 2\n", ""),
+                Map.of("location", "grid", "cause", "blank_value", "field", "relaxation"));
+        assertMapError(
+                Files.MAP.replace("relaxation: 2", "relaxation: 11"),
+                Map.of("location", "grid", "cause", "value_out_of_range", "field", "map_grid.relaxation"));
     }
 
     @Test

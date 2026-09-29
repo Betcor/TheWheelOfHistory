@@ -10,17 +10,19 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 
-/** Контент карти (GD §3.3–3.5): поки лише шаблони; рельєф, клімат і родовища додадуться з генератором карти. */
+/** Контент карти (GD §3.3–3.5): шаблони й сітка комірок; рельєф, клімат і родовища додадуться з генератором карти. */
 public final class MapContent {
 
     private final List<MapTemplateDef> templates;
     private final SortedMap<MapTemplateId, MapTemplateDef> templatesById;
+    private final MapGridDef grid;
 
     /**
      * @param templates шаблони в порядку контенту (порядок секторів колеса шаблону)
+     * @param grid числа сітки комірок Вороного
      * @throws ValidationException якщо шаблонів немає або id повторюється
      */
-    public MapContent(List<MapTemplateDef> templates) {
+    public MapContent(List<MapTemplateDef> templates, MapGridDef grid) {
         if (templates.isEmpty()) {
             throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", "map_templates"));
         }
@@ -34,6 +36,7 @@ public final class MapContent {
         }
         this.templates = List.copyOf(templates);
         this.templatesById = Collections.unmodifiableSortedMap(byId);
+        this.grid = Objects.requireNonNull(grid, "map_grid");
     }
 
     /** Шаблони в порядку контенту — порядок секторів колеса шаблону. */
@@ -43,5 +46,9 @@ public final class MapContent {
 
     public Optional<MapTemplateDef> template(MapTemplateId id) {
         return Optional.ofNullable(templatesById.get(id));
+    }
+
+    public MapGridDef grid() {
+        return grid;
     }
 }

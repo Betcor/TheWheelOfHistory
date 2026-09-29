@@ -61,9 +61,10 @@ class MapDefinitionsTest {
 
     @Test
     void mapContentRejectsEmptyAndDuplicateTemplates() {
-        assertFails(() -> new MapContent(List.of()), ErrorCode.EMPTY_COLLECTION);
+        assertFails(() -> new MapContent(List.of(), TestMaps.GRID), ErrorCode.EMPTY_COLLECTION);
         assertFails(
-                () -> new MapContent(List.of(TestMaps.PANGAEA, TestMaps.template("pangaea", 1, 100, 1, 1))),
+                () -> new MapContent(
+                        List.of(TestMaps.PANGAEA, TestMaps.template("pangaea", 1, 100, 1, 1)), TestMaps.GRID),
                 ErrorCode.DUPLICATE_ID);
     }
 
