@@ -20,6 +20,10 @@ import kolo.engine.wheel.Advantage;
  *     −2·x}, найбагатший — {@code +2·x}
  * @param armySizeGdpAdvantage перевага колеса розміру армії за кожен крок рівня результату рівня ВВП від часткового,
  *     {@code 0..}{@value Advantage#MAX}: багатша держава утримує більшу армію
+ * @param armyTrainingGdpAdvantage перевага колеса вишколу армії за кожен крок рівня результату рівня ВВП від
+ *     часткового, {@code 0..}{@value Advantage#MAX}: багатша держава більше витрачає на навчання
+ * @param armyTrainingDevelopmentAdvantage перевага колеса вишколу армії за кожен рівень розвиненості військової
+ *     галузі відносно світового, {@code 0..}{@value Advantage#MAX}
  */
 public record GenerationBalanceDef(
         CountRange backstoryFragments,
@@ -28,7 +32,9 @@ public record GenerationBalanceDef(
         int nuclearEnergyAdvantage,
         int gdpDevelopmentAdvantage,
         int hdiGdpAdvantage,
-        int armySizeGdpAdvantage) {
+        int armySizeGdpAdvantage,
+        int armyTrainingGdpAdvantage,
+        int armyTrainingDevelopmentAdvantage) {
 
     /** Більше фрагментів чи постатей перевантажили б картку країни. */
     public static final int MAX_COUNT = 10;
@@ -44,6 +50,9 @@ public record GenerationBalanceDef(
         Checks.inRange("generation.gdp_development_advantage", gdpDevelopmentAdvantage, 0, Advantage.MAX);
         Checks.inRange("generation.hdi_gdp_advantage", hdiGdpAdvantage, 0, Advantage.MAX);
         Checks.inRange("generation.army_size_gdp_advantage", armySizeGdpAdvantage, 0, Advantage.MAX);
+        Checks.inRange("generation.army_training_gdp_advantage", armyTrainingGdpAdvantage, 0, Advantage.MAX);
+        Checks.inRange(
+                "generation.army_training_development_advantage", armyTrainingDevelopmentAdvantage, 0, Advantage.MAX);
     }
 
     private static void check(String field, CountRange range, int max) {

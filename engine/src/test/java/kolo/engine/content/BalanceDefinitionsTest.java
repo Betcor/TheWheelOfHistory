@@ -144,21 +144,45 @@ class BalanceDefinitionsTest {
         CountRange people = new CountRange(1, 3);
         CountRange warheads = new CountRange(2, 10);
         assertFails(
-                () -> new GenerationBalanceDef(new CountRange(0, 4), people, warheads, 10, 10, 15, 10),
+                () -> new GenerationBalanceDef(new CountRange(0, 4), people, warheads, 10, 10, 15, 10, 10, 10),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(
                 () -> new GenerationBalanceDef(
-                        fragments, new CountRange(1, GenerationBalanceDef.MAX_COUNT + 1), warheads, 10, 10, 15, 10),
+                        fragments,
+                        new CountRange(1, GenerationBalanceDef.MAX_COUNT + 1),
+                        warheads,
+                        10,
+                        10,
+                        15,
+                        10,
+                        10,
+                        10),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(
-                () -> new GenerationBalanceDef(fragments, people, new CountRange(0, 10), 10, 10, 15, 10),
+                () -> new GenerationBalanceDef(fragments, people, new CountRange(0, 10), 10, 10, 15, 10, 10, 10),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(
                 () -> new GenerationBalanceDef(
-                        fragments, people, new CountRange(2, GenerationBalanceDef.MAX_WARHEADS + 1), 10, 10, 15, 10),
+                        fragments,
+                        people,
+                        new CountRange(2, GenerationBalanceDef.MAX_WARHEADS + 1),
+                        10,
+                        10,
+                        15,
+                        10,
+                        10,
+                        10),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertThat(new GenerationBalanceDef(
-                                fragments, people, new CountRange(1, GenerationBalanceDef.MAX_WARHEADS), 0, 0, 15, 10)
+                                fragments,
+                                people,
+                                new CountRange(1, GenerationBalanceDef.MAX_WARHEADS),
+                                0,
+                                0,
+                                15,
+                                10,
+                                10,
+                                10)
                         .warheads()
                         .max())
                 .isEqualTo(GenerationBalanceDef.MAX_WARHEADS);
@@ -167,36 +191,72 @@ class BalanceDefinitionsTest {
     @Test
     void nuclearEnergyAdvantageIsWithinAdvantageRange() {
         CountRange count = new CountRange(1, 3);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, -1, 10, 15, 10), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, 101, 10, 15, 10), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertThat(new GenerationBalanceDef(count, count, count, 100, 10, 15, 10).nuclearEnergyAdvantage())
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, -1, 10, 15, 10, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 101, 10, 15, 10, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThat(new GenerationBalanceDef(count, count, count, 100, 10, 15, 10, 10, 10).nuclearEnergyAdvantage())
                 .isEqualTo(100);
     }
 
     @Test
     void hdiGdpAdvantageIsWithinAdvantageRange() {
         CountRange count = new CountRange(1, 3);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, 10, 10, -1, 10), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, 10, 10, 101, 10), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertThat(new GenerationBalanceDef(count, count, count, 10, 10, 100, 10).hdiGdpAdvantage())
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, -1, 10, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, 101, 10, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThat(new GenerationBalanceDef(count, count, count, 10, 10, 100, 10, 10, 10).hdiGdpAdvantage())
                 .isEqualTo(100);
     }
 
     @Test
     void armySizeGdpAdvantageIsWithinAdvantageRange() {
         CountRange count = new CountRange(1, 3);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, 10, 10, 15, -1), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, 10, 10, 15, 101), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertThat(new GenerationBalanceDef(count, count, count, 10, 10, 15, 100).armySizeGdpAdvantage())
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, 15, -1, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, 15, 101, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThat(new GenerationBalanceDef(count, count, count, 10, 10, 15, 100, 10, 10).armySizeGdpAdvantage())
                 .isEqualTo(100);
+    }
+
+    @Test
+    void armyTrainingAdvantagesAreWithinAdvantageRange() {
+        CountRange count = new CountRange(1, 3);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, 15, 10, -1, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, 15, 10, 101, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, 15, 10, 10, -1),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 10, 15, 10, 10, 101),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        GenerationBalanceDef max = new GenerationBalanceDef(count, count, count, 10, 10, 15, 10, 100, 100);
+        assertThat(max.armyTrainingGdpAdvantage()).isEqualTo(100);
+        assertThat(max.armyTrainingDevelopmentAdvantage()).isEqualTo(100);
     }
 
     @Test
     void gdpDevelopmentAdvantageIsWithinAdvantageRange() {
         CountRange count = new CountRange(1, 3);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, 10, -1, 15, 10), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertFails(() -> new GenerationBalanceDef(count, count, count, 10, 101, 15, 10), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertThat(new GenerationBalanceDef(count, count, count, 10, 100, 15, 10).gdpDevelopmentAdvantage())
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, -1, 15, 10, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new GenerationBalanceDef(count, count, count, 10, 101, 15, 10, 10, 10),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThat(new GenerationBalanceDef(count, count, count, 10, 100, 15, 10, 10, 10).gdpDevelopmentAdvantage())
                 .isEqualTo(100);
     }
 

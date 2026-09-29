@@ -45,6 +45,7 @@ import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.content.WheelBalanceDef;
@@ -56,6 +57,7 @@ import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.TechBranch;
+import kolo.engine.state.Training;
 import kolo.engine.wheel.OutcomeTier;
 
 /** Контент для тестів колеса передісторії: невеликий набір фрагментів з умовами, сусідами й різними роками. */
@@ -275,9 +277,7 @@ final class TestBackstory {
                 10);
     }
 
-    /**
-     * Мінімальний валідний пакет з усім, що задають тести коліс генерації, зокрема рівнями ВВП, ІЛР і розміру армії.
-     */
+    /** Мінімальний валідний пакет з цими рівнями ВВП, ІЛР і розміру армії та однаковими рівнями вишколу. */
     static ContentPack pack(
             List<IdeologyDef> ideologies,
             List<BackstoryFragmentDef> fragments,
@@ -293,6 +293,48 @@ final class TestBackstory {
             int hdiGdpAdvantage,
             List<ArmySizeDef> armySizes,
             int armySizeGdpAdvantage) {
+        return pack(
+                ideologies,
+                fragments,
+                count,
+                levels,
+                resources,
+                nuclear,
+                warheads,
+                nuclearEnergyAdvantage,
+                gdpLevels,
+                gdpDevelopmentAdvantage,
+                hdiLevels,
+                hdiGdpAdvantage,
+                armySizes,
+                armySizeGdpAdvantage,
+                trainingLevels(),
+                10,
+                10);
+    }
+
+    /**
+     * Мінімальний валідний пакет з усім, що задають тести коліс генерації, зокрема рівнями ВВП, ІЛР, розміру й
+     * вишколу армії.
+     */
+    static ContentPack pack(
+            List<IdeologyDef> ideologies,
+            List<BackstoryFragmentDef> fragments,
+            CountRange count,
+            List<DevelopmentLevelDef> levels,
+            List<ResourceDef> resources,
+            List<NuclearStatusDef> nuclear,
+            CountRange warheads,
+            int nuclearEnergyAdvantage,
+            List<GdpLevelDef> gdpLevels,
+            int gdpDevelopmentAdvantage,
+            List<HdiLevelDef> hdiLevels,
+            int hdiGdpAdvantage,
+            List<ArmySizeDef> armySizes,
+            int armySizeGdpAdvantage,
+            List<TrainingLevelDef> trainingLevels,
+            int armyTrainingGdpAdvantage,
+            int armyTrainingDevelopmentAdvantage) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -342,6 +384,7 @@ final class TestBackstory {
                 gdpLevels,
                 hdiLevels,
                 armySizes,
+                trainingLevels,
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -362,7 +405,24 @@ final class TestBackstory {
                                 nuclearEnergyAdvantage,
                                 gdpDevelopmentAdvantage,
                                 hdiGdpAdvantage,
-                                armySizeGdpAdvantage)));
+                                armySizeGdpAdvantage,
+                                armyTrainingGdpAdvantage,
+                                armyTrainingDevelopmentAdvantage)));
+    }
+
+    /** По рівню вишколу на кожен рівень 1..5 з рівними вагами, від провалу до успіху. */
+    static List<TrainingLevelDef> trainingLevels() {
+        return Training.levels().stream()
+                .map(level -> new TrainingLevelDef(
+                        level,
+                        "Рівень",
+                        "Опис",
+                        (level - Training.REGULAR) * 10,
+                        OutcomeTier.values()[level - Training.MIN],
+                        100,
+                        50,
+                        List.of()))
+                .toList();
     }
 
     /** Чоловічий рід, тверда група: «Велор, Велору, …» — і для короткої, і для повної назви. */

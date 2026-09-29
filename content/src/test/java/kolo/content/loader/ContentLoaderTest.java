@@ -35,6 +35,7 @@ import kolo.engine.content.StreakRulesDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
+import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.error.ContentException;
@@ -769,6 +770,127 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsTrainingLevelsFromMilitiaToElite() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.trainingLevels().values())
+                .extracting(
+                        TrainingLevelDef::level,
+                        TrainingLevelDef::combatModifier,
+                        TrainingLevelDef::tier,
+                        TrainingLevelDef::weight)
+                .containsExactly(
+                        tuple(1, -20, OutcomeTier.CRIT_FAIL, 10),
+                        tuple(2, -10, OutcomeTier.FAIL, 25),
+                        tuple(3, 0, OutcomeTier.PARTIAL, 35),
+                        tuple(4, 10, OutcomeTier.SUCCESS, 20),
+                        tuple(5, 20, OutcomeTier.CRIT_SUCCESS, 10));
+        TrainingLevelDef elite = pack.trainingLevel(5);
+        assertThat(elite.name()).isEqualTo("Еліта");
+        assertThat(elite.quality()).isEqualTo(90);
+        assertThat(elite.tags()).containsExactly("elite_army");
+        assertThat(pack.trainingLevel(3).tags()).isEmpty();
+    }
+
+    @Test
+    void invalidTrainingLevelIsReportedAtItsPosition() {
+        assertArmyError(
+                Files.ARMY.replace("combat_modifier: 0, ", ""),
+                Map.of("location", "training[2]", "cause", "blank_value", "field", "combat_modifier"));
+        assertArmyError(
+                Files.ARMY.replace("level: 3, ", ""),
+                Map.of("location", "training[2]", "cause", "blank_value", "field", "level"));
+        assertArmyError(
+                Files.ARMY.replace("tier: success", "tier: good"),
+                Map.of("location", "training[3]", "cause", "unknown_reference", "field", "tier", "value", "good"));
+        assertArmyError(
+                Files.ARMY.replace("combat_modifier: 20", "combat_modifier: 101"),
+                Map.of(
+                        "location",
+                        "training[4]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "training_level.5.combat_modifier"));
+        assertArmyError(
+                Files.ARMY.replace("level: 4", "level: 3"),
+                Map.of("location", "training[3]", "cause", "duplicate_id", "value", 3));
+        assertArmyError(
+                Files.ARMY.replace("level: 5", "level: 6"),
+                Map.of("location", "training[4]", "cause", "value_out_of_range", "field", "training_level.level"));
+    }
+
+    @Test
+    void everyTrainingLevelMustBeDefined() {
+        assertArmyError(
+                Files.ARMY.substring(0, Files.ARMY.indexOf("  - { level: 5")),
+                Map.of("location", "training", "cause", "missing_definition", "field", "training", "value", 5));
+        assertArmyError(
+                Files.ARMY.substring(0, Files.ARMY.indexOf("training:")),
+                Map.of("location", "training", "cause", "missing_definition", "field", "training", "value", 1));
+    }
+
+    @Test
+    void trainingLevelsMustGoFromMilitiaToElite() {
+        assertArmyError(
+                Files.ARMY.replace("combat_modifier: 10", "combat_modifier: 0"),
+                Map.of(
+                        "location",
+                        "training[3]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "training_level.4.combat_modifier",
+                        "value",
+                        0));
+        assertArmyError(
+                Files.ARMY.replace("tier: crit_success, weight: 10", "tier: fail, weight: 10"),
+                Map.of(
+                        "location",
+                        "training[4]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "training_level.5.tier",
+                        "value",
+                        "fail"));
+        String swapped = Files.ARMY
+                .replace("level: 4, name: Ветерани", "level: 9, name: Ветерани")
+                .replace("level: 5, name: Еліта", "level: 4, name: Еліта")
+                .replace("level: 9, name: Ветерани", "level: 5, name: Ветерани");
+        assertArmyError(
+                swapped,
+                Map.of(
+                        "location",
+                        "training[4]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "training_level.4.level",
+                        "value",
+                        4));
+    }
+
+    @Test
+    void trainingTagIsASourceForBackstoryConditions() {
+        String backstory = Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, elite_army]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.ARMY, Files.ARMY.replace(", tags: [elite_army]", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "elite_army"));
+    }
+
+    @Test
     void loadsBalance() {
         BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
 
@@ -785,6 +907,8 @@ class ContentLoaderTest {
         assertThat(balance.generation().gdpDevelopmentAdvantage()).isEqualTo(10);
         assertThat(balance.generation().hdiGdpAdvantage()).isEqualTo(15);
         assertThat(balance.generation().armySizeGdpAdvantage()).isEqualTo(10);
+        assertThat(balance.generation().armyTrainingGdpAdvantage()).isEqualTo(10);
+        assertThat(balance.generation().armyTrainingDevelopmentAdvantage()).isEqualTo(10);
     }
 
     @Test
@@ -857,6 +981,15 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("army_size_gdp_advantage: 10", "army_size_gdp_advantage: -1")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.army_size_gdp_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("army_training_gdp_advantage: 10", "army_training_gdp_advantage: 101")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.army_training_gdp_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "army_training_development_advantage: 10", "army_training_development_advantage: -1")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.army_training_development_advantage"));
     }
 
     @Test
@@ -913,6 +1046,26 @@ class ContentLoaderTest {
                         "blank_value",
                         "field",
                         "army_size_gdp_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  army_training_gdp_advantage: 10\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "generation.army_training_gdp_advantage",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "army_training_gdp_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  army_training_development_advantage: 10\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "generation.army_training_development_advantage",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "army_training_development_advantage"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,

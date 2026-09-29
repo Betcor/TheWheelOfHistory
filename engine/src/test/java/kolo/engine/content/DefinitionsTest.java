@@ -281,6 +281,64 @@ class DefinitionsTest {
     }
 
     @Test
+    void trainingLevelIsWithinScaleWithBoundedCombatModifier() {
+        TrainingLevelDef regular = training(3, 0, OutcomeTier.PARTIAL, 35, 50);
+        assertThat(regular)
+                .extracting(
+                        TrainingLevelDef::level,
+                        TrainingLevelDef::combatModifier,
+                        TrainingLevelDef::tier,
+                        TrainingLevelDef::weight,
+                        TrainingLevelDef::quality)
+                .containsExactly(3, 0, OutcomeTier.PARTIAL, 35, 50);
+        assertThat(training(1, -TrainingLevelDef.MAX_COMBAT_MODIFIER, OutcomeTier.CRIT_FAIL, 1, 0)
+                        .combatModifier())
+                .isEqualTo(-TrainingLevelDef.MAX_COMBAT_MODIFIER);
+        assertThat(training(5, TrainingLevelDef.MAX_COMBAT_MODIFIER, OutcomeTier.CRIT_SUCCESS, 10_000, 100)
+                        .weight())
+                .isEqualTo(TrainingLevelDef.MAX_WEIGHT);
+        assertFails(() -> training(0, 0, OutcomeTier.PARTIAL, 35, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> training(6, 0, OutcomeTier.PARTIAL, 35, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> training(3, TrainingLevelDef.MAX_COMBAT_MODIFIER + 1, OutcomeTier.PARTIAL, 35, 50),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> training(3, -TrainingLevelDef.MAX_COMBAT_MODIFIER - 1, OutcomeTier.PARTIAL, 35, 50),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> training(3, 0, OutcomeTier.PARTIAL, 0, 50), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> training(3, 0, OutcomeTier.PARTIAL, 35, 101), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new TrainingLevelDef(3, "Регулярна", " ", 0, OutcomeTier.PARTIAL, 35, 50, List.of()),
+                ErrorCode.BLANK_VALUE);
+        assertFails(
+                () -> new TrainingLevelDef(
+                        3, "Регулярна", "Опис", 0, OutcomeTier.PARTIAL, 35, 50, List.of("Elite Army")),
+                ErrorCode.INVALID_KEY_FORMAT);
+        assertThatThrownBy(() -> new TrainingLevelDef(3, "Регулярна", "Опис", 0, null, 35, 50, List.of()))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void trainingLevelFollowsLowerLevelWithBetterModifierAndNoLowerTier() {
+        TrainingLevelDef reservists = training(2, -10, OutcomeTier.FAIL, 25, 30);
+
+        TrainingLevelDef.checkFollows(reservists, training(3, 0, OutcomeTier.FAIL, 35, 50));
+        TrainingLevelDef.checkFollows(reservists, training(5, 20, OutcomeTier.CRIT_SUCCESS, 10, 90));
+        assertOutOfOrder(
+                () -> TrainingLevelDef.checkFollows(reservists, training(2, 0, OutcomeTier.PARTIAL, 35, 50)),
+                "training_level.2.level",
+                2);
+        assertOutOfOrder(
+                () -> TrainingLevelDef.checkFollows(reservists, training(3, -10, OutcomeTier.PARTIAL, 35, 50)),
+                "training_level.3.combat_modifier",
+                -10);
+        assertOutOfOrder(
+                () -> TrainingLevelDef.checkFollows(reservists, training(3, 0, OutcomeTier.CRIT_FAIL, 35, 50)),
+                "training_level.3.tier",
+                "crit_fail");
+    }
+
+    @Test
     void personKindNeedsNameAndDescription() {
         assertThat(new PersonKindDef(PersonKind.GENERAL, "Генерал", "Командує фронтом.", List.of("military")).tags())
                 .containsExactly("military");
@@ -336,6 +394,17 @@ class DefinitionsTest {
 
         assertThat(iron.tags()).containsExactly("metal");
         assertThatThrownBy(() -> iron.tags().add("x")).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    private static TrainingLevelDef training(int level, int combatModifier, OutcomeTier tier, int weight, int quality) {
+        return new TrainingLevelDef(level, "Рівень", "Опис", combatModifier, tier, weight, quality, List.of());
+    }
+
+    private static void assertOutOfOrder(ThrowingCallable check, String field, Object value) {
+        assertThatThrownBy(check).isInstanceOfSatisfying(ValidationException.class, e -> {
+            assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_ORDER);
+            assertThat(e.details()).containsExactly(entry("field", field), entry("value", value));
+        });
     }
 
     private static ArmySizeDef army(String id, int shareBp, OutcomeTier tier, int weight, int quality) {
