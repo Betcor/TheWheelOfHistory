@@ -315,6 +315,70 @@ final class Files {
                   name: Гори
                   description: Гірські хребти.
                   min_height: 70
+            climate:
+              worlds:
+                - id: cold
+                  name: Холодний світ
+                  description: Холодніше.
+                  weight: 25
+                  temperature_shift: -8
+                - id: temperate
+                  name: Помірний світ
+                  description: Як на Землі.
+                  weight: 50
+                  temperature_shift: 0
+              temperature: { equator: 90, pole: 0, height_cooling: 30, noise_amplitude: 10 }
+              moisture: { coast: 80, inland_drying: 6, noise_amplitude: 30 }
+              noise_cells: 8
+              polar_below: 15
+              boreal_below: 35
+              tropical_from: 70
+              arid_below: 30
+              zones:
+                - id: polar
+                  name: Полярний
+                  description: Мерзлота.
+                - id: boreal
+                  name: Бореальний
+                  description: Тайга.
+                - id: temperate
+                  name: Помірний
+                  description: Чотири сезони.
+                - id: arid
+                  name: Посушливий
+                  description: Мало води.
+                - id: tropical
+                  name: Тропічний
+                  description: Спека й зливи.
+              covers:
+                - id: tundra
+                  name: Тундра
+                  description: Мерзла рівнина.
+                  climates: [polar]
+                  reliefs: [plain, hills]
+                  moisture: { min: 0, max: 100 }
+                  height: { min: 0, max: 100 }
+                - id: swamp
+                  name: Болото
+                  description: Драговина.
+                  climates: [boreal, temperate, tropical]
+                  reliefs: [plain]
+                  moisture: { min: 80, max: 100 }
+                  height: { min: 0, max: 30 }
+                - id: desert
+                  name: Пустеля
+                  description: Пісок.
+                  climates: [arid]
+                  reliefs: [plain, hills]
+                  moisture: { min: 0, max: 15 }
+                  height: { min: 0, max: 100 }
+                - id: forest
+                  name: Ліс
+                  description: Густий ліс.
+                  climates: [boreal, temperate, tropical]
+                  reliefs: [plain, hills]
+                  moisture: { min: 55, max: 100 }
+                  height: { min: 0, max: 100 }
             """;
 
     static final String RELIGIONS = """

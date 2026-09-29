@@ -43,7 +43,7 @@ continents:
 #   noise_amplitude — найбільший внесок шуму в будь-який бік (0..100): окремі пагорби серед рівнин;
 #   noise_cells — розмір плям шуму в комірках (1..100);
 #   levels — рівні рельєфу в порядку висоти: min_height — з якої висоти починається рівень (рівнина — з 0).
-#     Ліс, пустеля, тундра й болото — покрив за кліматом, не рельєф.
+#     Ліс, пустеля, тундра й болото — покрив за кліматом (див. climate), не рельєф.
 relief:
   ridges: { min: 1, max: 3 }
   ridge_min_provinces: 40
@@ -67,6 +67,91 @@ relief:
       name: Гори
       description: Гірські хребти — природна фортеця й перешкода для постачання.
       min_height: 70
+
+# climate — клімат суходолу (GD §3.5). Температура й волога — шкала 0..100, пояс і покрив — за порогами нижче.
+#   worlds — колесо клімату світу за вагою (відносна, 1..10000), у порядку цього файлу: temperature_shift зсуває
+#     температуру всієї карти (−50..50);
+#   temperature — температура провінції: від equator на середній лінії карти до pole на верхньому й нижньому краях
+#     (лінійно за відстанню від екватора), + зсув світу, − висота × height_cooling / 100 (гори холодніші), + шум у межах
+#     ±noise_amplitude;
+#   moisture — волога провінції: coast у береговій провінції, − inland_drying за кожен крок углиб суходолу, + шум у
+#     межах ±noise_amplitude;
+#   noise_cells — розмір плям шуму температури й вологи в комірках (1..100);
+#   polar_below / boreal_below — температура, нижче якої пояс полярний / бореальний; arid_below — волога, нижче якої
+#     теплий пояс посушливий; tropical_from — температура, з якої вологий пояс тропічний; решта — помірний;
+#   zones — назви поясів;
+#   covers — покрив (ліс, пустеля, тундра, болото) перетворює рівнини й пагорби: провінція отримує перший у порядку
+#     цього файлу покрив, чиї пояси (climates), рельєф (reliefs), волога (moisture) і висота (height) їй підходять, або
+#     жодного. Гори покриву не мають.
+climate:
+  worlds:
+    - id: cold
+      name: Холодний світ
+      description: Льодовики сповзли нижче — більше тундри й тайги, менше тропіків.
+      weight: 25
+      temperature_shift: -8
+    - id: temperate
+      name: Помірний світ
+      description: Клімат, звичний для Землі другої половини XX століття.
+      weight: 50
+      temperature_shift: 0
+    - id: warm
+      name: Теплий світ
+      description: Тропіки й пустелі розлогі, полярні шапки малі.
+      weight: 25
+      temperature_shift: 8
+  temperature: { equator: 90, pole: 0, height_cooling: 30, noise_amplitude: 10 }
+  moisture: { coast: 65, inland_drying: 8, noise_amplitude: 35 }
+  noise_cells: 6
+  polar_below: 15
+  boreal_below: 35
+  tropical_from: 70
+  arid_below: 30
+  zones:
+    - id: polar
+      name: Полярний
+      description: Вічна мерзлота й довга зима — наступ можливий лише влітку.
+    - id: boreal
+      name: Бореальний
+      description: Холодна зима й коротке літо — тайга й багнища.
+    - id: temperate
+      name: Помірний
+      description: Чотири виразні сезони — осіннє й весняне бездоріжжя.
+    - id: arid
+      name: Посушливий
+      description: Мало води — спека, пил і важке постачання.
+    - id: tropical
+      name: Тропічний
+      description: Спека й зливи круглий рік — джунглі та хвороби.
+  covers:
+    - id: tundra
+      name: Тундра
+      description: Мерзла безлісна рівнина — мало людей і доріг.
+      climates: [polar]
+      reliefs: [plain, hills]
+      moisture: { min: 0, max: 100 }
+      height: { min: 0, max: 100 }
+    - id: swamp
+      name: Болото
+      description: Драговина — техніка грузне, оборона тримається.
+      climates: [boreal, temperate, tropical]
+      reliefs: [plain]
+      moisture: { min: 85, max: 100 }
+      height: { min: 0, max: 25 }
+    - id: desert
+      name: Пустеля
+      description: Пісок і каміння — простір для маневру, але немає води.
+      climates: [arid]
+      reliefs: [plain, hills]
+      moisture: { min: 0, max: 15 }
+      height: { min: 0, max: 100 }
+    - id: forest
+      name: Ліс
+      description: Густий ліс — укриття для оборони й партизанів.
+      climates: [boreal, temperate, tropical]
+      reliefs: [plain, hills]
+      moisture: { min: 55, max: 100 }
+      height: { min: 0, max: 100 }
 
 templates:
   - id: continents
