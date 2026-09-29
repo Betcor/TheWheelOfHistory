@@ -6,7 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
@@ -340,12 +344,53 @@ class DefinitionsTest {
 
     @Test
     void personKindNeedsNameAndDescription() {
-        assertThat(new PersonKindDef(PersonKind.GENERAL, "Генерал", "Командує фронтом.", List.of("military")).tags())
+        assertThat(kind("Генерал", "Командує фронтом.", 10, Map.of(), List.of("military"))
+                        .tags())
                 .containsExactly("military");
+        assertFails(() -> kind(" ", "Командує фронтом.", 10, Map.of(), List.of()), ErrorCode.BLANK_VALUE);
+        assertFails(() -> kind("Генерал", "", 10, Map.of(), List.of()), ErrorCode.BLANK_VALUE);
+    }
+
+    @Test
+    void personKindWeightIsInRange() {
+        assertFails(() -> kind(0), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> kind(PersonKindDef.MAX_WEIGHT + 1), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThat(kind(1).weight()).isEqualTo(1);
+        assertThat(kind(PersonKindDef.MAX_WEIGHT).weight()).isEqualTo(PersonKindDef.MAX_WEIGHT);
+    }
+
+    @Test
+    void personKindWeightTagsAreChecked() {
+        assertFails(() -> kind("Генерал", "Опис", 10, Map.of("Junta", 5), List.of()), ErrorCode.INVALID_KEY_FORMAT);
         assertFails(
-                () -> new PersonKindDef(PersonKind.GENERAL, " ", "Командує фронтом.", List.of()),
-                ErrorCode.BLANK_VALUE);
-        assertFails(() -> new PersonKindDef(PersonKind.GENERAL, "Генерал", "", List.of()), ErrorCode.BLANK_VALUE);
+                () -> kind("Генерал", "Опис", 10, Map.of("junta", PersonKindDef.MAX_WEIGHT + 1), List.of()),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        HashMap<String, Integer> blank = new HashMap<>();
+        blank.put("junta", null);
+        assertFails(() -> kind("Генерал", "Опис", 10, blank, List.of()), ErrorCode.BLANK_VALUE);
+        assertThat(kind("Генерал", "Опис", 10, Map.of("b", 1, "a", 2), List.of())
+                        .weightTags())
+                .containsExactly(entry("a", 2), entry("b", 1));
+    }
+
+    @Test
+    void personKindWeightAddsBonusesForPresentTags() {
+        PersonKindDef general = kind("Генерал", "Опис", 10, Map.of("junta", 10, "democratic", -15), List.of());
+        assertThat(general.weightFor(Set.of())).isEqualTo(10);
+        assertThat(general.weightFor(Set.of("junta", "unrelated"))).isEqualTo(20);
+        assertThat(general.weightFor(Set.of("democratic"))).as("не менше нуля").isZero();
+        assertThat(kind("Генерал", "Опис", 9_000, Map.of("a", 5_000), List.of()).weightFor(Set.of("a")))
+                .as("не більше найбільшої ваги")
+                .isEqualTo(PersonKindDef.MAX_WEIGHT);
+    }
+
+    private static PersonKindDef kind(int weight) {
+        return kind("Генерал", "Опис", weight, Map.of(), List.of());
+    }
+
+    private static PersonKindDef kind(
+            String name, String description, int weight, Map<String, Integer> weightTags, List<String> tags) {
+        return new PersonKindDef(PersonKind.GENERAL, name, description, weight, new TreeMap<>(weightTags), tags);
     }
 
     @Test

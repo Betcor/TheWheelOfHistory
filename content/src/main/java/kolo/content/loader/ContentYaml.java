@@ -194,9 +194,19 @@ final class ContentYaml {
         }
     }
 
-    /** @param id ключ типу постаті, напр. {@code pretender} */
-    record PersonKind(String id, String name, String description, List<String> tags) {
+    /**
+     * @param id ключ типу постаті, напр. {@code pretender}
+     * @param weightTags мітка → добавка до ваги
+     */
+    record PersonKind(
+            String id,
+            String name,
+            String description,
+            Integer weight,
+            @JsonProperty("weight_tags") Map<String, Integer> weightTags,
+            List<String> tags) {
         PersonKind {
+            weightTags = weightTags == null ? Map.of() : weightTags;
             tags = orEmpty(tags);
         }
     }
@@ -398,7 +408,10 @@ final class ContentYaml {
             @JsonProperty("army_training_gdp_advantage") Integer armyTrainingGdpAdvantage,
 
             @JsonProperty("army_training_development_advantage")
-            Integer armyTrainingDevelopmentAdvantage) {}
+            Integer armyTrainingDevelopmentAdvantage,
+
+            @JsonProperty("person_traits") Count personTraits,
+            @JsonProperty("person_age") Count personAge) {}
 
     record Count(Integer min, Integer max) {}
 

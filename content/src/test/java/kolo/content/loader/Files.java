@@ -108,15 +108,15 @@ final class Files {
 
     static final String PEOPLE = """
             kinds:
-              - { id: scientist, name: Вчений, description: Прискорює дослідження. }
-              - { id: general, name: Генерал, description: Командує фронтом., tags: [military] }
-              - { id: admiral, name: Адмірал, description: Командує флотом. }
-              - { id: diplomat, name: Дипломат, description: Веде переговори. }
-              - { id: magnate, name: Магнат, description: Власник капіталу. }
-              - { id: prophet, name: Пророк, description: Проповідник. }
-              - { id: dissident, name: Дисидент, description: Голос опозиції. }
-              - { id: artist, name: Митець, description: Формує культуру. }
-              - { id: pretender, name: Диктатор-претендент, description: Прагне влади. }
+              - { id: scientist, name: Вчений, description: Прискорює дослідження., weight: 10 }
+              - { id: general, name: Генерал, description: Командує фронтом., weight: 10, weight_tags: { educated: 5 }, tags: [military] }
+              - { id: admiral, name: Адмірал, description: Командує флотом., weight: 10 }
+              - { id: diplomat, name: Дипломат, description: Веде переговори., weight: 10 }
+              - { id: magnate, name: Магнат, description: Власник капіталу., weight: 10 }
+              - { id: prophet, name: Пророк, description: Проповідник., weight: 10 }
+              - { id: dissident, name: Дисидент, description: Голос опозиції., weight: 10 }
+              - { id: artist, name: Митець, description: Формує культуру., weight: 10 }
+              - { id: pretender, name: Диктатор-претендент, description: Прагне влади., weight: 10 }
             traits:
               - id: loyal
                 name: Відданий
@@ -248,6 +248,8 @@ final class Files {
               army_size_gdp_advantage: 10
               army_training_gdp_advantage: 10
               army_training_development_advantage: 10
+              person_traits: { min: 1, max: 3 }
+              person_age: { min: 25, max: 70 }
             """;
 
     private final TreeMap<String, String> files = new TreeMap<>();

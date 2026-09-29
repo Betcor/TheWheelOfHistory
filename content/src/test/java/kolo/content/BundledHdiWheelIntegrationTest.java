@@ -63,6 +63,19 @@ class BundledHdiWheelIntegrationTest {
     }
 
     @Test
+    void lowAndHighLevelsAreTagged() {
+        for (HdiLevelDef level : PACK.hdiLevels()) {
+            if (level.hdi() <= 30) {
+                assertThat(level.tags()).as(level.id().value()).containsExactly("low_hdi");
+            } else if (level.hdi() >= 75) {
+                assertThat(level.tags()).as(level.id().value()).containsExactly("high_hdi");
+            } else {
+                assertThat(level.tags()).as(level.id().value()).isEmpty();
+            }
+        }
+    }
+
+    @Test
     void advantageStaysModerateForEveryRegimeAndGdp() {
         for (IdeologyDef ideology : PACK.ideologies().values()) {
             for (SubIdeologyDef sub : ideology.subIdeologies()) {

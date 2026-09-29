@@ -59,7 +59,8 @@ public final class ContentPack {
      * @param armySizes рівні розміру армії від найменшої до найбільшої (порядок секторів колеса розміру армії)
      * @param trainingLevels рівно по одному визначенню на кожен рівень вишколу {@link Training#MIN}..{@link
      *     Training#MAX}, від ополчення до еліти (порядок секторів колеса вишколу)
-     * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}
+     * @param personKinds рівно по одному визначенню на кожен {@link PersonKind}; мітки в добавках до ваги мають
+     *     джерело, як і мітки фрагментів передісторії
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
@@ -69,8 +70,8 @@ public final class ContentPack {
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР, розміру армії
      *     чи вишколу не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
-     *     підкласифікацію, підкласифікації не доступна жодна форма або фрагмент передісторії залежить від мітки без
-     *     джерела
+     *     підкласифікацію, підкласифікації не доступна жодна форма або фрагмент передісторії чи вага типу постаті
+     *     залежить від мітки без джерела
      */
     public ContentPack(
             String hash,
@@ -251,6 +252,13 @@ public final class ContentPack {
             for (String tag : fragment.referencedTags()) {
                 if (!known.contains(tag)) {
                     throw unknown("backstory." + fragment.id() + ".tags", tag);
+                }
+            }
+        }
+        for (PersonKindDef kind : kindMap.values()) {
+            for (String tag : kind.weightTags().keySet()) {
+                if (!known.contains(tag)) {
+                    throw unknown("person_kind." + kind.kind().key() + ".weight_tags", tag);
                 }
             }
         }

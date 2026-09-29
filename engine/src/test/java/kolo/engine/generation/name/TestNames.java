@@ -1,6 +1,7 @@
 package kolo.engine.generation.name;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -200,7 +201,8 @@ final class TestNames {
                                 level, "Рівень", "Опис", level * 10, OutcomeTier.PARTIAL, 100, 50, List.of()))
                         .toList(),
                 Arrays.stream(PersonKind.values())
-                        .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
+                        .map(kind ->
+                                new PersonKindDef(kind, "Тип", "Опис", 10, Collections.emptySortedMap(), List.of()))
                         .toList(),
                 List.of(new TraitDef(new TraitId("loyal"), "Відданий", List.of(), List.of(), List.of(), List.of())),
                 new NameContent(
@@ -221,7 +223,17 @@ final class TestNames {
                                 new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
                         .toList(),
                 new GenerationBalanceDef(
-                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15, 10, 10, 10));
+                        new CountRange(2, 4),
+                        new CountRange(1, 3),
+                        new CountRange(2, 10),
+                        10,
+                        10,
+                        15,
+                        10,
+                        10,
+                        10,
+                        new CountRange(1, 3),
+                        new CountRange(25, 70)));
     }
 
     private static BackstoryContent backstory() {

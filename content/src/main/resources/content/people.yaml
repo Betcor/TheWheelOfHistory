@@ -1,7 +1,12 @@
 # Відомі люди (GD §12.3): типи постатей і їхні риси.
 #
-# Кожен тип обов'язковий. Вік, колеса здоров'я й появи постатей, посади — система людей;
-# кількість постатей на старті (1–3, GD §4.8) — ланцюжок коліс генерації.
+# Кожен тип обов'язковий. Колеса здоров'я й появи постатей, посади — система людей; кількість
+# постатей на старті (1–3, GD §4.8), кількість рис і вік — generation у balance.yaml.
+#
+# Колесо типу стартової постаті (GD §4.1, колесо 16): сектори — типи в порядку цього файлу.
+# weight — базова вага типу, відносна (1..10000); weight_tags — добавки до ваги за мітки держави
+# (лад, рівні коліс генерації, передісторія; можуть бути від'ємні), підсумок обрізається до 0..10000,
+# тип з вагою 0 не випадає. Кожна мітка у weight_tags мусить мати джерело — як і в backstory.yaml.
 #
 # Риси: kinds — кому доступна риса (без kinds — будь-якому типу); incompatible — з якими рисами
 # не поєднується в одній постаті (досить указати з одного боку). Кожному типу доступна хоча б одна риса.
@@ -13,38 +18,56 @@ kinds:
   - id: scientist
     name: Вчений
     description: Прискорює дослідження; може очолити НДІ.
+    weight: 14
+    weight_tags: { high_hdi: 8, advanced: 6, technocracy: 10, science_prestige: 10, low_hdi: -6, backward: -4, theocratic: -4 }
     tags: [science]
   - id: general
     name: Генерал
     description: Командує сухопутним фронтом.
+    weight: 14
+    weight_tags: { junta: 10, militarism: 10, large_army: 6, won_war: 4, lost_war: 4, small_army: -6 }
     tags: [military, land]
   - id: admiral
     name: Адмірал
     description: Командує флотом.
+    weight: 6
+    weight_tags: { coastal: 6, empire: 4 }
     tags: [military, naval]
   - id: diplomat
     name: Дипломат
     description: Веде переговори й представляє державу у Світовій Раді.
+    weight: 12
+    weight_tags: { peace_mediator: 10, democratic: 4, trade_hub: 4, isolationism: -6 }
     tags: [diplomacy]
   - id: magnate
     name: Магнат
     description: Власник великого капіталу; впливає на економіку й політику.
+    weight: 12
+    weight_tags: { oligarchy: 12, rich: 6, oil_boom: 6, trade_hub: 4, socialist: -8, planned_economy: -4 }
     tags: [economy]
   - id: prophet
     name: Пророк
     description: Проповідник, за яким іде частина народу.
+    weight: 8
+    weight_tags: { theocratic: 14, religious_revival: 8, fundamentalism: 6, low_hdi: 4, secular_reforms: -4 }
     tags: [religion]
   - id: dissident
     name: Дисидент
     description: Голос опозиції; може очолити заворушення.
+    weight: 10
+    weight_tags: { student_protests: 8, totalitarian: 6, purges: 6, authoritarian: 4, personality_cult: 4, high_hdi: 4 }
     tags: [opposition]
   - id: artist
     name: Митець
     description: Письменник, музикант чи художник, що формує культуру доби.
+    weight: 16
+    weight_tags: { cultural_golden_age: 10, high_hdi: 6, liberal: 4, low_hdi: -6 }
     tags: [culture]
   - id: pretender
     name: Диктатор-претендент
     description: Прагне влади й чекає нагоди для перевороту.
+    weight: 8
+    weight_tags: { junta: 8, coup_past: 8, authoritarian: 4, old_dynasty: 4, failed_countercoup: 4, democratic: -4 }
     tags: [coup_risk]
 
 traits:

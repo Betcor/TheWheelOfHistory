@@ -11,8 +11,8 @@
 # у balance.yaml.
 # weight — базова вага сектора, відносна (1..10000); колесо нормалізує ваги до 100%.
 # quality — наскільки рівень добрий для держави (0..100), для стріків генерації (GD §4.10).
-# tags — мітки держави на цьому рівні (див. generation_tags у backstory.yaml); поки жоден рівень
-# міток не дає.
+# tags — мітки держави на цьому рівні: low_hdi — два нижчі рівні, high_hdi — два вищі. Від них
+# залежать типи стартових постатей (people.yaml) і можуть залежати фрагменти передісторії.
 
 levels:
   - id: very_low
@@ -22,6 +22,7 @@ levels:
     tier: crit_fail
     weight: 8
     quality: 5
+    tags: [low_hdi]
   - id: low
     name: Низький розвиток
     description: Лікарні й школи — лише в столиці, на селі їх майже немає.
@@ -29,6 +30,7 @@ levels:
     tier: fail
     weight: 17
     quality: 20
+    tags: [low_hdi]
   - id: lower_middle
     name: Розвиток нижче середнього
     description: Початкова школа для більшості, але медицина слабка, а дитяча смертність висока.
@@ -50,6 +52,7 @@ levels:
     tier: success
     weight: 19
     quality: 75
+    tags: [high_hdi]
   - id: very_high
     name: Дуже високий розвиток
     description: Одна з найкращих у світі якостей життя, освіти й охорони здоров'я.
@@ -57,3 +60,4 @@ levels:
     tier: crit_success
     weight: 10
     quality: 95
+    tags: [high_hdi]

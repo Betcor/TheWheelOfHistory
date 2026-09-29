@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -145,6 +146,7 @@ public final class ContentLoader {
                 hdi,
                 army,
                 training);
+        checkPersonKindTags(kinds, knownTags(backstory, ideologies, levels, nuclear, gdp, hdi, army, training));
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -451,7 +453,16 @@ public final class ContentLoader {
         List<PersonKindDef> kinds = list(PEOPLE, "kinds", yaml.kinds(), (location, kind) -> {
             PersonKind key =
                     at(PEOPLE, location, () -> unique(seen, personKind("person_kind", kind.id()), PersonKind::key));
-            return at(PEOPLE, location, () -> new PersonKindDef(key, kind.name(), kind.description(), kind.tags()));
+            return at(
+                    PEOPLE,
+                    location,
+                    () -> new PersonKindDef(
+                            key,
+                            kind.name(),
+                            kind.description(),
+                            required("weight", kind.weight()),
+                            new TreeMap<>(kind.weightTags()),
+                            kind.tags()));
         });
         complete(PEOPLE, "kinds", seen, List.of(PersonKind.values()), PersonKind::key);
         return kinds;
@@ -713,7 +724,31 @@ public final class ContentLoader {
         BackstoryContent content = at(BACKSTORY, "", () -> new BackstoryContent(yaml.generationTags(), fragments));
 
         // Мітки в умовах мають джерело; перевіряється тут, щоб помилка вказувала на фрагмент.
-        TreeSet<String> known = new TreeSet<>(content.producedTags());
+        TreeSet<String> known = knownTags(content, ideologies, levels, nuclear, gdp, hdi, army, training);
+        for (int i = 0; i < fragments.size(); i++) {
+            for (String tag : fragments.get(i).referencedTags()) {
+                if (!known.contains(tag)) {
+                    throw invalid(BACKSTORY, "fragments[" + i + "]", unknown("tag", tag));
+                }
+            }
+        }
+        return content;
+    }
+
+    /**
+     * Мітки, які може мати держава після генерації: з ладу, рівнів коліс генерації, фрагментів передісторії й
+     * словника міток коліс генерації.
+     */
+    private static TreeSet<String> knownTags(
+            BackstoryContent backstory,
+            List<IdeologyDef> ideologies,
+            List<DevelopmentLevelDef> levels,
+            List<NuclearStatusDef> nuclear,
+            List<GdpLevelDef> gdp,
+            List<HdiLevelDef> hdi,
+            List<ArmySizeDef> army,
+            List<TrainingLevelDef> training) {
+        TreeSet<String> known = new TreeSet<>(backstory.producedTags());
         for (IdeologyDef ideology : ideologies) {
             known.addAll(ideology.tags());
             ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
@@ -724,14 +759,18 @@ public final class ContentLoader {
         hdi.forEach(level -> known.addAll(level.tags()));
         army.forEach(size -> known.addAll(size.tags()));
         training.forEach(level -> known.addAll(level.tags()));
-        for (int i = 0; i < fragments.size(); i++) {
-            for (String tag : fragments.get(i).referencedTags()) {
+        return known;
+    }
+
+    /** Добавки до ваги типів постатей залежать лише від міток, які держава може мати. */
+    private static void checkPersonKindTags(List<PersonKindDef> kinds, Set<String> known) {
+        for (int i = 0; i < kinds.size(); i++) {
+            for (String tag : kinds.get(i).weightTags().keySet()) {
                 if (!known.contains(tag)) {
-                    throw invalid(BACKSTORY, "fragments[" + i + "]", unknown("tag", tag));
+                    throw invalid(PEOPLE, "kinds[" + i + "].weight_tags", unknown("tag", tag));
                 }
             }
         }
-        return content;
     }
 
     private static BackstoryFragmentDef fragment(
@@ -834,6 +873,8 @@ public final class ContentLoader {
                 "generation.army_training_development_advantage",
                 () -> required(
                         "army_training_development_advantage", generationYaml.armyTrainingDevelopmentAdvantage()));
+        CountRange traitCount = at(BALANCE, "generation.person_traits", () -> count(generationYaml.personTraits()));
+        CountRange age = at(BALANCE, "generation.person_age", () -> count(generationYaml.personAge()));
         GenerationBalanceDef generation = at(
                 BALANCE,
                 "generation",
@@ -846,7 +887,9 @@ public final class ContentLoader {
                         hdiAdvantage,
                         armySizeAdvantage,
                         trainingGdpAdvantage,
-                        trainingDevelopmentAdvantage));
+                        trainingDevelopmentAdvantage,
+                        traitCount,
+                        age));
 
         return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation));
     }

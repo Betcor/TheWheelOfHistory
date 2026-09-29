@@ -3,7 +3,9 @@ package kolo.engine.content;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -28,6 +30,38 @@ final class Defs {
             }
         }
         return List.copyOf(tags);
+    }
+
+    /**
+     * Добавки до ваги за мітки: мітки {@code snake_case}, значення {@code −max..max}.
+     *
+     * @return незмінна копія, впорядкована за мітками
+     */
+    static SortedMap<String, Integer> weightTags(String field, Map<String, Integer> weightTags, int max) {
+        TreeMap<String, Integer> bonuses = new TreeMap<>();
+        for (Map.Entry<String, Integer> bonus : weightTags.entrySet()) {
+            Checks.snakeCase(field, bonus.getKey());
+            String bonusField = field + "." + bonus.getKey();
+            Integer value = bonus.getValue();
+            if (value == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", bonusField));
+            }
+            Checks.inRange(bonusField, value, -max, max);
+            bonuses.put(bonus.getKey(), value);
+        }
+        return Collections.unmodifiableSortedMap(bonuses);
+    }
+
+    /** Базова вага плюс добавки за наявні мітки, у межах {@code 0..max}. */
+    static int weightFor(int weight, SortedMap<String, Integer> weightTags, Set<String> tags, int max) {
+        Objects.requireNonNull(tags, "tags");
+        long total = weight;
+        for (Map.Entry<String, Integer> bonus : weightTags.entrySet()) {
+            if (tags.contains(bonus.getKey())) {
+                total += bonus.getValue();
+            }
+        }
+        return Math.clamp(total, 0, max);
     }
 
     /** Ключ з {@code id} уже зустрічався в {@code seen}. */
