@@ -26,6 +26,7 @@ import kolo.engine.wheel.Advantage;
  *     галузі відносно світового, {@code 0..}{@value Advantage#MAX}
  * @param personTraits скільки рис у стартової постаті (GD §12.3), {@code 1..}{@value #MAX_TRAITS}
  * @param personAge вік стартової постаті на 1970 рік, {@value #MIN_PERSON_AGE}{@code ..}{@value #MAX_PERSON_AGE}
+ * @param nameCandidates скільки назв-кандидатів на колесі назви (GD §4.9), {@code 1..}{@value #MAX_NAME_CANDIDATES}
  */
 public record GenerationBalanceDef(
         CountRange backstoryFragments,
@@ -38,7 +39,8 @@ public record GenerationBalanceDef(
         int armyTrainingGdpAdvantage,
         int armyTrainingDevelopmentAdvantage,
         CountRange personTraits,
-        CountRange personAge) {
+        CountRange personAge,
+        int nameCandidates) {
 
     /** Більше фрагментів чи постатей перевантажили б картку країни. */
     public static final int MAX_COUNT = 10;
@@ -53,6 +55,9 @@ public record GenerationBalanceDef(
     public static final int MIN_PERSON_AGE = 16;
 
     public static final int MAX_PERSON_AGE = 100;
+
+    /** Більше назв не прочитати на колесі: сектори стали б надто вузькими для підписів. */
+    public static final int MAX_NAME_CANDIDATES = 12;
 
     public GenerationBalanceDef {
         check("generation.backstory_fragments", backstoryFragments, MAX_COUNT);
@@ -69,6 +74,7 @@ public record GenerationBalanceDef(
         Objects.requireNonNull(personAge, "generation.person_age");
         Checks.inRange("generation.person_age.min", personAge.min(), MIN_PERSON_AGE, MAX_PERSON_AGE);
         Checks.inRange("generation.person_age.max", personAge.max(), personAge.min(), MAX_PERSON_AGE);
+        Checks.inRange("generation.name_candidates", nameCandidates, 1, MAX_NAME_CANDIDATES);
     }
 
     private static void check(String field, CountRange range, int max) {

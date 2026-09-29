@@ -478,7 +478,8 @@ final class TestBackstory {
                                 armyTrainingGdpAdvantage,
                                 armyTrainingDevelopmentAdvantage,
                                 persons.traitCount(),
-                                persons.age())));
+                                persons.age(),
+                                5)));
     }
 
     /** По рівню вишколу на кожен рівень 1..5 з рівними вагами, від провалу до успіху. */

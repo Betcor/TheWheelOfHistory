@@ -59,12 +59,15 @@ import kolo.engine.state.TechBranch;
 import kolo.engine.state.Training;
 import kolo.engine.wheel.OutcomeTier;
 
-/** Контент для тестів генераторів назв та імен: дві ідеології, два стилі, три форми державності. */
-final class TestNames {
+/**
+ * Контент для тестів генераторів назв та імен: дві ідеології, два стилі, три форми державності. Відкритий, бо ним
+ * користуються й тести колеса назви в {@code generation.country}.
+ */
+public final class TestNames {
 
-    static final NameParadigmDef MASC_HARD = new NameParadigmDef(
+    public static final NameParadigmDef MASC_HARD = new NameParadigmDef(
             new NameParadigmId("masc_hard"), GrammaticalGender.MASCULINE, List.of("", "у", "у", "", "ом", "і", "е"));
-    static final NameParadigmDef FEM_IYA = new NameParadigmDef(
+    public static final NameParadigmDef FEM_IYA = new NameParadigmDef(
             new NameParadigmId("fem_iya"), GrammaticalGender.FEMININE, List.of("я", "ї", "ї", "ю", "єю", "ї", "є"));
 
     static final NameParadigmDef PERSON_MASC = new NameParadigmDef(
@@ -76,14 +79,14 @@ final class TestNames {
     static final NameParadigmDef FIXED_FEM = new NameParadigmDef(
             new NameParadigmId("fixed_fem"), GrammaticalGender.FEMININE, List.of("", "", "", "", "", "", ""));
 
-    static final NameStyleDef NORTHERN = new NameStyleDef(
+    public static final NameStyleDef NORTHERN = new NameStyleDef(
             new NameStyleId("northern"),
             "Північний",
             List.of("вел", "тор", "гар"),
             List.of("ім", "ен"),
             5000,
             List.of(new NameFinalDef("ор", MASC_HARD.id()), new NameFinalDef("і", FEM_IYA.id())));
-    static final NameStyleDef SOUTHERN = new NameStyleDef(
+    public static final NameStyleDef SOUTHERN = new NameStyleDef(
             new NameStyleId("southern"),
             "Південний",
             List.of("сал", "мар"),
@@ -108,7 +111,7 @@ final class TestNames {
             new NamePartsDef(List.of("мар"), List.of(), 0),
             List.of(new SurnameFinalDef("ес", PERSON_MASC.id(), FIXED_FEM.id())));
 
-    static final StateFormDef REPUBLIC = form(
+    public static final StateFormDef REPUBLIC = form(
             "republic",
             GrammaticalGender.FEMININE,
             List.of(new IdeologyId("democracy")),
@@ -120,7 +123,7 @@ final class TestNames {
             "Республікою",
             "Республіці",
             "Республіко");
-    static final StateFormDef UNITED_PROVINCES = form(
+    public static final StateFormDef UNITED_PROVINCES = form(
             "united_provinces",
             GrammaticalGender.PLURAL,
             List.of(),
@@ -132,7 +135,7 @@ final class TestNames {
             "Об'єднаними Провінціями",
             "Об'єднаних Провінціях",
             "Об'єднані Провінції");
-    static final StateFormDef KINGDOM = form(
+    public static final StateFormDef KINGDOM = form(
             "kingdom",
             GrammaticalGender.NEUTER,
             List.of(new IdeologyId("monarchy")),
@@ -145,7 +148,7 @@ final class TestNames {
             "Королівстві",
             "Королівство");
 
-    static final ContentPack PACK = pack();
+    public static final ContentPack PACK = pack(5);
 
     private TestNames() {}
 
@@ -173,7 +176,8 @@ final class TestNames {
                         .toList());
     }
 
-    private static ContentPack pack() {
+    /** Пакет з {@code nameCandidates} назвами-кандидатами на колесі назви. */
+    public static ContentPack pack(int nameCandidates) {
         return new ContentPack(
                 "0".repeat(64),
                 List.of(
@@ -211,10 +215,10 @@ final class TestNames {
                         List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM),
                         List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE)),
                 backstory(),
-                balance());
+                balance(nameCandidates));
     }
 
-    private static BalanceDef balance() {
+    private static BalanceDef balance(int nameCandidates) {
         return BalanceDef.of(
                 new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                 new StreakRulesDef(85, 15, 3),
@@ -233,7 +237,8 @@ final class TestNames {
                         10,
                         10,
                         new CountRange(1, 3),
-                        new CountRange(25, 70)));
+                        new CountRange(25, 70),
+                        nameCandidates));
     }
 
     private static BackstoryContent backstory() {
