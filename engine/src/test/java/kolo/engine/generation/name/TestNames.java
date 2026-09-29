@@ -178,7 +178,7 @@ final class TestNames {
                         .map(level -> new DevelopmentLevelDef(level, "Рівень", "Опис", 100, 50, List.of()))
                         .toList(),
                 Arrays.stream(NuclearStatus.values())
-                        .map(status -> new NuclearStatusDef(status, "Статус", List.of()))
+                        .map(status -> new NuclearStatusDef(status, "Статус", 100, 50, List.of()))
                         .toList(),
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
@@ -201,7 +201,7 @@ final class TestNames {
                         .map(corridor ->
                                 new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
                         .toList(),
-                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3)));
+                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10));
     }
 
     private static BackstoryContent backstory() {

@@ -32,7 +32,12 @@ power_corridors:
     players: { min_pct: 20, max_pct: 500 }
     npc: { min_pct: 10, max_pct: 1000 }
 
-# Кількості в ланцюжку коліс генерації (GD §4.7, §4.8).
+# Ланцюжок коліс генерації (GD §4.6–4.8).
 generation:
   backstory_fragments: { min: 2, max: 4 }
   notable_people: { min: 1, max: 3 }
+  # Боєголовки стартового арсеналу: рівноймовірно від min до max (1..100).
+  warheads: { min: 2, max: 10 }
+  # Перевага колеса ядерного статусу за кожен рівень енергетики й науки відносно світового
+  # (0..100): −3 → −3·x, +2 → +2·x.
+  nuclear_energy_advantage: 10

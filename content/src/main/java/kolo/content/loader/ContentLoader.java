@@ -286,7 +286,15 @@ public final class ContentLoader {
                             ContentKeys.parse(
                                     "nuclear_status", NuclearStatus.values(), NuclearStatus::key, status.id()),
                             NuclearStatus::key));
-            return at(NUCLEAR, location, () -> new NuclearStatusDef(key, status.name(), status.tags()));
+            return at(
+                    NUCLEAR,
+                    location,
+                    () -> new NuclearStatusDef(
+                            key,
+                            status.name(),
+                            required("weight", status.weight()),
+                            required("quality", status.quality()),
+                            status.tags()));
         });
         complete(NUCLEAR, "statuses", seen, List.of(NuclearStatus.values()), NuclearStatus::key);
         return statuses;
@@ -646,7 +654,13 @@ public final class ContentLoader {
         CountRange fragments =
                 at(BALANCE, "generation.backstory_fragments", () -> count(generationYaml.backstoryFragments()));
         CountRange people = at(BALANCE, "generation.notable_people", () -> count(generationYaml.notablePeople()));
-        GenerationBalanceDef generation = at(BALANCE, "generation", () -> new GenerationBalanceDef(fragments, people));
+        CountRange warheads = at(BALANCE, "generation.warheads", () -> count(generationYaml.warheads()));
+        int energyAdvantage = at(
+                BALANCE,
+                "generation.nuclear_energy_advantage",
+                () -> required("nuclear_energy_advantage", generationYaml.nuclearEnergyAdvantage()));
+        GenerationBalanceDef generation =
+                at(BALANCE, "generation", () -> new GenerationBalanceDef(fragments, people, warheads, energyAdvantage));
 
         return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation));
     }

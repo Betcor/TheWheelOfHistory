@@ -117,7 +117,7 @@ class ContentPackTest {
                         resources,
                         branches(),
                         levels(),
-                        List.of(new NuclearStatusDef(NuclearStatus.NONE, "Немає", List.of())),
+                        List.of(new NuclearStatusDef(NuclearStatus.NONE, "Немає", 80, 50, List.of())),
                         personKinds(),
                         traits(),
                         names(ideologies),
@@ -400,9 +400,9 @@ class ContentPackTest {
     void backstoryTagsNeedASource() {
         // Джерела: мітка ідеології (democracy), ядерного статусу, словника коліс генерації й іншого фрагмента.
         List<NuclearStatusDef> statuses = List.of(
-                new NuclearStatusDef(NuclearStatus.NONE, "Немає", List.of()),
-                new NuclearStatusDef(NuclearStatus.PROGRAM, "Програма", List.of("nuclear_program")),
-                new NuclearStatusDef(NuclearStatus.ARSENAL, "Арсенал", List.of("nuclear_power")));
+                new NuclearStatusDef(NuclearStatus.NONE, "Немає", 80, 50, List.of()),
+                new NuclearStatusDef(NuclearStatus.PROGRAM, "Програма", 13, 70, List.of("nuclear_program")),
+                new NuclearStatusDef(NuclearStatus.ARSENAL, "Арсенал", 7, 90, List.of("nuclear_power")));
         BackstoryFragmentDef lostWar = TestContent.fragment("lost_war", TagCondition.NONE, List.of("lost_war"));
         BackstoryFragmentDef reparations = TestContent.fragment(
                 "reparations",

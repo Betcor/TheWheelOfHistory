@@ -88,7 +88,7 @@ final class ContentYaml {
     }
 
     /** @param id ключ статусу: {@code none}, {@code program} або {@code arsenal} */
-    record NuclearStatus(String id, String name, List<String> tags) {
+    record NuclearStatus(String id, String name, Integer weight, Integer quality, List<String> tags) {
         NuclearStatus {
             tags = orEmpty(tags);
         }
@@ -296,7 +296,9 @@ final class ContentYaml {
 
     record Generation(
             @JsonProperty("backstory_fragments") Count backstoryFragments,
-            @JsonProperty("notable_people") Count notablePeople) {}
+            @JsonProperty("notable_people") Count notablePeople,
+            Count warheads,
+            @JsonProperty("nuclear_energy_advantage") Integer nuclearEnergyAdvantage) {}
 
     record Count(Integer min, Integer max) {}
 

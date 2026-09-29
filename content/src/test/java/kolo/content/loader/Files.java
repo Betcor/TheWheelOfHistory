@@ -66,10 +66,16 @@ final class Files {
             statuses:
               - id: none
                 name: Без ядерної зброї
+                weight: 80
+                quality: 50
               - id: program
                 name: Ядерна програма
+                weight: 13
+                quality: 70
               - id: arsenal
                 name: Ядерний арсенал
+                weight: 7
+                quality: 90
                 tags: [nuclear_power]
             """;
 
@@ -208,6 +214,8 @@ final class Files {
             generation:
               backstory_fragments: { min: 2, max: 4 }
               notable_people: { min: 1, max: 3 }
+              warheads: { min: 2, max: 10 }
+              nuclear_energy_advantage: 10
             """;
 
     private final TreeMap<String, String> files = new TreeMap<>();

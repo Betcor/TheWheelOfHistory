@@ -171,6 +171,29 @@ final class TestBackstory {
             List<BackstoryFragmentDef> fragments,
             CountRange count,
             List<DevelopmentLevelDef> levels) {
+        return pack(
+                ideologies,
+                fragments,
+                count,
+                levels,
+                List.of(new ResourceDef(new ResourceId("iron"), "Залізо", List.of())),
+                Arrays.stream(NuclearStatus.values())
+                        .map(status -> new NuclearStatusDef(status, "Статус", 100, 50, List.of()))
+                        .toList(),
+                new CountRange(2, 10),
+                10);
+    }
+
+    /** Мінімальний валідний пакет з цими ідеологіями, рівнями, ресурсами, ядерними статусами й балансом арсеналу. */
+    static ContentPack pack(
+            List<IdeologyDef> ideologies,
+            List<BackstoryFragmentDef> fragments,
+            CountRange count,
+            List<DevelopmentLevelDef> levels,
+            List<ResourceDef> resources,
+            List<NuclearStatusDef> nuclear,
+            CountRange warheads,
+            int nuclearEnergyAdvantage) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -211,14 +234,12 @@ final class TestBackstory {
                 "0".repeat(64),
                 ideologies,
                 List.of(new DoctrineDef(new DoctrineId("armored"), "Бронетанкова", List.of(), List.of())),
-                List.of(new ResourceDef(new ResourceId("iron"), "Залізо", List.of())),
+                resources,
                 Arrays.stream(TechBranch.values())
                         .map(branch -> new TechBranchDef(branch, "Галузь"))
                         .toList(),
                 levels,
-                Arrays.stream(NuclearStatus.values())
-                        .map(status -> new NuclearStatusDef(status, "Статус", List.of()))
-                        .toList(),
+                nuclear,
                 Arrays.stream(PersonKind.values())
                         .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
                         .toList(),
@@ -232,7 +253,7 @@ final class TestBackstory {
                                 .map(corridor -> new PowerCorridorDef(
                                         corridor, new MedianRange(50, 200), new MedianRange(50, 200)))
                                 .toList(),
-                        new GenerationBalanceDef(count, new CountRange(1, 3))));
+                        new GenerationBalanceDef(count, new CountRange(1, 3), warheads, nuclearEnergyAdvantage)));
     }
 
     /** Чоловічий рід, тверда група: «Велор, Велору, …» — і для короткої, і для повної назви. */
