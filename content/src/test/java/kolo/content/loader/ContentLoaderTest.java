@@ -120,6 +120,9 @@ class ContentLoaderTest {
         ContentPack pack = ContentLoader.load(Files.valid().source());
 
         assertThat(pack.personKind(PersonKind.GENERAL).tags()).containsExactly("military");
+        assertThat(pack.personKind(PersonKind.GENERAL).weight()).isEqualTo(10);
+        assertThat(pack.personKind(PersonKind.GENERAL).weightTags()).containsExactly(entry("educated", 5));
+        assertThat(pack.personKind(PersonKind.ARTIST).weightTags()).isEmpty();
         assertThat(pack.personKind(PersonKind.PRETENDER).name()).isEqualTo("Диктатор-претендент");
         TraitDef genius = pack.trait(new TraitId("genius")).orElseThrow();
         assertThat(genius.kinds()).containsExactly(PersonKind.SCIENTIST);
@@ -162,6 +165,46 @@ class ContentLoaderTest {
                         .source(),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "kinds", "cause", "missing_definition", "value", "artist"));
+    }
+
+    @Test
+    void personKindWeightIsRequiredAndInRange() {
+        assertContentError(
+                Files.valid()
+                        .with(
+                                ContentLoader.PEOPLE,
+                                Files.PEOPLE.replace(
+                                        "description: Формує культуру., weight: 10", "description: Формує культуру."))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("file", "people.yaml", "location", "kinds[7]", "cause", "blank_value", "field", "weight"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.PEOPLE, Files.PEOPLE.replace("{ educated: 5 }", "{ educated: 10001 }"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "kinds[1]", "cause", "value_out_of_range"));
+    }
+
+    @Test
+    void personKindWeightTagsNeedASource() {
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.PEOPLE, Files.PEOPLE.replace("{ educated: 5 }", "{ wizardry: 5 }"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "file", "people.yaml",
+                        "location", "kinds[1].weight_tags",
+                        "cause", "unknown_reference",
+                        "value", "wizardry"));
+        // Мітка рівня ІЛР — джерело; без неї посилання повисає.
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.HDI, Files.HDI.replace(", tags: [educated]", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("file", "people.yaml", "location", "kinds[1].weight_tags", "value", "educated"));
     }
 
     @Test
@@ -909,6 +952,8 @@ class ContentLoaderTest {
         assertThat(balance.generation().armySizeGdpAdvantage()).isEqualTo(10);
         assertThat(balance.generation().armyTrainingGdpAdvantage()).isEqualTo(10);
         assertThat(balance.generation().armyTrainingDevelopmentAdvantage()).isEqualTo(10);
+        assertThat(balance.generation().personTraits()).isEqualTo(new CountRange(1, 3));
+        assertThat(balance.generation().personAge()).isEqualTo(new CountRange(25, 70));
     }
 
     @Test
@@ -990,6 +1035,15 @@ class ContentLoaderTest {
                         "army_training_development_advantage: 10", "army_training_development_advantage: -1")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.army_training_development_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "person_traits: { min: 1, max: 3 }", "person_traits: { min: 1, max: 4 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.person_traits.max"));
+        assertContentError(
+                balance(Files.BALANCE.replace("person_age: { min: 25, max: 70 }", "person_age: { min: 10, max: 70 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.person_age.min"));
     }
 
     @Test
@@ -1066,6 +1120,14 @@ class ContentLoaderTest {
                         "blank_value",
                         "field",
                         "army_training_development_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  person_traits: { min: 1, max: 3 }\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation.person_traits", "cause", "blank_value"));
+        assertContentError(
+                balance(Files.BALANCE.replace("person_age: { min: 25, max: 70 }", "person_age: { min: 25 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation.person_age", "cause", "blank_value", "field", "max"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,

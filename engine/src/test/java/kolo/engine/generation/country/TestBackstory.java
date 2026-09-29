@@ -1,6 +1,7 @@
 package kolo.engine.generation.country;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -335,6 +336,76 @@ final class TestBackstory {
             List<TrainingLevelDef> trainingLevels,
             int armyTrainingGdpAdvantage,
             int armyTrainingDevelopmentAdvantage) {
+        return pack(
+                ideologies,
+                fragments,
+                count,
+                levels,
+                resources,
+                nuclear,
+                warheads,
+                nuclearEnergyAdvantage,
+                gdpLevels,
+                gdpDevelopmentAdvantage,
+                hdiLevels,
+                hdiGdpAdvantage,
+                armySizes,
+                armySizeGdpAdvantage,
+                trainingLevels,
+                armyTrainingGdpAdvantage,
+                armyTrainingDevelopmentAdvantage,
+                People.DEFAULT);
+    }
+
+    /**
+     * Типи й риси постатей, числа їхньої генерації й склади імен.
+     *
+     * @param givenStarts початки імен; кінцівки — «-ор» і «-ен»
+     * @param surnameStarts початки прізвищ; кінцівка — «-ер»
+     */
+    record People(
+            List<PersonKindDef> kinds,
+            List<TraitDef> traits,
+            CountRange count,
+            CountRange traitCount,
+            CountRange age,
+            List<String> givenStarts,
+            List<String> surnameStarts) {
+
+        /** Усі типи з вагою 10, одна риса, одне ім'я на стать. */
+        static final People DEFAULT = new People(
+                Arrays.stream(PersonKind.values())
+                        .map(kind ->
+                                new PersonKindDef(kind, "Тип", "Опис", 10, Collections.emptySortedMap(), List.of()))
+                        .toList(),
+                List.of(new TraitDef(new TraitId("loyal"), "Відданий", List.of(), List.of(), List.of(), List.of())),
+                new CountRange(1, 3),
+                new CountRange(1, 3),
+                new CountRange(25, 70),
+                List.of("вел"),
+                List.of("торв"));
+    }
+
+    /** Мінімальний валідний пакет з усім, що задають тести коліс генерації, і з заданими постатями. */
+    static ContentPack pack(
+            List<IdeologyDef> ideologies,
+            List<BackstoryFragmentDef> fragments,
+            CountRange count,
+            List<DevelopmentLevelDef> levels,
+            List<ResourceDef> resources,
+            List<NuclearStatusDef> nuclear,
+            CountRange warheads,
+            int nuclearEnergyAdvantage,
+            List<GdpLevelDef> gdpLevels,
+            int gdpDevelopmentAdvantage,
+            List<HdiLevelDef> hdiLevels,
+            int hdiGdpAdvantage,
+            List<ArmySizeDef> armySizes,
+            int armySizeGdpAdvantage,
+            List<TrainingLevelDef> trainingLevels,
+            int armyTrainingGdpAdvantage,
+            int armyTrainingDevelopmentAdvantage,
+            People persons) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -352,10 +423,10 @@ final class TestBackstory {
                 List.of(new NameFinalDef("ор", masc.id())));
         PersonNameStyleDef people = new PersonNameStyleDef(
                 style.id(),
-                new NamePartsDef(List.of("вел"), List.of(), 0),
+                new NamePartsDef(persons.givenStarts(), List.of(), 0),
                 List.of(new NameFinalDef("ор", masc.id())),
                 List.of(new NameFinalDef("ен", fem.id())),
-                new NamePartsDef(List.of("торв"), List.of(), 0),
+                new NamePartsDef(persons.surnameStarts(), List.of(), 0),
                 List.of(new SurnameFinalDef("ер", masc.id(), fem.id())));
         StateFormDef republic = new StateFormDef(
                 new StateFormId("republic"),
@@ -385,10 +456,8 @@ final class TestBackstory {
                 hdiLevels,
                 armySizes,
                 trainingLevels,
-                Arrays.stream(PersonKind.values())
-                        .map(kind -> new PersonKindDef(kind, "Тип", "Опис", List.of()))
-                        .toList(),
-                List.of(new TraitDef(new TraitId("loyal"), "Відданий", List.of(), List.of(), List.of(), List.of())),
+                persons.kinds(),
+                persons.traits(),
                 new NameContent(List.of(masc, fem), List.of(style), List.of(republic), List.of(people)),
                 new BackstoryContent(GENERATION_TAGS, fragments),
                 BalanceDef.of(
@@ -400,14 +469,16 @@ final class TestBackstory {
                                 .toList(),
                         new GenerationBalanceDef(
                                 count,
-                                new CountRange(1, 3),
+                                persons.count(),
                                 warheads,
                                 nuclearEnergyAdvantage,
                                 gdpDevelopmentAdvantage,
                                 hdiGdpAdvantage,
                                 armySizeGdpAdvantage,
                                 armyTrainingGdpAdvantage,
-                                armyTrainingDevelopmentAdvantage)));
+                                armyTrainingDevelopmentAdvantage,
+                                persons.traitCount(),
+                                persons.age())));
     }
 
     /** По рівню вишколу на кожен рівень 1..5 з рівними вагами, від провалу до успіху. */

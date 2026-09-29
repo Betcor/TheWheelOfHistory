@@ -1,6 +1,7 @@
 package kolo.engine.content;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -119,7 +120,13 @@ final class TestContent {
     /** По визначенню на кожен тип постаті. */
     static List<PersonKindDef> personKinds() {
         return Arrays.stream(PersonKind.values())
-                .map(kind -> new PersonKindDef(kind, "Тип " + kind.key(), "Опис типу " + kind.key(), List.of()))
+                .map(kind -> new PersonKindDef(
+                        kind,
+                        "Тип " + kind.key(),
+                        "Опис типу " + kind.key(),
+                        10,
+                        Collections.emptySortedMap(),
+                        List.of()))
                 .toList();
     }
 
@@ -242,7 +249,17 @@ final class TestContent {
                 new StreakRulesDef(85, 15, 3),
                 Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList(),
                 new GenerationBalanceDef(
-                        new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10, 10, 15, 10, 10, 10));
+                        new CountRange(2, 4),
+                        new CountRange(1, 3),
+                        new CountRange(2, 10),
+                        10,
+                        10,
+                        15,
+                        10,
+                        10,
+                        10,
+                        new CountRange(1, 3),
+                        new CountRange(25, 70)));
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {

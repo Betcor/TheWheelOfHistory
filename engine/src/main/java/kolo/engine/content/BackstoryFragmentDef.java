@@ -1,17 +1,11 @@
 package kolo.engine.content;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.stream.Stream;
 import kolo.engine.error.Checks;
-import kolo.engine.error.ErrorCode;
-import kolo.engine.error.ErrorDetails;
-import kolo.engine.error.ValidationException;
 
 /**
  * Фрагмент передісторії держави (GD §4.7): подія до 1970 року з умовами, вагою, мітками й ефектами.
@@ -61,18 +55,7 @@ public record BackstoryFragmentDef(
         Checks.inRange(field + ".years.from", yearFrom, EARLIEST_YEAR, LATEST_YEAR);
         Checks.inRange(field + ".years.to", yearTo, yearFrom, LATEST_YEAR);
         Objects.requireNonNull(condition, "condition");
-        TreeMap<String, Integer> bonuses = new TreeMap<>();
-        for (Map.Entry<String, Integer> bonus : weightTags.entrySet()) {
-            Checks.snakeCase(field + ".weight_tags", bonus.getKey());
-            String bonusField = field + ".weight_tags." + bonus.getKey();
-            Integer value = bonus.getValue();
-            if (value == null) {
-                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", bonusField));
-            }
-            Checks.inRange(bonusField, value, -MAX_WEIGHT, MAX_WEIGHT);
-            bonuses.put(bonus.getKey(), value);
-        }
-        weightTags = Collections.unmodifiableSortedMap(bonuses);
+        weightTags = Defs.weightTags(field + ".weight_tags", weightTags, MAX_WEIGHT);
         adds = Defs.tags(field + ".adds", adds);
         Checks.inRange(field + ".duration", durationYears, 0, MAX_DURATION_YEARS);
         modifiers = List.copyOf(modifiers);
@@ -90,14 +73,7 @@ public record BackstoryFragmentDef(
 
     /** Вага для держави з цими мітками: базова плюс добавки за наявні мітки, у межах {@code 0..}{@value #MAX_WEIGHT}. */
     public int weightFor(Set<String> tags) {
-        Objects.requireNonNull(tags, "tags");
-        long total = weight;
-        for (Map.Entry<String, Integer> bonus : weightTags.entrySet()) {
-            if (tags.contains(bonus.getKey())) {
-                total += bonus.getValue();
-            }
-        }
-        return Math.clamp(total, 0, MAX_WEIGHT);
+        return Defs.weightFor(weight, weightTags, tags, MAX_WEIGHT);
     }
 
     /** Усі мітки, від яких залежить фрагмент: умова й добавки до ваги. */

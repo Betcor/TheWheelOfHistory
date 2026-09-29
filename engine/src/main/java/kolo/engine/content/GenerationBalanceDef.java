@@ -24,6 +24,8 @@ import kolo.engine.wheel.Advantage;
  *     часткового, {@code 0..}{@value Advantage#MAX}: багатша держава більше витрачає на навчання
  * @param armyTrainingDevelopmentAdvantage перевага колеса вишколу армії за кожен рівень розвиненості військової
  *     галузі відносно світового, {@code 0..}{@value Advantage#MAX}
+ * @param personTraits скільки рис у стартової постаті (GD §12.3), {@code 1..}{@value #MAX_TRAITS}
+ * @param personAge вік стартової постаті на 1970 рік, {@value #MIN_PERSON_AGE}{@code ..}{@value #MAX_PERSON_AGE}
  */
 public record GenerationBalanceDef(
         CountRange backstoryFragments,
@@ -34,13 +36,23 @@ public record GenerationBalanceDef(
         int hdiGdpAdvantage,
         int armySizeGdpAdvantage,
         int armyTrainingGdpAdvantage,
-        int armyTrainingDevelopmentAdvantage) {
+        int armyTrainingDevelopmentAdvantage,
+        CountRange personTraits,
+        CountRange personAge) {
 
     /** Більше фрагментів чи постатей перевантажили б картку країни. */
     public static final int MAX_COUNT = 10;
 
     /** Стартовий арсенал — «кілька боєголовок», а не сотні: кожну боєголовку можна застосувати окремо. */
     public static final int MAX_WARHEADS = 100;
+
+    /** Постать має 1–3 риси (GD §12.3). */
+    public static final int MAX_TRAITS = 3;
+
+    /** Відома постать — доросла людина. */
+    public static final int MIN_PERSON_AGE = 16;
+
+    public static final int MAX_PERSON_AGE = 100;
 
     public GenerationBalanceDef {
         check("generation.backstory_fragments", backstoryFragments, MAX_COUNT);
@@ -53,6 +65,10 @@ public record GenerationBalanceDef(
         Checks.inRange("generation.army_training_gdp_advantage", armyTrainingGdpAdvantage, 0, Advantage.MAX);
         Checks.inRange(
                 "generation.army_training_development_advantage", armyTrainingDevelopmentAdvantage, 0, Advantage.MAX);
+        check("generation.person_traits", personTraits, MAX_TRAITS);
+        Objects.requireNonNull(personAge, "generation.person_age");
+        Checks.inRange("generation.person_age.min", personAge.min(), MIN_PERSON_AGE, MAX_PERSON_AGE);
+        Checks.inRange("generation.person_age.max", personAge.max(), personAge.min(), MAX_PERSON_AGE);
     }
 
     private static void check(String field, CountRange range, int max) {
