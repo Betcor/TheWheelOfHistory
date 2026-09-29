@@ -10,7 +10,8 @@ import kolo.engine.error.ValidationException;
 import kolo.engine.state.PowerCorridor;
 
 /**
- * Числа балансу, що не належать жодному окремому визначенню: колеса, стріки, коридор сили, кількості генерації.
+ * Числа балансу, що не належать жодному окремому визначенню: колеса, стріки, коридор сили, кількості генерації
+ * країн і релігій.
  *
  * <p>Правила гри (межі переваги, мінімум КП/КУ, ліміт жетонів долі) — не тут, а в коді: вони не налаштовуються.
  *
@@ -20,12 +21,14 @@ public record BalanceDef(
         WheelBalanceDef wheel,
         StreakRulesDef streaks,
         SortedMap<PowerCorridor, PowerCorridorDef> corridors,
-        GenerationBalanceDef generation) {
+        GenerationBalanceDef generation,
+        ReligionBalanceDef religion) {
 
     public BalanceDef {
         Objects.requireNonNull(wheel, "wheel");
         Objects.requireNonNull(streaks, "streaks");
         Objects.requireNonNull(generation, "generation");
+        Objects.requireNonNull(religion, "religion");
         TreeMap<PowerCorridor, PowerCorridorDef> copy = new TreeMap<>();
         corridors.forEach((key, def) -> {
             if (key != Objects.requireNonNull(def, "power_corridor").corridor()) {
@@ -47,7 +50,8 @@ public record BalanceDef(
             WheelBalanceDef wheel,
             StreakRulesDef streaks,
             List<PowerCorridorDef> corridors,
-            GenerationBalanceDef generation) {
+            GenerationBalanceDef generation,
+            ReligionBalanceDef religion) {
         TreeMap<PowerCorridor, PowerCorridorDef> map = new TreeMap<>();
         for (PowerCorridorDef def : corridors) {
             Objects.requireNonNull(def, "power_corridor");
@@ -61,7 +65,7 @@ public record BalanceDef(
                                 def.corridor().key()));
             }
         }
-        return new BalanceDef(wheel, streaks, map, generation);
+        return new BalanceDef(wheel, streaks, map, generation, religion);
     }
 
     public PowerCorridorDef corridor(PowerCorridor corridor) {

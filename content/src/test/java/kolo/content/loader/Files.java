@@ -251,6 +251,78 @@ final class Files {
               person_traits: { min: 1, max: 3 }
               person_age: { min: 25, max: 70 }
               name_candidates: 5
+            religion:
+              aspects: { min: 2, max: 3 }
+              dogmas: { min: 2, max: 4 }
+            """;
+
+    static final String RELIGIONS = """
+            archetypes:
+              - id: monotheism
+                name: Монотеїзм
+                description: Віра в єдиного бога.
+                figure: Єдиний Бог
+                weight: 20
+                tags: [archetype_monotheism]
+              - id: polytheism
+                name: Політеїзм
+                description: Віра в багатьох богів.
+                figure: Верховне божество
+                weight: 20
+                tags: [archetype_polytheism]
+            aspects:
+              - id: war
+                name: Війна
+                description: Божество битв.
+                weight: 100
+                weight_tags: { archetype_polytheism: 30 }
+                tags: [religion_war]
+              - id: knowledge
+                name: Знання
+                description: Божество мудрості.
+                weight: 100
+                tags: [religion_knowledge]
+            dogmas:
+              - id: holy_war
+                name: Священна війна
+                description: Війна за віру — обов'язок.
+                weight: 60
+                weight_tags: { religion_war: 150 }
+                modifiers:
+                  - { target: "stat:war_weariness", value: -5 }
+                tags: [dogma_holy_war]
+                incompatible: [pacifism]
+              - id: pacifism
+                name: Ненасильство
+                description: Проливати кров — гріх.
+                weight: 60
+                tags: [dogma_pacifism]
+            polities:
+              - id: single_church
+                name: Єдина церква
+                description: Одна ієрархія.
+                weight: 100
+                weight_tags: { archetype_monotheism: 100, dogma_holy_war: 10 }
+                modifiers:
+                  - { target: "stat:stability", value: 5 }
+                tags: [polity_single_church]
+              - id: communities
+                name: Незалежні громади
+                description: Кожна громада сама по собі.
+                weight: 100
+            faith_forms:
+              - id: path
+                gender: masculine
+                figure_case: genitive
+                archetypes: [monotheism, polytheism]
+                forms:
+                  nominative: "Шлях {figure}"
+                  genitive: "Шляху {figure}"
+                  dative: "Шляхові {figure}"
+                  accusative: "Шлях {figure}"
+                  instrumental: "Шляхом {figure}"
+                  locative: "Шляху {figure}"
+                  vocative: "Шляху {figure}"
             """;
 
     static final String STREAKS = """
@@ -299,6 +371,7 @@ final class Files {
         files.put(ContentLoader.NAMES, NAMES);
         files.put(ContentLoader.BACKSTORY, BACKSTORY);
         files.put(ContentLoader.STREAKS, STREAKS);
+        files.put(ContentLoader.RELIGIONS, RELIGIONS);
         files.put(ContentLoader.BALANCE, BALANCE);
     }
 

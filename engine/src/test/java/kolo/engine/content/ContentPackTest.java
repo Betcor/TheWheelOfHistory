@@ -52,6 +52,7 @@ class ContentPackTest {
                 names(List.of(ideology("socialism", "planned_economy"), ideology("democracy", "liberal_democracy"))),
                 TestContent.backstory(),
                 TestContent.streaks(),
+                TestReligions.content(),
                 TestContent.balance());
 
         assertThat(pack.hash()).isEqualTo(HASH);
@@ -63,6 +64,8 @@ class ContentPackTest {
         assertThat(pack.nuclearStatuses().keySet()).containsExactly(NuclearStatus.values());
         assertThat(pack.personKinds().keySet()).containsExactly(PersonKind.values());
         assertThat(pack.balance()).isEqualTo(TestContent.balance());
+        assertThat(pack.religions().archetypes()).hasSize(2);
+        assertThat(pack.balance().religion()).isEqualTo(TestReligions.BALANCE);
     }
 
     @Test
@@ -102,6 +105,7 @@ class ContentPackTest {
                         names(ideologies),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()),
                 "tech_branches",
                 "energy_science");
@@ -123,6 +127,7 @@ class ContentPackTest {
                         names(ideologies),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()),
                 "development_levels",
                 -3);
@@ -144,6 +149,7 @@ class ContentPackTest {
                         names(ideologies),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()),
                 "nuclear_statuses",
                 "program");
@@ -171,6 +177,7 @@ class ContentPackTest {
                         names(List.of(ideology("democracy", "a"))),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.DUPLICATE_ID);
@@ -227,6 +234,7 @@ class ContentPackTest {
                         names(List.of(ideology("democracy", "a"))),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()))
                 .isInstanceOf(ValidationException.class);
     }
@@ -255,6 +263,7 @@ class ContentPackTest {
                         names(ideologies),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()),
                 "ideologies");
         assertEmpty(
@@ -275,6 +284,7 @@ class ContentPackTest {
                         names(ideologies),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()),
                 "doctrines");
         assertEmpty(
@@ -295,6 +305,7 @@ class ContentPackTest {
                         names(ideologies),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()),
                 "resources");
         assertThatThrownBy(() -> new ContentPack(
@@ -314,6 +325,7 @@ class ContentPackTest {
                         names(ideologies),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()))
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BLANK_VALUE));
@@ -403,6 +415,7 @@ class ContentPackTest {
                         names(List.of(ideology("democracy", "a"))),
                         TestContent.backstory(),
                         TestContent.streaks(),
+                        TestReligions.content(),
                         TestContent.balance()),
                 "person_kinds",
                 "pretender");
@@ -789,6 +802,7 @@ class ContentPackTest {
                 names(ideologies),
                 backstory,
                 streaks,
+                TestReligions.content(),
                 TestContent.balance());
     }
 
@@ -816,6 +830,7 @@ class ContentPackTest {
                 names(ideologies),
                 backstory,
                 TestContent.streaks(),
+                TestReligions.content(),
                 TestContent.balance());
     }
 
@@ -843,6 +858,7 @@ class ContentPackTest {
                 names(ideologies),
                 backstory,
                 TestContent.streaks(),
+                TestReligions.content(),
                 TestContent.balance());
     }
 
@@ -878,6 +894,7 @@ class ContentPackTest {
                         List.of(TestContent.personStyle("northern"))),
                 TestContent.backstory(),
                 TestContent.streaks(),
+                TestReligions.content(),
                 TestContent.balance());
     }
 
@@ -899,6 +916,7 @@ class ContentPackTest {
                 names(List.of(ideology("democracy", "a"))),
                 TestContent.backstory(),
                 TestContent.streaks(),
+                TestReligions.content(),
                 TestContent.balance());
     }
 

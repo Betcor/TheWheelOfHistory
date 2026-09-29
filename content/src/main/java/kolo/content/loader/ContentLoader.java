@@ -20,8 +20,12 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import kolo.engine.content.ArchetypeDef;
+import kolo.engine.content.ArchetypeId;
 import kolo.engine.content.ArmySizeDef;
 import kolo.engine.content.ArmySizeId;
+import kolo.engine.content.AspectDef;
+import kolo.engine.content.AspectId;
 import kolo.engine.content.BackstoryContent;
 import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
@@ -32,6 +36,10 @@ import kolo.engine.content.CountRange;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
+import kolo.engine.content.DogmaDef;
+import kolo.engine.content.DogmaId;
+import kolo.engine.content.FaithFormDef;
+import kolo.engine.content.FaithFormId;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
@@ -52,6 +60,10 @@ import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.PowerCorridorDef;
+import kolo.engine.content.ReligionBalanceDef;
+import kolo.engine.content.ReligionContent;
+import kolo.engine.content.ReligionPolityDef;
+import kolo.engine.content.ReligionPolityId;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
@@ -76,6 +88,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.Development;
+import kolo.engine.state.GrammaticalCase;
 import kolo.engine.state.GrammaticalGender;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
@@ -106,6 +119,7 @@ public final class ContentLoader {
     public static final String NAMES = "names.yaml";
     public static final String BACKSTORY = "backstory.yaml";
     public static final String STREAKS = "streaks.yaml";
+    public static final String RELIGIONS = "religions.yaml";
     public static final String BALANCE = "balance.yaml";
 
     /** Усі файли контенту; кожен обов'язковий. */
@@ -122,6 +136,7 @@ public final class ContentLoader {
             NAMES,
             BACKSTORY,
             STREAKS,
+            RELIGIONS,
             BALANCE);
 
     private static final YAMLMapper MAPPER = createMapper();
@@ -168,6 +183,7 @@ public final class ContentLoader {
                 training);
         checkPersonKindTags(
                 kinds, knownTags(backstory, streaks, ideologies, levels, nuclear, gdp, hdi, army, training));
+        ReligionContent religions = religions(parse(files, RELIGIONS, ContentYaml.ReligionsFile.class));
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -192,6 +208,7 @@ public final class ContentLoader {
                         names,
                         backstory,
                         streaks,
+                        religions,
                         balance));
     }
 
@@ -840,6 +857,160 @@ public final class ContentLoader {
         return at(STREAKS, "", () -> new StreakContent(wheels));
     }
 
+    private static ReligionContent religions(ContentYaml.ReligionsFile yaml) {
+        TreeSet<ArchetypeId> archetypeIds = new TreeSet<>();
+        List<ArchetypeDef> archetypes = list(
+                RELIGIONS,
+                "archetypes",
+                nonEmpty(RELIGIONS, "archetypes", yaml.archetypes()),
+                (location, archetype) -> {
+                    ArchetypeId id =
+                            at(RELIGIONS, location, () -> unique(archetypeIds, new ArchetypeId(archetype.id())));
+                    return at(
+                            RELIGIONS,
+                            location,
+                            () -> new ArchetypeDef(
+                                    id,
+                                    archetype.name(),
+                                    archetype.description(),
+                                    archetype.figure(),
+                                    required("weight", archetype.weight()),
+                                    archetype.tags()));
+                });
+
+        TreeSet<AspectId> aspectIds = new TreeSet<>();
+        List<AspectDef> aspects =
+                list(RELIGIONS, "aspects", nonEmpty(RELIGIONS, "aspects", yaml.aspects()), (location, aspect) -> {
+                    AspectId id = at(RELIGIONS, location, () -> unique(aspectIds, new AspectId(aspect.id())));
+                    return at(
+                            RELIGIONS,
+                            location,
+                            () -> new AspectDef(
+                                    id,
+                                    aspect.name(),
+                                    aspect.description(),
+                                    required("weight", aspect.weight()),
+                                    new TreeMap<>(aspect.weightTags()),
+                                    aspect.tags()));
+                });
+
+        TreeSet<DogmaId> dogmaIds = new TreeSet<>();
+        List<DogmaDef> dogmas =
+                list(RELIGIONS, "dogmas", nonEmpty(RELIGIONS, "dogmas", yaml.dogmas()), (location, dogma) -> {
+                    DogmaId id = at(RELIGIONS, location, () -> unique(dogmaIds, new DogmaId(dogma.id())));
+                    List<DogmaId> incompatible = list(
+                            RELIGIONS,
+                            location + ".incompatible",
+                            dogma.incompatible(),
+                            (otherLocation, other) -> at(RELIGIONS, otherLocation, () -> new DogmaId(other)));
+                    List<ModifierDef> modifiers = modifiers(RELIGIONS, location, dogma.modifiers());
+                    return at(
+                            RELIGIONS,
+                            location,
+                            () -> new DogmaDef(
+                                    id,
+                                    dogma.name(),
+                                    dogma.description(),
+                                    required("weight", dogma.weight()),
+                                    new TreeMap<>(dogma.weightTags()),
+                                    modifiers,
+                                    dogma.tags(),
+                                    incompatible));
+                });
+        // Посилання між догматами — в межах файлу, тож місце помилки відоме точно.
+        for (int i = 0; i < dogmas.size(); i++) {
+            List<DogmaId> incompatible = dogmas.get(i).incompatible();
+            for (int j = 0; j < incompatible.size(); j++) {
+                if (!dogmaIds.contains(incompatible.get(j))) {
+                    throw invalid(
+                            RELIGIONS,
+                            "dogmas[" + i + "].incompatible[" + j + "]",
+                            unknown("dogma", incompatible.get(j)));
+                }
+            }
+        }
+
+        TreeSet<ReligionPolityId> polityIds = new TreeSet<>();
+        List<ReligionPolityDef> polities =
+                list(RELIGIONS, "polities", nonEmpty(RELIGIONS, "polities", yaml.polities()), (location, polity) -> {
+                    ReligionPolityId id =
+                            at(RELIGIONS, location, () -> unique(polityIds, new ReligionPolityId(polity.id())));
+                    List<ModifierDef> modifiers = modifiers(RELIGIONS, location, polity.modifiers());
+                    return at(
+                            RELIGIONS,
+                            location,
+                            () -> new ReligionPolityDef(
+                                    id,
+                                    polity.name(),
+                                    polity.description(),
+                                    required("weight", polity.weight()),
+                                    new TreeMap<>(polity.weightTags()),
+                                    modifiers,
+                                    polity.tags()));
+                });
+
+        TreeSet<FaithFormId> formIds = new TreeSet<>();
+        List<FaithFormDef> forms = list(
+                RELIGIONS, "faith_forms", nonEmpty(RELIGIONS, "faith_forms", yaml.faithForms()), (location, form) -> {
+                    FaithFormId id = at(RELIGIONS, location, () -> unique(formIds, new FaithFormId(form.id())));
+                    List<ArchetypeId> formArchetypes =
+                            list(RELIGIONS, location + ".archetypes", form.archetypes(), (itemLocation, value) -> {
+                                ArchetypeId archetype = at(RELIGIONS, itemLocation, () -> new ArchetypeId(value));
+                                if (!archetypeIds.contains(archetype)) {
+                                    throw invalid(RELIGIONS, itemLocation, unknown("archetype", archetype));
+                                }
+                                return archetype;
+                            });
+                    return at(
+                            RELIGIONS,
+                            location,
+                            () -> new FaithFormDef(
+                                    id,
+                                    gender(form.gender()),
+                                    cases("forms", form.forms()),
+                                    ContentKeys.parse(
+                                            "figure_case",
+                                            GrammaticalCase.values(),
+                                            GrammaticalCase::key,
+                                            form.figureCase()),
+                                    formArchetypes));
+                });
+        // Кожному архетипу — хоча б одна форма; перевіряється тут, щоб помилка вказувала на список форм.
+        for (ArchetypeDef archetype : archetypes) {
+            if (forms.stream().noneMatch(form -> form.appliesTo(archetype.id()))) {
+                throw invalid(
+                        RELIGIONS,
+                        "faith_forms",
+                        new ValidationException(
+                                ErrorCode.MISSING_DEFINITION,
+                                ErrorDetails.of("field", "faith_forms", "value", archetype.id())));
+            }
+        }
+
+        // Добавки до ваги — лише за мітки коліс, що крутяться раніше або те саме: архетип → аспекти → догмати → устрій.
+        TreeSet<String> known = new TreeSet<>();
+        archetypes.forEach(archetype -> known.addAll(archetype.tags()));
+        aspects.forEach(aspect -> known.addAll(aspect.tags()));
+        checkWeightTags("aspects", aspects, AspectDef::weightTags, known);
+        dogmas.forEach(dogma -> known.addAll(dogma.tags()));
+        checkWeightTags("dogmas", dogmas, DogmaDef::weightTags, known);
+        polities.forEach(polity -> known.addAll(polity.tags()));
+        checkWeightTags("polities", polities, ReligionPolityDef::weightTags, known);
+
+        return at(RELIGIONS, "", () -> new ReligionContent(archetypes, aspects, dogmas, polities, forms));
+    }
+
+    private static <T> void checkWeightTags(
+            String field, List<T> defs, Function<T, SortedMap<String, Integer>> weightTags, Set<String> known) {
+        for (int i = 0; i < defs.size(); i++) {
+            for (String tag : weightTags.apply(defs.get(i)).keySet()) {
+                if (!known.contains(tag)) {
+                    throw invalid(RELIGIONS, field + "[" + i + "].weight_tags", unknown("tag", tag));
+                }
+            }
+        }
+    }
+
     private static BackstoryFragmentDef fragment(
             BackstoryFragmentId id, ContentYaml.Fragment fragment, List<ModifierDef> modifiers) {
         if (fragment.quality() == null) {
@@ -963,7 +1134,12 @@ public final class ContentLoader {
                         age,
                         nameCandidates));
 
-        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation));
+        ContentYaml.Religion religionYaml = section("religion", yaml.religion());
+        CountRange aspects = at(BALANCE, "religion.aspects", () -> count(religionYaml.aspects()));
+        CountRange dogmas = at(BALANCE, "religion.dogmas", () -> count(religionYaml.dogmas()));
+        ReligionBalanceDef religion = at(BALANCE, "religion", () -> new ReligionBalanceDef(aspects, dogmas));
+
+        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation, religion));
     }
 
     /** Розділ файлу балансу; пропущений — помилка з назвою розділу як місцем. */

@@ -46,6 +46,7 @@ public final class ContentPack {
     private final NameContent names;
     private final BackstoryContent backstory;
     private final StreakContent streaks;
+    private final ReligionContent religions;
     private final BalanceDef balance;
 
     /**
@@ -68,6 +69,7 @@ public final class ContentPack {
      *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, ІЛР, розміру армії чи вишколу, фрагмент,
      *     колесо стріку чи його нагороду або словник міток коліс генерації
      * @param streaks колеса стріків генерації
+     * @param religions шаблон релігій світу: архетипи, аспекти, догмати, устрої, форми назви віри
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР, розміру армії
      *     чи вишколу не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
@@ -92,6 +94,7 @@ public final class ContentPack {
             NameContent names,
             BackstoryContent backstory,
             StreakContent streaks,
+            ReligionContent religions,
             BalanceDef balance) {
         this.hash = Checks.notBlank("content.hash", hash);
 
@@ -268,6 +271,7 @@ public final class ContentPack {
             }
         }
 
+        this.religions = Objects.requireNonNull(religions, "religions");
         this.balance = Objects.requireNonNull(balance, "balance");
     }
 
@@ -447,6 +451,11 @@ public final class ContentPack {
     /** Колеса стріків генерації: «Золота доба» й «Андердог». */
     public StreakContent streaks() {
         return streaks;
+    }
+
+    /** Шаблон релігій світу (GD §25.1): з його частин генеруються релігії. */
+    public ReligionContent religions() {
+        return religions;
     }
 
     /** Числа балансу: колеса, стріки, коридор сили, кількості генерації. */

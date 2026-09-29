@@ -46,6 +46,7 @@ import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TestReligions;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -461,6 +462,7 @@ final class TestBackstory {
                 new NameContent(List.of(masc, fem), List.of(style), List.of(republic), List.of(people)),
                 new BackstoryContent(GENERATION_TAGS, fragments),
                 TestStreaks.CONTENT,
+                TestReligions.content(),
                 BalanceDef.of(
                         new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                         new StreakRulesDef(85, 15, 3),
@@ -480,7 +482,8 @@ final class TestBackstory {
                                 armyTrainingDevelopmentAdvantage,
                                 persons.traitCount(),
                                 persons.age(),
-                                5)));
+                                5),
+                        TestReligions.BALANCE));
     }
 
     /** По рівню вишколу на кожен рівень 1..5 з рівними вагами, від провалу до успіху. */

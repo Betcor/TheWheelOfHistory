@@ -1,0 +1,395 @@
+# Релігії світу (GD §25.1): шаблон, з частин якого генеруються вигадані релігії.
+#
+# Релігія — ланцюжок коліс: архетип → аспекти божества → догмати → устрій → назва. Сектори кожного колеса —
+# записи відповідного списку в порядку цього файлу. Кількість аспектів і догматів — religion у balance.yaml.
+#
+# weight — базова вага, відносна (1..10000); weight_tags — добавки до ваги за мітки вже обраних частин
+# (можуть бути від'ємні), підсумок обрізається до 0..10000, частина з вагою 0 не випадає. Частини не бувають
+# кращими чи гіршими, тож вплив попередніх коліс — не перевагою, а вагою, як у типів постатей.
+# Добавка може залежати лише від міток коліс, що крутяться раніше або те саме:
+#   аспекти — від міток архетипів і аспектів; догмати — ще й догматів; устрій — від усіх.
+#
+# Мітки частин стають мітками релігії (GD §25.1): за ними обиратимуться події, фрагменти передісторії й технології.
+# Модифікатори догматів і устрою діятимуть на держави цієї віри (колесо релігії держави, GD §25.2). Обмеження
+# догматів (що вони забороняють), дари й технології аспектів (GD §25.3) з'являться разом із системами.
+#
+# Аспект «машина» тут навмисно відсутній: він з'являється лише в Культі Машини — через розкол (GD §25.4).
+#
+# Ваги, добавки й модифікатори запропоновано; чекають підтвердження автора.
+
+archetypes:
+  - id: monotheism
+    name: Монотеїзм
+    description: Віра в єдиного бога, творця й суддю світу.
+    figure: Єдиний Бог
+    weight: 20
+    tags: [archetype_monotheism]
+  - id: polytheism
+    name: Політеїзм
+    description: Віра в багатьох богів, кожен з яких править своєю частиною світу; на чолі — верховне божество.
+    figure: Верховне божество
+    weight: 20
+    tags: [archetype_polytheism]
+  - id: dualism
+    name: Дуалізм
+    description: Світ — поле вічної боротьби світла й темряви; вірянин обирає бік.
+    figure: Бог світла
+    weight: 12
+    tags: [archetype_dualism]
+  - id: ancestor_cult
+    name: Культ предків
+    description: Шана до померлих предків, які оберігають рід і судять живих.
+    figure: Праотець
+    weight: 16
+    tags: [archetype_ancestor_cult]
+  - id: animism
+    name: Анімізм
+    description: Духи живуть у горах, ріках і звірах; з ними домовляються, а не поклоняються.
+    figure: Великий Дух
+    weight: 12
+    tags: [archetype_animism]
+  - id: philosophy
+    name: Філософське вчення
+    description: Шлях мудрості без богів або з богами на другому плані; засновник — учитель, а не пророк.
+    figure: Учитель
+    weight: 20
+    tags: [archetype_philosophy]
+
+aspects:
+  - id: war
+    name: Війна
+    description: Божество битв і перемоги.
+    weight: 100
+    weight_tags: { archetype_dualism: 50, archetype_polytheism: 30, archetype_philosophy: -60 }
+    tags: [religion_war]
+  - id: knowledge
+    name: Знання
+    description: Божество мудрості, письма й пізнання.
+    weight: 100
+    weight_tags: { archetype_philosophy: 100, archetype_animism: -50 }
+    tags: [religion_knowledge]
+  - id: fertility
+    name: Родючість
+    description: Божество врожаю, дітей і достатку.
+    weight: 100
+    weight_tags: { archetype_animism: 60, archetype_polytheism: 40, archetype_philosophy: -60, religion_nature: 40 }
+    tags: [religion_fertility]
+  - id: death
+    name: Смерть
+    description: Володар потойбіччя й суду над душами.
+    weight: 100
+    weight_tags: { archetype_ancestor_cult: 100, archetype_dualism: 40, religion_war: 30 }
+    tags: [religion_death]
+  - id: order
+    name: Порядок
+    description: Божество закону, влади й правильного устрою світу.
+    weight: 100
+    weight_tags: { archetype_monotheism: 60, archetype_philosophy: 60, archetype_animism: -50 }
+    tags: [religion_order]
+  - id: sea
+    name: Море
+    description: Володар вод, бур і мореплавців.
+    weight: 100
+    weight_tags: { archetype_polytheism: 40, archetype_animism: 30, archetype_philosophy: -80 }
+    tags: [religion_sea]
+  - id: trade
+    name: Торгівля
+    description: Покровитель купців, доріг і чесної міри.
+    weight: 100
+    weight_tags: { archetype_polytheism: 30, archetype_animism: -50, religion_sea: 40 }
+    tags: [religion_trade]
+  - id: craft
+    name: Ремесло
+    description: Покровитель ковалів, будівничих і майстрів.
+    weight: 100
+    weight_tags: { archetype_polytheism: 30, archetype_ancestor_cult: 20 }
+    tags: [religion_craft]
+  - id: nature
+    name: Природа
+    description: Дух лісів, гір і звірів.
+    weight: 100
+    weight_tags: { archetype_animism: 100, archetype_monotheism: -40, religion_fertility: 40 }
+    tags: [religion_nature]
+  - id: fate
+    name: Доля
+    description: Той, хто пряде долю людей і народів.
+    weight: 100
+    weight_tags: { archetype_dualism: 40, archetype_monotheism: 30, archetype_philosophy: 30 }
+    tags: [religion_fate]
+
+dogmas:
+  - id: holy_war
+    name: Священна війна
+    description: Війна за віру — обов'язок, а загибель у ній — шлях до спасіння.
+    weight: 60
+    weight_tags: { religion_war: 150, archetype_dualism: 60, archetype_philosophy: -40 }
+    modifiers:
+      - { target: "stat:war_weariness", value: -5 }
+    tags: [dogma_holy_war]
+    incompatible: [pacifism]
+  - id: pacifism
+    name: Ненасильство
+    description: Проливати кров — тяжкий гріх; війна виснажує віруючий народ швидше.
+    weight: 60
+    weight_tags: { archetype_philosophy: 100, religion_war: -60 }
+    modifiers:
+      - { target: "stat:stability", value: 3 }
+      - { target: "stat:war_weariness", value: 5 }
+    tags: [dogma_pacifism]
+  - id: asceticism
+    name: Аскеза
+    description: Відмова від розкошів очищує душу.
+    weight: 80
+    weight_tags: { archetype_philosophy: 60, archetype_monotheism: 30 }
+    modifiers:
+      - { target: "stat:stability", value: 3 }
+    tags: [dogma_asceticism]
+    incompatible: [sacred_wealth]
+  - id: sacred_wealth
+    name: Багатство — благословення
+    description: Достаток — знак ласки бога, а бідність — його кара.
+    weight: 60
+    weight_tags: { religion_trade: 120, religion_fertility: 40 }
+    modifiers:
+      - { target: "stat:influence", value: 3 }
+      - { target: "stat:stability", value: -3 }
+    tags: [dogma_sacred_wealth]
+  - id: scholar_honor
+    name: Шана вченим
+    description: Пізнання світу — пізнання бога; вчений стоїть поруч зі священником.
+    weight: 70
+    weight_tags: { religion_knowledge: 150, religion_craft: 40 }
+    modifiers:
+      - { target: "stat:hdi", value: 3 }
+    tags: [dogma_scholar_honor]
+    incompatible: [forbidden_knowledge]
+  - id: forbidden_knowledge
+    name: Заборонене знання
+    description: Деякі таємниці належать лише богам; хто шукає їх — накликає біду.
+    weight: 50
+    weight_tags: { religion_death: 60, religion_fate: 40, religion_knowledge: -40 }
+    modifiers:
+      - { target: "stat:stability", value: 5 }
+      - { target: "stat:hdi", value: -3 }
+    tags: [dogma_forbidden_knowledge]
+  - id: usury_ban
+    name: Заборона лихварства
+    description: Позичати під відсотки — гріх.
+    weight: 60
+    weight_tags: { archetype_monotheism: 60, religion_order: 40, religion_trade: -40 }
+    modifiers:
+      - { target: "stat:stability", value: 3 }
+    tags: [dogma_usury_ban]
+  - id: missionary
+    name: Місіонерство
+    description: Віру треба нести іншим народам.
+    weight: 70
+    weight_tags: { archetype_monotheism: 80, archetype_ancestor_cult: -60 }
+    modifiers:
+      - { target: "stat:influence", value: 5 }
+    tags: [dogma_missionary]
+    incompatible: [faith_of_blood]
+  - id: faith_of_blood
+    name: Віра по крові
+    description: Вірянином народжуються, а не стають; чужинців до обрядів не допускають.
+    weight: 50
+    weight_tags: { archetype_ancestor_cult: 120, archetype_animism: 40 }
+    modifiers:
+      - { target: "stat:stability", value: 5 }
+      - { target: "stat:influence", value: -3 }
+    tags: [dogma_faith_of_blood]
+  - id: pilgrimage
+    name: Паломництво
+    description: Кожен вірянин хоч раз у житті має побувати в святому центрі.
+    weight: 80
+    weight_tags: { archetype_monotheism: 40, archetype_polytheism: 30 }
+    modifiers:
+      - { target: "stat:influence", value: 3 }
+    tags: [dogma_pilgrimage]
+  - id: sacred_ruler
+    name: Священний правитель
+    description: Влада правителя — від бога, і повстати проти нього — святотатство.
+    weight: 60
+    weight_tags: { religion_order: 120, archetype_ancestor_cult: 40 }
+    modifiers:
+      - { target: "stat:legitimacy", value: 10 }
+    tags: [dogma_sacred_ruler]
+  - id: charity
+    name: Милосердя
+    description: Допомога бідним і хворим — перший обов'язок вірянина.
+    weight: 80
+    weight_tags: { religion_fertility: 30, archetype_monotheism: 30 }
+    modifiers:
+      - { target: "stat:hdi", value: 3 }
+      - { target: "stat:stability", value: 2 }
+    tags: [dogma_charity]
+  - id: omens
+    name: Віра в знамення
+    description: Боги говорять знаками; жодна велика справа не починається без ворожби.
+    weight: 60
+    weight_tags: { religion_fate: 150, archetype_animism: 40 }
+    modifiers:
+      - { target: "stat:legitimacy", value: 3 }
+    tags: [dogma_omens]
+
+# Устрій впливатиме на стабільність, розколи й роль пророків (GD §25.1) — разом із системою релігій.
+polities:
+  - id: single_church
+    name: Єдина церква
+    description: Одна ієрархія священників на чолі з верховним.
+    weight: 100
+    weight_tags: { archetype_monotheism: 100, archetype_animism: -60, archetype_philosophy: -40, dogma_sacred_ruler: 40 }
+    modifiers:
+      - { target: "stat:stability", value: 5 }
+    tags: [polity_single_church]
+  - id: communities
+    name: Незалежні громади
+    description: Кожна громада сама обирає наставників; спільного проводу немає.
+    weight: 100
+    weight_tags: { archetype_polytheism: 50, archetype_animism: 80, archetype_ancestor_cult: 50 }
+    tags: [polity_communities]
+  - id: no_clergy
+    name: Без духовенства
+    description: Між вірянином і богом немає посередників; обряди веде старший у родині.
+    weight: 60
+    weight_tags: { archetype_philosophy: 120, archetype_ancestor_cult: 40, dogma_asceticism: 30 }
+    tags: [polity_no_clergy]
+
+# Назва віри (GD §25.1, колесо 5): головне слово відмінюється, ім'я постаті (божества, засновника)
+# стоїть у відмінку figure_case в усіх формах: «Шлях Оріна», «Шляхом Оріна». Ім'я постаті — з мовних
+# стилів імен людей (names.yaml), відмінюється як ім'я істоти. gender — рід назви віри, з ним
+# узгоджуються дієслова в хроніці. Форма доступна релігіям з архетипами зі списку archetypes; кожному
+# архетипу — хоча б одна. Форма обирається рівноймовірно: назва не впливає на ігровий процес.
+faith_forms:
+  - id: faith
+    gender: feminine
+    figure_case: genitive
+    archetypes: [monotheism, polytheism, dualism, ancestor_cult, animism, philosophy]
+    forms:
+      nominative: "Віра {figure}"
+      genitive: "Віри {figure}"
+      dative: "Вірі {figure}"
+      accusative: "Віру {figure}"
+      instrumental: "Вірою {figure}"
+      locative: "Вірі {figure}"
+      vocative: "Віро {figure}"
+  - id: church
+    gender: feminine
+    figure_case: genitive
+    archetypes: [monotheism, dualism]
+    forms:
+      nominative: "Церква {figure}"
+      genitive: "Церкви {figure}"
+      dative: "Церкві {figure}"
+      accusative: "Церкву {figure}"
+      instrumental: "Церквою {figure}"
+      locative: "Церкві {figure}"
+      vocative: "Церкво {figure}"
+  - id: covenant
+    gender: masculine
+    figure_case: genitive
+    archetypes: [monotheism]
+    forms:
+      nominative: "Завіт {figure}"
+      genitive: "Завіту {figure}"
+      dative: "Завітові {figure}"
+      accusative: "Завіт {figure}"
+      instrumental: "Завітом {figure}"
+      locative: "Завіті {figure}"
+      vocative: "Завіте {figure}"
+  - id: temple
+    gender: masculine
+    figure_case: genitive
+    archetypes: [polytheism]
+    forms:
+      nominative: "Храм {figure}"
+      genitive: "Храму {figure}"
+      dative: "Храмові {figure}"
+      accusative: "Храм {figure}"
+      instrumental: "Храмом {figure}"
+      locative: "Храмі {figure}"
+      vocative: "Храме {figure}"
+  - id: pantheon
+    gender: masculine
+    figure_case: genitive
+    archetypes: [polytheism]
+    forms:
+      nominative: "Пантеон {figure}"
+      genitive: "Пантеону {figure}"
+      dative: "Пантеонові {figure}"
+      accusative: "Пантеон {figure}"
+      instrumental: "Пантеоном {figure}"
+      locative: "Пантеоні {figure}"
+      vocative: "Пантеоне {figure}"
+  - id: light
+    gender: neuter
+    figure_case: genitive
+    archetypes: [dualism]
+    forms:
+      nominative: "Світло {figure}"
+      genitive: "Світла {figure}"
+      dative: "Світлу {figure}"
+      accusative: "Світло {figure}"
+      instrumental: "Світлом {figure}"
+      locative: "Світлі {figure}"
+      vocative: "Світло {figure}"
+  - id: path
+    gender: masculine
+    figure_case: genitive
+    archetypes: [ancestor_cult, animism, philosophy]
+    forms:
+      nominative: "Шлях {figure}"
+      genitive: "Шляху {figure}"
+      dative: "Шляхові {figure}"
+      accusative: "Шлях {figure}"
+      instrumental: "Шляхом {figure}"
+      locative: "Шляху {figure}"
+      vocative: "Шляху {figure}"
+  - id: teaching
+    gender: neuter
+    figure_case: genitive
+    archetypes: [philosophy]
+    forms:
+      nominative: "Вчення {figure}"
+      genitive: "Вчення {figure}"
+      dative: "Вченню {figure}"
+      accusative: "Вчення {figure}"
+      instrumental: "Вченням {figure}"
+      locative: "Вченні {figure}"
+      vocative: "Вчення {figure}"
+  - id: kin
+    gender: masculine
+    figure_case: genitive
+    archetypes: [ancestor_cult]
+    forms:
+      nominative: "Рід {figure}"
+      genitive: "Роду {figure}"
+      dative: "Родові {figure}"
+      accusative: "Рід {figure}"
+      instrumental: "Родом {figure}"
+      locative: "Роді {figure}"
+      vocative: "Роде {figure}"
+  - id: children
+    gender: plural
+    figure_case: genitive
+    archetypes: [ancestor_cult, animism]
+    forms:
+      nominative: "Діти {figure}"
+      genitive: "Дітей {figure}"
+      dative: "Дітям {figure}"
+      accusative: "Дітей {figure}"
+      instrumental: "Дітьми {figure}"
+      locative: "Дітях {figure}"
+      vocative: "Діти {figure}"
+  - id: trail
+    gender: feminine
+    figure_case: genitive
+    archetypes: [animism]
+    forms:
+      nominative: "Стежка {figure}"
+      genitive: "Стежки {figure}"
+      dative: "Стежці {figure}"
+      accusative: "Стежку {figure}"
+      instrumental: "Стежкою {figure}"
+      locative: "Стежці {figure}"
+      vocative: "Стежко {figure}"
