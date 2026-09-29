@@ -41,6 +41,8 @@ import kolo.engine.content.NameParadigmId;
 import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonNameStyleDef;
+import kolo.engine.content.ReliefDef;
+import kolo.engine.content.ReliefLevelDef;
 import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ReligionCountDef;
@@ -69,6 +71,7 @@ import kolo.engine.state.NpcShare;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
+import kolo.engine.state.Relief;
 import kolo.engine.state.Sex;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
@@ -1314,6 +1317,24 @@ class ContentLoaderTest {
                         tuple(new MapTemplateId("archipelago"), "Архіпелаг", 15, 120, 30, new CountRange(5, 8)));
         assertThat(pack.map().grid()).isEqualTo(new MapGridDef(100, 2, 1, 2));
         assertThat(pack.map().continents()).isEqualTo(new ContinentsDef(new CountRange(1, 4), 20, 50, 6));
+        ReliefDef relief = pack.map().relief();
+        assertThat(relief.ridges()).isEqualTo(new CountRange(1, 3));
+        assertThat(List.of(
+                        relief.ridgeMinProvinces(),
+                        relief.ridgeLengthPct(),
+                        relief.ridgeWander(),
+                        relief.ridgeHeight(),
+                        relief.ridgeFalloff(),
+                        relief.baseHeight(),
+                        relief.noiseAmplitude(),
+                        relief.noiseCells()))
+                .containsExactly(40, 70, 30, 70, 20, 20, 25, 4);
+        assertThat(relief.levels())
+                .extracting(ReliefLevelDef::relief, ReliefLevelDef::name, ReliefLevelDef::minHeight)
+                .containsExactly(
+                        tuple(Relief.PLAIN, "Рівнина", 0),
+                        tuple(Relief.HILLS, "Пагорби", 40),
+                        tuple(Relief.MOUNTAINS, "Гори", 70));
         WorldBalanceDef world = pack.balance().world();
         assertThat(world.npcExtra(NpcShare.FEW)).isEqualTo(new CountRange(1, 3));
         assertThat(world.npcExtra(NpcShare.NORMAL)).isEqualTo(new CountRange(2, 6));
@@ -1379,6 +1400,41 @@ class ContentLoaderTest {
         assertMapError(
                 Files.MAP.replace("noise_cells: 6", "noise_cells: 0"),
                 Map.of("location", "continents", "cause", "value_out_of_range", "field", "continents.noise_cells"));
+    }
+
+    @Test
+    void invalidReliefIsReportedAtItsPosition() {
+        String relief = Files.MAP.substring(Files.MAP.indexOf("relief:\n"));
+        assertMapError(
+                Files.MAP.replace(relief, ""), Map.of("location", "relief", "cause", "blank_value", "field", "relief"));
+        assertMapError(
+                Files.MAP.replace("  ridges: { min: 1, max: 3 }\n", ""),
+                Map.of("location", "relief", "cause", "blank_value", "field", "ridges"));
+        assertMapError(
+                Files.MAP.replace("  ridge_falloff: 20\n", ""),
+                Map.of("location", "relief", "cause", "blank_value", "field", "ridge_falloff"));
+        assertMapError(
+                Files.MAP.replace("ridges: { min: 1, max: 3 }", "ridges: { min: 1, max: 11 }"),
+                Map.of("location", "relief", "cause", "value_out_of_range", "field", "relief.ridges.max"));
+        assertMapError(
+                Files.MAP.replace("ridge_wander: 30", "ridge_wander: 61"),
+                Map.of("location", "relief", "cause", "value_out_of_range", "field", "relief.ridge_wander"));
+        assertMapError(
+                Files.MAP.replace("- id: hills", "- id: plateau"),
+                Map.of("location", "relief.levels[1]", "cause", "unknown_reference", "value", "plateau"));
+        assertMapError(
+                Files.MAP.replace("- id: hills", "- id: plain"),
+                Map.of("location", "relief.levels[1]", "cause", "duplicate_id", "value", "plain"));
+        assertMapError(
+                Files.MAP.replace("      min_height: 40\n", ""),
+                Map.of("location", "relief.levels[1]", "cause", "blank_value", "field", "min_height"));
+        assertMapError(
+                Files.MAP.replace("min_height: 40", "min_height: 70"),
+                Map.of("location", "relief", "cause", "out_of_order", "field", "relief.mountains.min_height"));
+        String mountains = Files.MAP.substring(Files.MAP.indexOf("    - id: mountains"));
+        assertMapError(
+                Files.MAP.replace(mountains, ""),
+                Map.of("location", "relief.levels", "cause", "missing_definition", "value", "mountains"));
     }
 
     @Test
