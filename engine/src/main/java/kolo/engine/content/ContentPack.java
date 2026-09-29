@@ -45,6 +45,7 @@ public final class ContentPack {
     private final SortedMap<TraitId, TraitDef> traits;
     private final NameContent names;
     private final BackstoryContent backstory;
+    private final StreakContent streaks;
     private final BalanceDef balance;
 
     /**
@@ -64,8 +65,9 @@ public final class ContentPack {
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
-     *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, ІЛР, розміру армії чи вишколу, фрагмент
-     *     або словник міток коліс генерації
+     *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, ІЛР, розміру армії чи вишколу, фрагмент,
+     *     колесо стріку чи його нагороду або словник міток коліс генерації
+     * @param streaks колеса стріків генерації
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР, розміру армії
      *     чи вишколу не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
@@ -89,6 +91,7 @@ public final class ContentPack {
             List<TraitDef> traits,
             NameContent names,
             BackstoryContent backstory,
+            StreakContent streaks,
             BalanceDef balance) {
         this.hash = Checks.notBlank("content.hash", hash);
 
@@ -237,7 +240,9 @@ public final class ContentPack {
         }
 
         this.backstory = Objects.requireNonNull(backstory, "backstory");
+        this.streaks = Objects.requireNonNull(streaks, "streaks");
         TreeSet<String> known = new TreeSet<>(backstory.producedTags());
+        known.addAll(streaks.producedTags());
         for (IdeologyDef ideology : ideologyMap.values()) {
             known.addAll(ideology.tags());
             ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
@@ -437,6 +442,11 @@ public final class ContentPack {
     /** Передісторія: фрагменти й словник міток коліс генерації. */
     public BackstoryContent backstory() {
         return backstory;
+    }
+
+    /** Колеса стріків генерації: «Золота доба» й «Андердог». */
+    public StreakContent streaks() {
+        return streaks;
     }
 
     /** Числа балансу: колеса, стріки, коридор сили, кількості генерації. */

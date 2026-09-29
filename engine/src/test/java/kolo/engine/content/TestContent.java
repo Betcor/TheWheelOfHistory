@@ -237,6 +237,31 @@ final class TestContent {
         return new BackstoryContent(Map.of(), List.of(fragment("civil_war", TagCondition.NONE, List.of("civil_war"))));
     }
 
+    /** Нагорода стріку з одним модифікатором стабільності на 10 років. */
+    static StreakRewardDef reward(String id, List<String> tags) {
+        return new StreakRewardDef(
+                new StreakRewardId(id),
+                "Нагорода " + id,
+                "Опис нагороди " + id,
+                100,
+                10,
+                List.of(new ModifierDef(ModifierTarget.stat(Stat.STABILITY), 10)),
+                0,
+                0,
+                tags);
+    }
+
+    static StreakWheelDef streakWheel(StreakKind kind, List<String> tags, StreakRewardDef... rewards) {
+        return new StreakWheelDef(kind, "Колесо " + kind.key(), "Опис колеса " + kind.key(), tags, List.of(rewards));
+    }
+
+    /** По колесу на кожен вид стріку, з мітками коліс і нагород. */
+    static StreakContent streaks() {
+        return new StreakContent(List.of(
+                streakWheel(StreakKind.GOLDEN_AGE, List.of("world_attention"), reward("national_pride", List.of())),
+                streakWheel(StreakKind.UNDERDOG, List.of(), reward("sympathy", List.of("international_sympathy")))));
+    }
+
     /** Коридор, у якому NPC ширші за гравців. */
     static PowerCorridorDef corridor(PowerCorridor corridor) {
         return new PowerCorridorDef(corridor, new MedianRange(50, 200), new MedianRange(25, 400));
@@ -280,6 +305,7 @@ final class TestContent {
                 traits(),
                 names(ideologies),
                 backstory(),
+                streaks(),
                 balance());
     }
 }

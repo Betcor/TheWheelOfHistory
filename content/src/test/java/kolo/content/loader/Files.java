@@ -253,6 +253,37 @@ final class Files {
               name_candidates: 5
             """;
 
+    static final String STREAKS = """
+            wheels:
+              - id: golden_age
+                name: Золота доба
+                description: Усе вдається поспіль.
+                tags: [golden_age, world_attention]
+                rewards:
+                  - id: national_pride
+                    name: Національна гордість
+                    description: Успіхи згуртували країну.
+                    weight: 100
+                    duration: 10
+                    modifiers:
+                      - { target: "stat:stability", value: 10 }
+                  - id: great_figure
+                    name: Видатна постать
+                    description: Ще одна відома людина.
+                    weight: 100
+                    extra_people: 1
+              - id: underdog
+                name: Андердог
+                description: Доля била державу знову й знову.
+                tags: [underdog]
+                rewards:
+                  - id: second_chance
+                    name: Другий шанс
+                    description: Два жетони долі.
+                    weight: 100
+                    fate_tokens: 2
+            """;
+
     private final TreeMap<String, String> files = new TreeMap<>();
 
     private Files() {
@@ -267,6 +298,7 @@ final class Files {
         files.put(ContentLoader.PEOPLE, PEOPLE);
         files.put(ContentLoader.NAMES, NAMES);
         files.put(ContentLoader.BACKSTORY, BACKSTORY);
+        files.put(ContentLoader.STREAKS, STREAKS);
         files.put(ContentLoader.BALANCE, BALANCE);
     }
 

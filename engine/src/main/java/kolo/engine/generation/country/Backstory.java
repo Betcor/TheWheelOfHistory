@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import kolo.engine.state.CountryId;
@@ -25,5 +26,22 @@ public record Backstory(
         Objects.requireNonNull(neighbor, "neighbor");
         tags = Collections.unmodifiableSortedSet(new TreeSet<>(tags));
         rolls = List.copyOf(rolls);
+    }
+
+    /**
+     * Якість передісторії для стріків генерації (GD §4.10): одна на всю передісторію — середня якість фрагментів,
+     * округлена вниз. Пов'язані фрагменти («програна війна» → «контрибуції») інакше самі собою складали б стрік.
+     *
+     * @return порожньо, якщо фрагментів немає: тоді передісторія не рахується в стріки
+     */
+    public OptionalInt quality() {
+        if (entries.isEmpty()) {
+            return OptionalInt.empty();
+        }
+        int sum = 0;
+        for (BackstoryEntry entry : entries) {
+            sum += entry.fragment().quality();
+        }
+        return OptionalInt.of(Math.floorDiv(sum, entries.size()));
     }
 }
