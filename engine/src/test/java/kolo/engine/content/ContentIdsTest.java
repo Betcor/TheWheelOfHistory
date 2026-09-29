@@ -21,7 +21,12 @@ class ContentIdsTest {
             () -> new TraitId("Brave"),
             () -> new GdpLevelId("Very Rich"),
             () -> new HdiLevelId("very-high"),
-            () -> new ArmySizeId("Nation In Arms")
+            () -> new ArmySizeId("Nation In Arms"),
+            () -> new ArchetypeId("Monotheism"),
+            () -> new AspectId("war god"),
+            () -> new DogmaId("holy-war"),
+            () -> new ReligionPolityId(""),
+            () -> new FaithFormId("Path")
         }) {
             assertThatThrownBy(invalid::run)
                     .isInstanceOfSatisfying(
@@ -45,5 +50,12 @@ class ContentIdsTest {
         assertThat(new HdiLevelId("high")).isLessThan(new HdiLevelId("low"));
         assertThat(new ArmySizeId("large")).hasToString("large");
         assertThat(new ArmySizeId("large")).isLessThan(new ArmySizeId("small"));
+        assertThat(new ArchetypeId("dualism")).hasToString("dualism").isLessThan(new ArchetypeId("monotheism"));
+        assertThat(new AspectId("death")).hasToString("death").isLessThan(new AspectId("war"));
+        assertThat(new DogmaId("asceticism")).hasToString("asceticism").isLessThan(new DogmaId("pacifism"));
+        assertThat(new ReligionPolityId("communities"))
+                .hasToString("communities")
+                .isLessThan(new ReligionPolityId("single_church"));
+        assertThat(new FaithFormId("path")).hasToString("path").isLessThan(new FaithFormId("temple"));
     }
 }

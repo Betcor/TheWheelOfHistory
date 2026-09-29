@@ -8,7 +8,10 @@ import static org.assertj.core.api.Assertions.tuple;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import kolo.engine.content.ArchetypeDef;
+import kolo.engine.content.ArchetypeId;
 import kolo.engine.content.ArmySizeDef;
 import kolo.engine.content.ArmySizeId;
 import kolo.engine.content.BackstoryContent;
@@ -17,6 +20,10 @@ import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BalanceDef;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.CountRange;
+import kolo.engine.content.DogmaDef;
+import kolo.engine.content.DogmaId;
+import kolo.engine.content.FaithFormDef;
+import kolo.engine.content.FaithFormId;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.HdiLevelDef;
@@ -30,6 +37,8 @@ import kolo.engine.content.NameParadigmId;
 import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonNameStyleDef;
+import kolo.engine.content.ReligionBalanceDef;
+import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
@@ -1043,6 +1052,109 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsReligions() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+        ReligionContent religions = pack.religions();
+
+        assertThat(religions.archetypes())
+                .extracting(ArchetypeDef::id, ArchetypeDef::figure, ArchetypeDef::weight)
+                .containsExactly(
+                        tuple(new ArchetypeId("monotheism"), "Єдиний Бог", 20),
+                        tuple(new ArchetypeId("polytheism"), "Верховне божество", 20));
+        assertThat(religions.aspects().getFirst().weightFor(Set.of("archetype_polytheism")))
+                .isEqualTo(130);
+        DogmaDef holyWar = religions.dogma(new DogmaId("holy_war")).orElseThrow();
+        assertThat(holyWar.modifiers()).containsExactly(new ModifierDef(ModifierTarget.stat(Stat.WAR_WEARINESS), -5));
+        assertThat(religions.compatible(new DogmaId("pacifism"), new DogmaId("holy_war")))
+                .isFalse();
+        assertThat(religions.polities())
+                .extracting(polity -> polity.id().value())
+                .containsExactly("single_church", "communities");
+        FaithFormDef path = religions.faithForm(new FaithFormId("path")).orElseThrow();
+        assertThat(path.gender()).isEqualTo(GrammaticalGender.MASCULINE);
+        assertThat(path.figureCase()).isEqualTo(GrammaticalCase.GENITIVE);
+        assertThat(path.render(GrammaticalCase.DATIVE, "Оріна")).isEqualTo("Шляхові Оріна");
+        assertThat(pack.balance().religion())
+                .isEqualTo(new ReligionBalanceDef(new CountRange(2, 3), new CountRange(2, 4)));
+    }
+
+    @Test
+    void invalidReligionsAreReportedAtTheirPosition() {
+        assertReligionsError(
+                Files.RELIGIONS.replace("id: polytheism", "id: monotheism"),
+                Map.of("location", "archetypes[1]", "cause", "duplicate_id", "value", "monotheism"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("    figure: Єдиний Бог\n", ""),
+                Map.of("location", "archetypes[0]", "cause", "blank_value", "field", "archetype.monotheism.figure"));
+        assertReligionsError(
+                Files.RELIGIONS.replace(
+                        "    weight: 100\n    tags: [religion_knowledge]", "    tags: [religion_knowledge]"),
+                Map.of("location", "aspects[1]", "cause", "blank_value", "field", "weight"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("incompatible: [pacifism]", "incompatible: [asceticism]"),
+                Map.of("location", "dogmas[0].incompatible[0]", "cause", "unknown_reference", "value", "asceticism"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("incompatible: [pacifism]", "incompatible: [holy_war]"),
+                Map.of("location", "dogmas[0]", "cause", "self_reference"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("stat:war_weariness", "stat:faith"),
+                Map.of("location", "dogmas[0].modifiers[0]", "cause", "unknown_reference"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("archetypes: [monotheism, polytheism]", "archetypes: [monotheism, dualism]"),
+                Map.of("location", "faith_forms[0].archetypes[1]", "cause", "unknown_reference", "value", "dualism"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("archetypes: [monotheism, polytheism]", "archetypes: [monotheism]"),
+                Map.of("location", "faith_forms", "cause", "missing_definition", "value", "polytheism"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("figure_case: genitive", "figure_case: ablative"),
+                Map.of("location", "faith_forms[0]", "cause", "unknown_reference", "value", "ablative"));
+        assertReligionsError(
+                Files.RELIGIONS.replace("\"Шляхом {figure}\"", "\"Шляхом\""),
+                Map.of(
+                        "location",
+                        "faith_forms[0]",
+                        "cause",
+                        "invalid_name_format",
+                        "field",
+                        "faith_form.path.templates.instrumental"));
+        assertReligionsError(
+                Files.RELIGIONS.replace(
+                        "  - id: pacifism", "  - id: pacifism\n    weight_tags: { polity_single_church: 10 }"),
+                Map.of(
+                        "location",
+                        "dogmas[1].weight_tags",
+                        "cause",
+                        "unknown_reference",
+                        "value",
+                        "polity_single_church"));
+        assertReligionsError(
+                Files.RELIGIONS.replace(
+                        "weight_tags: { archetype_polytheism: 30 }", "weight_tags: { dogma_holy_war: 30 }"),
+                Map.of("location", "aspects[0].weight_tags", "cause", "unknown_reference", "value", "dogma_holy_war"));
+        assertReligionsError(
+                Files.RELIGIONS.substring(0, Files.RELIGIONS.indexOf("polities:")) + "polities: []\n"
+                        + Files.RELIGIONS.substring(Files.RELIGIONS.indexOf("faith_forms:")),
+                Map.of("location", "polities", "cause", "empty_collection"));
+    }
+
+    @Test
+    void missingReligionBalanceIsAnError() {
+        String withoutReligion = Files.BALANCE.substring(0, Files.BALANCE.indexOf("religion:"));
+        assertContentError(
+                balance(withoutReligion),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion", "cause", "blank_value", "field", "religion"));
+        assertContentError(
+                balance(withoutReligion + "religion:\n  aspects: { min: 2, max: 3 }\n"),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion.dogmas", "cause", "blank_value"));
+        assertContentError(
+                balance(Files.BALANCE.replace("dogmas: { min: 2, max: 4 }", "dogmas: { min: 2, max: 7 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion", "cause", "value_out_of_range", "field", "religion.dogmas.max"));
+    }
+
+    @Test
     void loadsBalance() {
         BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
 
@@ -1472,6 +1584,14 @@ class ContentLoaderTest {
                 Files.valid().with(ContentLoader.ARMY, army).source(),
                 ErrorCode.INVALID_CONTENT,
                 withFile(ContentLoader.ARMY, expected));
+    }
+
+    private static void assertReligionsError(String religions, Map<String, ?> expected) {
+        assertThat(religions).isNotEqualTo(Files.RELIGIONS);
+        assertContentError(
+                Files.valid().with(ContentLoader.RELIGIONS, religions).source(),
+                ErrorCode.INVALID_CONTENT,
+                withFile(ContentLoader.RELIGIONS, expected));
     }
 
     private static Map<String, ?> withFile(String file, Map<String, ?> expected) {

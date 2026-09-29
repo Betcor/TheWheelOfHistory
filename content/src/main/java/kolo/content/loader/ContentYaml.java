@@ -397,6 +397,94 @@ final class ContentYaml {
         }
     }
 
+    record ReligionsFile(
+            List<Archetype> archetypes,
+            List<Aspect> aspects,
+            List<Dogma> dogmas,
+            List<Polity> polities,
+            @JsonProperty("faith_forms") List<FaithForm> faithForms) {
+        ReligionsFile {
+            archetypes = orEmpty(archetypes);
+            aspects = orEmpty(aspects);
+            dogmas = orEmpty(dogmas);
+            polities = orEmpty(polities);
+            faithForms = orEmpty(faithForms);
+        }
+    }
+
+    /** @param figure роль постаті, чиїм ім'ям зветься віра */
+    record Archetype(String id, String name, String description, String figure, Integer weight, List<String> tags) {
+        Archetype {
+            tags = orEmpty(tags);
+        }
+    }
+
+    /** @param weightTags мітка → добавка до ваги */
+    record Aspect(
+            String id,
+            String name,
+            String description,
+            Integer weight,
+            @JsonProperty("weight_tags") Map<String, Integer> weightTags,
+            List<String> tags) {
+        Aspect {
+            weightTags = weightTags == null ? Map.of() : weightTags;
+            tags = orEmpty(tags);
+        }
+    }
+
+    /**
+     * @param weightTags мітка → добавка до ваги
+     * @param incompatible id несумісних догматів
+     */
+    record Dogma(
+            String id,
+            String name,
+            String description,
+            Integer weight,
+            @JsonProperty("weight_tags") Map<String, Integer> weightTags,
+            List<Modifier> modifiers,
+            List<String> tags,
+            List<String> incompatible) {
+        Dogma {
+            weightTags = weightTags == null ? Map.of() : weightTags;
+            modifiers = orEmpty(modifiers);
+            tags = orEmpty(tags);
+            incompatible = orEmpty(incompatible);
+        }
+    }
+
+    /** @param weightTags мітка → добавка до ваги */
+    record Polity(
+            String id,
+            String name,
+            String description,
+            Integer weight,
+            @JsonProperty("weight_tags") Map<String, Integer> weightTags,
+            List<Modifier> modifiers,
+            List<String> tags) {
+        Polity {
+            weightTags = weightTags == null ? Map.of() : weightTags;
+            modifiers = orEmpty(modifiers);
+            tags = orEmpty(tags);
+        }
+    }
+
+    /**
+     * @param figureCase ключ відмінка імені постаті в назві, напр. {@code genitive}
+     * @param forms шаблони назви віри за відмінками, з {@code {figure}}
+     */
+    record FaithForm(
+            String id,
+            String gender,
+            @JsonProperty("figure_case") String figureCase,
+            List<String> archetypes,
+            Cases forms) {
+        FaithForm {
+            archetypes = orEmpty(archetypes);
+        }
+    }
+
     /**
      * Числа — {@code Integer}, а не {@code int}: пропущене поле має стати помилкою, а не тихим нулем.
      *
@@ -406,7 +494,8 @@ final class ContentYaml {
             WheelBalance wheel,
             Streaks streaks,
             @JsonProperty("power_corridors") List<PowerCorridor> powerCorridors,
-            Generation generation) {
+            Generation generation,
+            Religion religion) {
         BalanceFile {
             powerCorridors = orEmpty(powerCorridors);
         }
@@ -451,6 +540,8 @@ final class ContentYaml {
             @JsonProperty("person_traits") Count personTraits,
             @JsonProperty("person_age") Count personAge,
             @JsonProperty("name_candidates") Integer nameCandidates) {}
+
+    record Religion(Count aspects, Count dogmas) {}
 
     record Count(Integer min, Integer max) {}
 

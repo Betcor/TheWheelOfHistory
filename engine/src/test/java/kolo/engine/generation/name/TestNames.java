@@ -46,6 +46,7 @@ import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TestReligions;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -217,6 +218,7 @@ public final class TestNames {
                         List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE)),
                 backstory(),
                 TestStreaks.CONTENT,
+                TestReligions.content(),
                 balance(nameCandidates));
     }
 
@@ -240,7 +242,8 @@ public final class TestNames {
                         10,
                         new CountRange(1, 3),
                         new CountRange(25, 70),
-                        nameCandidates));
+                        nameCandidates),
+                TestReligions.BALANCE);
     }
 
     private static BackstoryContent backstory() {

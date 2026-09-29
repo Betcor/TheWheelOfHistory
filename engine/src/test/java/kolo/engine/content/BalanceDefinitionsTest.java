@@ -409,7 +409,8 @@ class BalanceDefinitionsTest {
                         List.of(
                                 TestContent.corridor(PowerCorridor.CLASSIC),
                                 TestContent.corridor(PowerCorridor.EQUAL_CHANCES)),
-                        balance.generation()))
+                        balance.generation(),
+                        balance.religion()))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.MISSING_DEFINITION);
                     assertThat(e.details())
@@ -419,7 +420,8 @@ class BalanceDefinitionsTest {
                 Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList());
         twice.add(TestContent.corridor(PowerCorridor.CLASSIC));
         assertFails(
-                () -> BalanceDef.of(balance.wheel(), balance.streaks(), twice, balance.generation()),
+                () -> BalanceDef.of(
+                        balance.wheel(), balance.streaks(), twice, balance.generation(), balance.religion()),
                 ErrorCode.DUPLICATE_ID);
     }
 
@@ -430,7 +432,8 @@ class BalanceDefinitionsTest {
         swapped.put(PowerCorridor.CLASSIC, TestContent.corridor(PowerCorridor.FULL_CHAOS));
 
         assertFails(
-                () -> new BalanceDef(balance.wheel(), balance.streaks(), swapped, balance.generation()),
+                () -> new BalanceDef(
+                        balance.wheel(), balance.streaks(), swapped, balance.generation(), balance.religion()),
                 ErrorCode.UNKNOWN_REFERENCE);
     }
 
