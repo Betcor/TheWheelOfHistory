@@ -71,6 +71,28 @@ class MapDefinitionsTest {
     }
 
     @Test
+    void seaSplitsIntoZonesRoundingToNearest() {
+        SeaDef sea = new SeaDef(10, 40);
+
+        assertThat(sea.minCells()).isEqualTo(10);
+        assertThat(sea.zones(1)).isEqualTo(1);
+        assertThat(sea.zones(19)).isEqualTo(1);
+        assertThat(sea.zones(59)).isEqualTo(1);
+        assertThat(sea.zones(60)).isEqualTo(2);
+        assertThat(sea.zones(4_000)).isEqualTo(100);
+        assertThat(new SeaDef(1, 1).zones(7)).isEqualTo(7);
+        assertFails(() -> sea.zones(0), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void seaRejectsValuesOutsideLimits() {
+        assertFails(() -> new SeaDef(0, 40), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new SeaDef(SeaDef.MAX_MIN_CELLS + 1, 40), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new SeaDef(10, 0), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new SeaDef(10, SeaDef.MAX_ZONE_CELLS + 1), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
     void continentsKeepTheirValues() {
         ContinentsDef continents = new ContinentsDef(new CountRange(1, 4), 20, 50, 6);
 
@@ -183,12 +205,14 @@ class MapDefinitionsTest {
         assertThat(content.continents()).isEqualTo(TestMaps.CONTINENTS);
         assertThat(content.relief()).isEqualTo(TestMaps.RELIEF);
         assertThat(content.climate()).isEqualTo(TestMaps.CLIMATE);
+        assertThat(content.sea()).isEqualTo(TestMaps.SEA);
     }
 
     @Test
     void mapContentRejectsEmptyAndDuplicateTemplates() {
         assertFails(
-                () -> new MapContent(List.of(), TestMaps.GRID, TestMaps.CONTINENTS, TestMaps.RELIEF, TestMaps.CLIMATE),
+                () -> new MapContent(
+                        List.of(), TestMaps.GRID, TestMaps.CONTINENTS, TestMaps.RELIEF, TestMaps.CLIMATE, TestMaps.SEA),
                 ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
@@ -196,7 +220,8 @@ class MapDefinitionsTest {
                         TestMaps.GRID,
                         TestMaps.CONTINENTS,
                         TestMaps.RELIEF,
-                        TestMaps.CLIMATE),
+                        TestMaps.CLIMATE,
+                        TestMaps.SEA),
                 ErrorCode.DUPLICATE_ID);
     }
 
