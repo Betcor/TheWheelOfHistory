@@ -281,6 +281,10 @@ final class Files {
                 weight: 15
                 provinces_pct: 120
                 continents: { min: 5, max: 8 }
+            grid:
+              cell_size: 100
+              aspect: { width: 2, height: 1 }
+              relaxation: 2
             """;
 
     static final String RELIGIONS = """

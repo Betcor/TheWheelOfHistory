@@ -13,7 +13,10 @@ public final class TestMaps {
     public static final MapTemplateDef PANGAEA = template("pangaea", 100, 100, 1, 1);
     public static final MapTemplateDef ARCHIPELAGO = template("archipelago", 100, 150, 3, 5);
 
-    public static final MapContent CONTENT = new MapContent(List.of(PANGAEA, ARCHIPELAGO));
+    /** Комірка 20 одиниць, карта 2:1, одна ітерація Ллойда — дрібні карти для швидких тестів. */
+    public static final MapGridDef GRID = new MapGridDef(20, 2, 1, 1);
+
+    public static final MapContent CONTENT = new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID);
 
     /** NPC: мало 0–1, звичайно 2–4, багато 10–20; 60–100 провінцій на державу з кроком 20; 5–15% нічийних; 100–3000. */
     public static final WorldBalanceDef BALANCE = world(new CountRange(100, 3000));

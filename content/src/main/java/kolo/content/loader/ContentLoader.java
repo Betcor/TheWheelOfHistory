@@ -48,6 +48,7 @@ import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MapContent;
+import kolo.engine.content.MapGridDef;
 import kolo.engine.content.MapTemplateDef;
 import kolo.engine.content.MapTemplateId;
 import kolo.engine.content.MedianRange;
@@ -1260,7 +1261,23 @@ public final class ContentLoader {
                                     required("provinces_pct", template.provincesPct()),
                                     continents));
                 });
-        return at(MAP, "", () -> new MapContent(templates));
+        MapGridDef grid = at(MAP, "grid", () -> grid(yaml.grid()));
+        return at(MAP, "", () -> new MapContent(templates, grid));
+    }
+
+    private static MapGridDef grid(ContentYaml.MapGrid grid) {
+        if (grid == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "grid"));
+        }
+        ContentYaml.MapAspect aspect = grid.aspect();
+        if (aspect == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "aspect"));
+        }
+        return new MapGridDef(
+                required("cell_size", grid.cellSize()),
+                required("width", aspect.width()),
+                required("height", aspect.height()),
+                required("relaxation", grid.relaxation()));
     }
 
     /** Розділ файлу балансу; пропущений — помилка з назвою розділу як місцем. */
