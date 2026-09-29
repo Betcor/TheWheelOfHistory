@@ -175,7 +175,7 @@ final class TestNames {
                         .map(branch -> new TechBranchDef(branch, "Галузь"))
                         .toList(),
                 Development.levels().stream()
-                        .map(level -> new DevelopmentLevelDef(level, "Рівень", "Опис"))
+                        .map(level -> new DevelopmentLevelDef(level, "Рівень", "Опис", 100, 50, List.of()))
                         .toList(),
                 Arrays.stream(NuclearStatus.values())
                         .map(status -> new NuclearStatusDef(status, "Статус", List.of()))

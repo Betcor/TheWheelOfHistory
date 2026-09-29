@@ -52,11 +52,33 @@ class DefinitionsTest {
 
     @Test
     void developmentLevelIsWithinDesignRange() {
-        assertThat(new DevelopmentLevelDef(-3, "Глибоке відставання", "Лише базові технології.").level())
+        assertThat(new DevelopmentLevelDef(-3, "Глибоке відставання", "Лише базові технології.", 8, 5, List.of())
+                        .level())
                 .isEqualTo(Development.MIN);
-        assertFails(() -> new DevelopmentLevelDef(-4, "Нижче дна", "—"), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertFails(() -> new DevelopmentLevelDef(3, "Понад лідера", "—"), ErrorCode.VALUE_OUT_OF_RANGE);
-        assertFails(() -> new DevelopmentLevelDef(0, "Світовий рівень", " "), ErrorCode.BLANK_VALUE);
+        assertFails(() -> level(-4, "Нижче дна", "—", 1, 0, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> level(3, "Понад лідера", "—", 1, 0, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> level(0, "Світовий рівень", " ", 1, 0, List.of()), ErrorCode.BLANK_VALUE);
+    }
+
+    @Test
+    void developmentLevelWeightQualityAndTagsAreChecked() {
+        DevelopmentLevelDef leader =
+                level(2, "Лідер", "Попереду світу.", DevelopmentLevelDef.MAX_WEIGHT, 100, List.of("advanced"));
+        assertThat(leader.weight()).isEqualTo(10_000);
+        assertThat(leader.tags()).containsExactly("advanced");
+
+        assertFails(() -> level(0, "Світовий рівень", "—", 0, 50, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> level(0, "Світовий рівень", "—", 10_001, 50, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> level(0, "Світовий рівень", "—", 1, -1, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> level(0, "Світовий рівень", "—", 1, 101, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> level(0, "Світовий рівень", "—", 1, 50, List.of("Advanced")), ErrorCode.INVALID_KEY_FORMAT);
+        assertFails(
+                () -> level(0, "Світовий рівень", "—", 1, 50, List.of("advanced", "advanced")), ErrorCode.DUPLICATE_ID);
+    }
+
+    private static DevelopmentLevelDef level(
+            int level, String name, String description, int weight, int quality, List<String> tags) {
+        return new DevelopmentLevelDef(level, name, description, weight, quality, tags);
     }
 
     @Test

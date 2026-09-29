@@ -120,7 +120,7 @@ public final class ContentLoader {
         List<TraitDef> traits = traits(people);
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
         BackstoryContent backstory =
-                backstory(parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, nuclear);
+                backstory(parse(files, BACKSTORY, ContentYaml.BackstoryFile.class), ideologies, levels, nuclear);
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -261,7 +261,13 @@ public final class ContentLoader {
             DevelopmentLevelDef def = at(
                     DEVELOPMENT,
                     location,
-                    () -> new DevelopmentLevelDef(level.level(), level.name(), level.description()));
+                    () -> new DevelopmentLevelDef(
+                            level.level(),
+                            level.name(),
+                            level.description(),
+                            required("weight", level.weight()),
+                            required("quality", level.quality()),
+                            level.tags()));
             at(DEVELOPMENT, location, () -> unique(seen, def.level(), value -> value));
             return def;
         });
@@ -530,10 +536,14 @@ public final class ContentLoader {
     }
 
     /**
-     * @param ideologies уже завантажені ідеології й ядерні статуси: їхні мітки — джерела міток в умовах фрагментів
+     * @param ideologies уже завантажені ідеології, рівні розвиненості й ядерні статуси: їхні мітки — джерела міток в
+     *     умовах фрагментів
      */
     private static BackstoryContent backstory(
-            ContentYaml.BackstoryFile yaml, List<IdeologyDef> ideologies, List<NuclearStatusDef> nuclear) {
+            ContentYaml.BackstoryFile yaml,
+            List<IdeologyDef> ideologies,
+            List<DevelopmentLevelDef> levels,
+            List<NuclearStatusDef> nuclear) {
         TreeSet<BackstoryFragmentId> ids = new TreeSet<>();
         List<BackstoryFragmentDef> fragments = list(
                 BACKSTORY, "fragments", nonEmpty(BACKSTORY, "fragments", yaml.fragments()), (location, fragment) -> {
@@ -550,6 +560,7 @@ public final class ContentLoader {
             known.addAll(ideology.tags());
             ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
         }
+        levels.forEach(level -> known.addAll(level.tags()));
         nuclear.forEach(status -> known.addAll(status.tags()));
         for (int i = 0; i < fragments.size(); i++) {
             for (String tag : fragments.get(i).referencedTags()) {

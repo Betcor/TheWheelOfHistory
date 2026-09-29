@@ -421,7 +421,35 @@ class ContentPackTest {
                 });
     }
 
+    @Test
+    void developmentLevelTagsAreBackstoryTagSources() {
+        List<DevelopmentLevelDef> levels = Development.levels().stream()
+                .map(level -> level == Development.MIN
+                        ? new DevelopmentLevelDef(level, "Глибоке відставання", "Опис", 10, 5, List.of("backward"))
+                        : TestContent.level(level))
+                .toList();
+        BackstoryFragmentDef stagnation = TestContent.fragment(
+                "stagnation", new TagCondition(List.of("backward"), List.of(), List.of()), List.of());
+        BackstoryContent backstory = new BackstoryContent(Map.of(), List.of(stagnation));
+
+        assertThat(withBackstory(levels, TestContent.nuclearStatuses(), backstory)
+                        .backstory()
+                        .fragments())
+                .hasSize(1);
+        assertThatThrownBy(() -> withBackstory(levels(), TestContent.nuclearStatuses(), backstory))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "backstory.stagnation.tags"), entry("value", "backward"));
+                });
+    }
+
     private static ContentPack withBackstory(List<NuclearStatusDef> statuses, BackstoryContent backstory) {
+        return withBackstory(levels(), statuses, backstory);
+    }
+
+    private static ContentPack withBackstory(
+            List<DevelopmentLevelDef> levels, List<NuclearStatusDef> statuses, BackstoryContent backstory) {
         List<IdeologyDef> ideologies = List.of(ideology("democracy", "a"));
         return new ContentPack(
                 HASH,
@@ -429,7 +457,7 @@ class ContentPackTest {
                 List.of(doctrine("armored")),
                 List.of(resource("iron")),
                 branches(),
-                levels(),
+                levels,
                 statuses,
                 personKinds(),
                 traits(),

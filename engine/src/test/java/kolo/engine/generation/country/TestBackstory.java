@@ -156,6 +156,21 @@ final class TestBackstory {
 
     /** Мінімальний валідний пакет з цими ідеологіями; форма державності доступна кожній. */
     static ContentPack pack(List<IdeologyDef> ideologies, List<BackstoryFragmentDef> fragments, CountRange count) {
+        return pack(
+                ideologies,
+                fragments,
+                count,
+                Development.levels().stream()
+                        .map(level -> new DevelopmentLevelDef(level, "Рівень", "Опис", 100, 50, List.of()))
+                        .toList());
+    }
+
+    /** Мінімальний валідний пакет з цими ідеологіями й рівнями розвиненості. */
+    static ContentPack pack(
+            List<IdeologyDef> ideologies,
+            List<BackstoryFragmentDef> fragments,
+            CountRange count,
+            List<DevelopmentLevelDef> levels) {
         NameParadigmDef masc = new NameParadigmDef(
                 new NameParadigmId("masc_hard"),
                 GrammaticalGender.MASCULINE,
@@ -200,9 +215,7 @@ final class TestBackstory {
                 Arrays.stream(TechBranch.values())
                         .map(branch -> new TechBranchDef(branch, "Галузь"))
                         .toList(),
-                Development.levels().stream()
-                        .map(level -> new DevelopmentLevelDef(level, "Рівень", "Опис"))
-                        .toList(),
+                levels,
                 Arrays.stream(NuclearStatus.values())
                         .map(status -> new NuclearStatusDef(status, "Статус", List.of()))
                         .toList(),

@@ -8,6 +8,9 @@
 # Колеса генерації (GD §4.1, №5–6): спершу ідеологія, потім підкласифікація серед підкласифікацій
 # обраної ідеології. Ваги — відносні (1..10000), колесо нормалізує їх до 100%.
 # Порядок ідеологій і підкласифікацій — порядок секторів коліс.
+# Перевага колеса розвиненості галузі (GD §4.1, №7): wheel:generation_development_<галузь>, де галузь —
+# economy, military, society або energy_science (development.yaml). Модифікатори ідеології й
+# підкласифікації складаються.
 
 ideologies:
   - id: democracy
@@ -17,6 +20,9 @@ ideologies:
     modifiers:
       - { target: "stat:hdi", value: 5 }
       - { target: "stat:legitimacy", value: 10 }
+      - { target: "wheel:generation_development_economy", value: 10 }
+      - { target: "wheel:generation_development_society", value: 10 }
+      - { target: "wheel:generation_development_energy_science", value: 10 }
     sub_ideologies:
       - id: liberal_democracy
         name: Ліберальна демократія
@@ -54,16 +60,21 @@ ideologies:
         tags: [junta, militarism]
         modifiers:
           - { target: "stat:legitimacy", value: -10 }
+          - { target: "wheel:generation_development_military", value: 15 }
       - id: oligarchy
         name: Олігархія
         weight: 100
         tags: [oligarchy]
         modifiers:
           - { target: "stat:hdi", value: -5 }
+          - { target: "wheel:generation_development_society", value: -10 }
       - id: technocracy
         name: Технократія
         weight: 100
         tags: [technocracy]
+        modifiers:
+          - { target: "wheel:generation_development_energy_science", value: 20 }
+          - { target: "wheel:generation_development_economy", value: 10 }
       - id: managed_democracy
         name: «Керована демократія»
         weight: 100
@@ -78,6 +89,9 @@ ideologies:
     modifiers:
       - { target: "stat:hdi", value: -5 }
       - { target: "stat:war_weariness", value: -10 }
+      - { target: "wheel:generation_development_military", value: 10 }
+      - { target: "wheel:generation_development_society", value: -10 }
+      - { target: "wheel:generation_development_energy_science", value: -10 }
     sub_ideologies:
       - id: personality_cult
         name: Культ особи
@@ -95,12 +109,14 @@ ideologies:
         tags: [militarism]
         modifiers:
           - { target: "stat:war_weariness", value: -5 }
+          - { target: "wheel:generation_development_military", value: 15 }
       - id: isolationism
         name: Ізоляціонізм
         weight: 100
         tags: [isolationism]
         modifiers:
           - { target: "stat:influence", value: -10 }
+          - { target: "wheel:generation_development_economy", value: -10 }
 
   - id: monarchy
     name: Монархія
@@ -119,12 +135,15 @@ ideologies:
         tags: [feudalism]
         modifiers:
           - { target: "stat:hdi", value: -5 }
+          - { target: "wheel:generation_development_economy", value: -10 }
+          - { target: "wheel:generation_development_society", value: -10 }
       - id: hereditary_empire
         name: Спадкова імперія
         weight: 100
         tags: [empire]
         modifiers:
           - { target: "stat:influence", value: 5 }
+          - { target: "wheel:generation_development_military", value: 10 }
 
   - id: theocracy
     name: Теократія
@@ -133,6 +152,7 @@ ideologies:
     modifiers:
       - { target: "stat:stability", value: 10 }
       - { target: "stat:influence", value: 5 }
+      - { target: "wheel:generation_development_energy_science", value: -10 }
     sub_ideologies:
       - id: moderate_theocracy
         name: Помірна теократія
@@ -144,6 +164,8 @@ ideologies:
         tags: [fundamentalism]
         modifiers:
           - { target: "stat:hdi", value: -5 }
+          - { target: "wheel:generation_development_society", value: -10 }
+          - { target: "wheel:generation_development_energy_science", value: -10 }
       - id: temple_state
         name: Храмова держава
         weight: 100
@@ -157,6 +179,8 @@ ideologies:
     tags: [socialist]
     modifiers:
       - { target: "stat:hdi", value: 5 }
+      - { target: "wheel:generation_development_economy", value: 10 }
+      - { target: "wheel:generation_development_society", value: 10 }
     sub_ideologies:
       - id: planned_economy
         name: Планова економіка

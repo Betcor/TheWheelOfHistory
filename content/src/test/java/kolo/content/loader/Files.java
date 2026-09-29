@@ -54,12 +54,12 @@ final class Files {
               - { id: society, name: Суспільство }
               - { id: energy_science, name: Енергетика й наука }
             levels:
-              - { level: -3, name: Глибоке відставання, description: Лише базові технології. }
-              - { level: -2, name: Відставання, description: Частини технологій немає. }
-              - { level: -1, name: Легке відставання, description: Окремих технологій бракує. }
-              - { level: 0, name: Світовий рівень, description: Усі технології 1970 року. }
-              - { level: 1, name: Передовий, description: На 1–2 технології попереду. }
-              - { level: 2, name: Лідер, description: Кілька технологій попереду. }
+              - { level: -3, name: Глибоке відставання, description: Лише базові технології., weight: 8, quality: 5, tags: [backward] }
+              - { level: -2, name: Відставання, description: Частини технологій немає., weight: 14, quality: 15 }
+              - { level: -1, name: Легке відставання, description: Окремих технологій бракує., weight: 22, quality: 35 }
+              - { level: 0, name: Світовий рівень, description: Усі технології 1970 року., weight: 30, quality: 50 }
+              - { level: 1, name: Передовий, description: На 1–2 технології попереду., weight: 18, quality: 75 }
+              - { level: 2, name: Лідер, description: Кілька технологій попереду., weight: 8, quality: 95 }
             """;
 
     static final String NUCLEAR = """

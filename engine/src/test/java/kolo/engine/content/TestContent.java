@@ -51,7 +51,7 @@ final class TestContent {
     }
 
     static DevelopmentLevelDef level(int level) {
-        return new DevelopmentLevelDef(level, "Рівень " + level, "Опис рівня " + level);
+        return new DevelopmentLevelDef(level, "Рівень " + level, "Опис рівня " + level, 100, 50, List.of());
     }
 
     /** По визначенню на кожен рівень розвиненості. */

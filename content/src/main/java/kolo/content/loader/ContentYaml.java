@@ -75,7 +75,11 @@ final class ContentYaml {
     /** @param id ключ галузі, напр. {@code energy_science} */
     record Branch(String id, String name) {}
 
-    record Level(int level, String name, String description) {}
+    record Level(int level, String name, String description, Integer weight, Integer quality, List<String> tags) {
+        Level {
+            tags = orEmpty(tags);
+        }
+    }
 
     record NuclearFile(List<NuclearStatus> statuses) {
         NuclearFile {
