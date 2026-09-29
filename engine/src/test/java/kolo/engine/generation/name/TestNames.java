@@ -180,6 +180,27 @@ public final class TestNames {
                         .toList());
     }
 
+    /** Два стилі назв і імен, три форми державності для ідеологій {@code democracy} і {@code monarchy}. */
+    public static NameContent nameContent() {
+        return new NameContent(
+                List.of(MASC_HARD, FEM_IYA, PERSON_MASC, FEM_HARD, FIXED_FEM),
+                List.of(NORTHERN, SOUTHERN),
+                List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM),
+                List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE));
+    }
+
+    /**
+     * Лише північний стиль: десятки назв держав і досить імен, щоб у державі було кілька постатей однієї статі (у
+     * південному — одне ім'я на стать).
+     */
+    public static NameContent northernNameContent() {
+        return new NameContent(
+                List.of(MASC_HARD, FEM_IYA, PERSON_MASC, FEM_HARD, FIXED_FEM),
+                List.of(NORTHERN),
+                List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM),
+                List.of(NORTHERN_PEOPLE));
+    }
+
     /** Пакет з {@code nameCandidates} назвами-кандидатами на колесі назви. */
     public static ContentPack pack(int nameCandidates) {
         return pack(nameCandidates, TestReligions.content(), TestReligions.BALANCE);
@@ -222,11 +243,7 @@ public final class TestNames {
                                 new PersonKindDef(kind, "Тип", "Опис", 10, Collections.emptySortedMap(), List.of()))
                         .toList(),
                 List.of(new TraitDef(new TraitId("loyal"), "Відданий", List.of(), List.of(), List.of(), List.of())),
-                new NameContent(
-                        List.of(MASC_HARD, FEM_IYA, PERSON_MASC, FEM_HARD, FIXED_FEM),
-                        List.of(NORTHERN, SOUTHERN),
-                        List.of(REPUBLIC, UNITED_PROVINCES, KINGDOM),
-                        List.of(NORTHERN_PEOPLE, SOUTHERN_PEOPLE)),
+                nameContent(),
                 backstory(),
                 TestStreaks.CONTENT,
                 religions,

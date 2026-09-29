@@ -12,7 +12,7 @@ import kolo.engine.state.LocalizedName;
 import kolo.engine.wheel.RollRecord;
 
 /**
- * Назва держави на старті (GD §4.1, колесо 17; GD §4.9) — результат {@link NameWheel}.
+ * Назва держави на старті (GD §4.1, колесо 16; GD §4.9) — результат {@link NameWheel}.
  *
  * @param candidates назви-кандидати в порядку секторів колеса; повні назви в називному не повторюються
  * @param chosen індекс назви, що випала, з нуля

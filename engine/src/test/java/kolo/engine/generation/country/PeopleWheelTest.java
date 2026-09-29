@@ -282,6 +282,29 @@ class PeopleWheelTest {
                 .isInstanceOf(ValidationException.class);
     }
 
+    @Test
+    void extraPeopleFollowCountedOnesWithoutShiftingThem() {
+        for (long seed = 0; seed < 200; seed++) {
+            StartPeople base = generate(seed, Set.of());
+            StartPeople extended = PeopleWheel.generate(Rng.of(seed), PACK, Set.of(), STYLE, Set.of(), 2);
+
+            assertThat(extended.countRoll()).isEqualTo(base.countRoll());
+            assertThat(extended.people()).hasSize(base.people().size() + 2);
+            assertThat(extended.people().subList(0, base.people().size())).isEqualTo(base.people());
+            assertThat(extended.people())
+                    .extracting(person -> person.name().fullName().nominative())
+                    .doesNotHaveDuplicates();
+        }
+    }
+
+    @Test
+    void negativeExtraPeopleAreRejected() {
+        assertThatThrownBy(() -> PeopleWheel.generate(Rng.of(1), PACK, Set.of(), STYLE, Set.of(), -1))
+                .isInstanceOfSatisfying(
+                        ValidationException.class,
+                        error -> assertThat(error.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE));
+    }
+
     private static StartPeople generate(long seed, Set<String> tags) {
         return PeopleWheel.generate(Rng.of(seed), PACK, tags, STYLE, Set.of());
     }
