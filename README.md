@@ -12,6 +12,7 @@
 
 - [Ігровий дизайн](docs/GAME_DESIGN.md)
 - [Архітектурні рішення (ADR)](docs/decisions/)
+- [Як писати події](docs/EVENTS.md)
 - [Як долучитися](CONTRIBUTING.md)
 
 ## Збірка
