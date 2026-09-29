@@ -259,7 +259,8 @@ final class TestContent {
                         10,
                         10,
                         new CountRange(1, 3),
-                        new CountRange(25, 70)));
+                        new CountRange(25, 70),
+                        5));
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {

@@ -954,6 +954,7 @@ class ContentLoaderTest {
         assertThat(balance.generation().armyTrainingDevelopmentAdvantage()).isEqualTo(10);
         assertThat(balance.generation().personTraits()).isEqualTo(new CountRange(1, 3));
         assertThat(balance.generation().personAge()).isEqualTo(new CountRange(25, 70));
+        assertThat(balance.generation().nameCandidates()).isEqualTo(5);
     }
 
     @Test
@@ -1044,6 +1045,10 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("person_age: { min: 25, max: 70 }", "person_age: { min: 10, max: 70 }")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.person_age.min"));
+        assertContentError(
+                balance(Files.BALANCE.replace("name_candidates: 5", "name_candidates: 13")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.name_candidates"));
     }
 
     @Test
@@ -1128,6 +1133,10 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("person_age: { min: 25, max: 70 }", "person_age: { min: 25 }")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation.person_age", "cause", "blank_value", "field", "max"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  name_candidates: 5\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation.name_candidates", "cause", "blank_value", "field", "name_candidates"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,

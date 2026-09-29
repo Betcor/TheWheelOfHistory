@@ -411,7 +411,8 @@ final class ContentYaml {
             Integer armyTrainingDevelopmentAdvantage,
 
             @JsonProperty("person_traits") Count personTraits,
-            @JsonProperty("person_age") Count personAge) {}
+            @JsonProperty("person_age") Count personAge,
+            @JsonProperty("name_candidates") Integer nameCandidates) {}
 
     record Count(Integer min, Integer max) {}
 

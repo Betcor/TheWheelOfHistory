@@ -250,6 +250,7 @@ final class Files {
               army_training_development_advantage: 10
               person_traits: { min: 1, max: 3 }
               person_age: { min: 25, max: 70 }
+              name_candidates: 5
             """;
 
     private final TreeMap<String, String> files = new TreeMap<>();

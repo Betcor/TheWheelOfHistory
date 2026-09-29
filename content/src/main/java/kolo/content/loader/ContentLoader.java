@@ -875,6 +875,10 @@ public final class ContentLoader {
                         "army_training_development_advantage", generationYaml.armyTrainingDevelopmentAdvantage()));
         CountRange traitCount = at(BALANCE, "generation.person_traits", () -> count(generationYaml.personTraits()));
         CountRange age = at(BALANCE, "generation.person_age", () -> count(generationYaml.personAge()));
+        int nameCandidates = at(
+                BALANCE,
+                "generation.name_candidates",
+                () -> required("name_candidates", generationYaml.nameCandidates()));
         GenerationBalanceDef generation = at(
                 BALANCE,
                 "generation",
@@ -889,7 +893,8 @@ public final class ContentLoader {
                         trainingGdpAdvantage,
                         trainingDevelopmentAdvantage,
                         traitCount,
-                        age));
+                        age,
+                        nameCandidates));
 
         return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation));
     }
