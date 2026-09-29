@@ -13,7 +13,7 @@ import kolo.engine.state.Stat;
 /**
  * Мінімальний валідний шаблон релігій для тестових пакетів: два архетипи (постать монотеїзму — лише чоловік,
  * політеїзму — будь-хто), три аспекти, три догмати (священна війна несумісна з ненасильством), два устрої, форма
- * «Шлях» для обох архетипів і «Храм» лише для політеїзму.
+ * «Шлях» для обох архетипів і «Храм» лише для політеїзму; колесо релігії держави — {@link #STATE_RELIGION}.
  */
 public final class TestReligions {
 
@@ -26,6 +26,13 @@ public final class TestReligions {
     /** 2–3 аспекти, 1–2 догмати. */
     public static final ReligionBalanceDef BALANCE =
             new ReligionBalanceDef(List.of(FEW_COUNTRIES, MANY_COUNTRIES), new CountRange(2, 3), new CountRange(1, 2));
+
+    /**
+     * Кожна релігія — вага 100, світська держава — 100 без добавок і умов: тестові ідеології не мають міток, а
+     * світська держава може залежати лише від міток ладу.
+     */
+    public static final StateReligionDef STATE_RELIGION =
+            new StateReligionDef(100, secular(100, Map.of(), TagCondition.NONE));
 
     private TestReligions() {}
 
@@ -45,7 +52,21 @@ public final class TestReligions {
                 List.of(polity("single_church", Map.of("archetype_monotheism", 100)), polity("communities", Map.of())),
                 List.of(
                         path(List.of(new ArchetypeId("monotheism"), new ArchetypeId("polytheism"))),
-                        temple(List.of(new ArchetypeId("polytheism")))));
+                        temple(List.of(new ArchetypeId("polytheism")))),
+                STATE_RELIGION);
+    }
+
+    /** Цей шаблон з іншим колесом релігії держави. */
+    public static ReligionContent content(StateReligionDef stateReligion) {
+        ReligionContent base = content();
+        return new ReligionContent(
+                base.archetypes(), base.aspects(), base.dogmas(), base.polities(), base.faithForms(), stateReligion);
+    }
+
+    /** Світська держава з цією вагою, добавками й умовою; мітка — {@code secular}. */
+    public static SecularStateDef secular(int weight, Map<String, Integer> weightTags, TagCondition condition) {
+        return new SecularStateDef(
+                "Світська держава", "Без державної релігії", weight, sorted(weightTags), condition, List.of("secular"));
     }
 
     public static ArchetypeDef archetype(String id, String figure, Sex... sexes) {

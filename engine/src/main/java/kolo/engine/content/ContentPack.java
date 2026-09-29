@@ -67,15 +67,16 @@ public final class ContentPack {
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
      *     підкласифікацію, рівень розвиненості, ядерний статус, рівень ВВП, ІЛР, розміру армії чи вишколу, фрагмент,
-     *     колесо стріку чи його нагороду або словник міток коліс генерації
+     *     колесо стріку чи його нагороду, частину релігії, світську державу або словник міток коліс генерації
      * @param streaks колеса стріків генерації
-     * @param religions шаблон релігій світу: архетипи, аспекти, догмати, устрої, форми назви віри
+     * @param religions шаблон релігій світу: архетипи, аспекти, догмати, устрої, форми назви віри, колесо релігії
+     *     держави; мітки релігій — джерело міток передісторії й типів постатей
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР, розміру армії
      *     чи вишколу не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
-     *     підкласифікацію, підкласифікації не доступна жодна форма або фрагмент передісторії чи вага типу постаті
-     *     залежить від мітки без джерела
+     *     підкласифікацію, підкласифікації не доступна жодна форма, фрагмент передісторії чи вага типу постаті
+     *     залежить від мітки без джерела або світська держава залежить від мітки, якої немає в ладу
      */
     public ContentPack(
             String hash,
@@ -244,12 +245,22 @@ public final class ContentPack {
 
         this.backstory = Objects.requireNonNull(backstory, "backstory");
         this.streaks = Objects.requireNonNull(streaks, "streaks");
+        this.religions = Objects.requireNonNull(religions, "religions");
+        TreeSet<String> regimeTags = new TreeSet<>();
+        for (IdeologyDef ideology : ideologyMap.values()) {
+            regimeTags.addAll(ideology.tags());
+            ideology.subIdeologies().forEach(sub -> regimeTags.addAll(sub.tags()));
+        }
+        // Колесо релігії держави крутиться одразу після ладу: інших міток держава ще не має.
+        for (String tag : religions.stateReligion().secular().referencedTags()) {
+            if (!regimeTags.contains(tag)) {
+                throw unknown("state_religion.secular.tags", tag);
+            }
+        }
         TreeSet<String> known = new TreeSet<>(backstory.producedTags());
         known.addAll(streaks.producedTags());
-        for (IdeologyDef ideology : ideologyMap.values()) {
-            known.addAll(ideology.tags());
-            ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
-        }
+        known.addAll(regimeTags);
+        known.addAll(religions.producedTags());
         levelMap.values().forEach(level -> known.addAll(level.tags()));
         nuclearMap.values().forEach(status -> known.addAll(status.tags()));
         gdpMap.values().forEach(gdp -> known.addAll(gdp.tags()));
@@ -271,7 +282,6 @@ public final class ContentPack {
             }
         }
 
-        this.religions = Objects.requireNonNull(religions, "religions");
         this.balance = Objects.requireNonNull(balance, "balance");
     }
 

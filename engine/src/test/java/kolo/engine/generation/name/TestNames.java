@@ -64,7 +64,7 @@ import kolo.engine.state.Training;
 import kolo.engine.wheel.OutcomeTier;
 
 /**
- * Контент для тестів генераторів назв та імен: дві ідеології, два стилі, три форми державності. Відкритий, бо ним
+ * Контент для тестів генераторів назв та імен: дві ідеології (мітка — id ідеології), два стилі, три форми державності. Відкритий, бо ним
  * користуються й тести колеса назви в {@code generation.country}.
  */
 public final class TestNames {
@@ -173,7 +173,7 @@ public final class TestNames {
                 "Ідеологія " + id,
                 100,
                 List.of(),
-                List.of(),
+                List.of(id),
                 Arrays.stream(subs)
                         .map(sub -> new SubIdeologyDef(
                                 new SubIdeologyId(sub), "Підкласифікація " + sub, 100, List.of(), List.of()))

@@ -32,6 +32,7 @@ public final class ReligionContent {
     private final SortedMap<ReligionPolityId, ReligionPolityDef> politiesById;
     private final List<FaithFormDef> faithForms;
     private final SortedMap<FaithFormId, FaithFormDef> faithFormsById;
+    private final StateReligionDef stateReligion;
 
     /**
      * @param archetypes архетипи в порядку секторів колеса архетипу
@@ -39,6 +40,8 @@ public final class ReligionContent {
      * @param dogmas догмати в порядку секторів колеса догмату
      * @param polities устрої в порядку секторів колеса устрою
      * @param faithForms форми назви віри; кожному архетипу доступна хоча б одна
+     * @param stateReligion колесо релігії держави; мітки ладу, від яких залежить світська держава, перевіряє
+     *     {@link ContentPack}
      * @throws ValidationException якщо якась колекція порожня, id повторюється, догмат чи форма назви посилається на
      *     невідомий догмат чи архетип ({@link ErrorCode#UNKNOWN_REFERENCE}), архетипу не доступна жодна форма назви
      *     ({@link ErrorCode#MISSING_DEFINITION}) або добавка до ваги залежить від мітки, якої на цьому колесі ще не
@@ -49,7 +52,8 @@ public final class ReligionContent {
             List<AspectDef> aspects,
             List<DogmaDef> dogmas,
             List<ReligionPolityDef> polities,
-            List<FaithFormDef> faithForms) {
+            List<FaithFormDef> faithForms,
+            StateReligionDef stateReligion) {
         this.archetypes = List.copyOf(archetypes);
         this.archetypesById = byId("archetypes", archetypes, ArchetypeDef::id);
         this.aspects = List.copyOf(aspects);
@@ -60,6 +64,7 @@ public final class ReligionContent {
         this.politiesById = byId("religion_polities", polities, ReligionPolityDef::id);
         this.faithForms = List.copyOf(faithForms);
         this.faithFormsById = byId("faith_forms", faithForms, FaithFormDef::id);
+        this.stateReligion = Objects.requireNonNull(stateReligion, "stateReligion");
 
         for (DogmaDef dogma : this.dogmas) {
             for (DogmaId other : dogma.incompatible()) {
@@ -164,9 +169,17 @@ public final class ReligionContent {
                 && !second.incompatible().contains(a);
     }
 
-    /** Мітки, які може мати релігія: з архетипів, аспектів, догматів і устроїв. */
+    /** Колесо релігії держави: вага релігій світу й сектор світської держави. */
+    public StateReligionDef stateReligion() {
+        return stateReligion;
+    }
+
+    /**
+     * Мітки, які держава може отримати з колеса релігії: з архетипів, аспектів, догматів і устроїв її релігії або
+     * мітки світської держави.
+     */
     public SortedSet<String> producedTags() {
-        TreeSet<String> produced = new TreeSet<>();
+        TreeSet<String> produced = new TreeSet<>(stateReligion.secular().tags());
         archetypes.forEach(archetype -> produced.addAll(archetype.tags()));
         aspects.forEach(aspect -> produced.addAll(aspect.tags()));
         dogmas.forEach(dogma -> produced.addAll(dogma.tags()));

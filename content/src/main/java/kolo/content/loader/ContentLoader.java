@@ -67,8 +67,10 @@ import kolo.engine.content.ReligionPolityDef;
 import kolo.engine.content.ReligionPolityId;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
+import kolo.engine.content.SecularStateDef;
 import kolo.engine.content.StateFormDef;
 import kolo.engine.content.StateFormId;
+import kolo.engine.content.StateReligionDef;
 import kolo.engine.content.StreakContent;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
@@ -173,9 +175,11 @@ public final class ContentLoader {
         List<TraitDef> traits = traits(people);
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
         StreakContent streaks = streaks(parse(files, STREAKS, ContentYaml.StreaksFile.class));
+        ReligionContent religions = religions(parse(files, RELIGIONS, ContentYaml.ReligionsFile.class), ideologies);
         BackstoryContent backstory = backstory(
                 parse(files, BACKSTORY, ContentYaml.BackstoryFile.class),
                 streaks,
+                religions,
                 ideologies,
                 levels,
                 nuclear,
@@ -184,8 +188,7 @@ public final class ContentLoader {
                 army,
                 training);
         checkPersonKindTags(
-                kinds, knownTags(backstory, streaks, ideologies, levels, nuclear, gdp, hdi, army, training));
-        ReligionContent religions = religions(parse(files, RELIGIONS, ContentYaml.ReligionsFile.class));
+                kinds, knownTags(backstory, streaks, religions, ideologies, levels, nuclear, gdp, hdi, army, training));
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -742,12 +745,13 @@ public final class ContentLoader {
     }
 
     /**
-     * @param streaks уже завантажені колеса стріків, ідеології, рівні розвиненості, ядерні статуси, рівні ВВП, ІЛР,
-     *     розміру й вишколу армії: їхні мітки — джерела міток в умовах фрагментів
+     * @param streaks уже завантажені колеса стріків, шаблон релігій, ідеології, рівні розвиненості, ядерні статуси,
+     *     рівні ВВП, ІЛР, розміру й вишколу армії: їхні мітки — джерела міток в умовах фрагментів
      */
     private static BackstoryContent backstory(
             ContentYaml.BackstoryFile yaml,
             StreakContent streaks,
+            ReligionContent religions,
             List<IdeologyDef> ideologies,
             List<DevelopmentLevelDef> levels,
             List<NuclearStatusDef> nuclear,
@@ -766,7 +770,8 @@ public final class ContentLoader {
         BackstoryContent content = at(BACKSTORY, "", () -> new BackstoryContent(yaml.generationTags(), fragments));
 
         // Мітки в умовах мають джерело; перевіряється тут, щоб помилка вказувала на фрагмент.
-        TreeSet<String> known = knownTags(content, streaks, ideologies, levels, nuclear, gdp, hdi, army, training);
+        TreeSet<String> known =
+                knownTags(content, streaks, religions, ideologies, levels, nuclear, gdp, hdi, army, training);
         for (int i = 0; i < fragments.size(); i++) {
             for (String tag : fragments.get(i).referencedTags()) {
                 if (!known.contains(tag)) {
@@ -778,12 +783,13 @@ public final class ContentLoader {
     }
 
     /**
-     * Мітки, які може мати держава після генерації: з ладу, рівнів коліс генерації, фрагментів передісторії, коліс
-     * стріків і словника міток коліс генерації.
+     * Мітки, які може мати держава після генерації: з ладу, релігії, рівнів коліс генерації, фрагментів передісторії,
+     * коліс стріків і словника міток коліс генерації.
      */
     private static TreeSet<String> knownTags(
             BackstoryContent backstory,
             StreakContent streaks,
+            ReligionContent religions,
             List<IdeologyDef> ideologies,
             List<DevelopmentLevelDef> levels,
             List<NuclearStatusDef> nuclear,
@@ -793,10 +799,8 @@ public final class ContentLoader {
             List<TrainingLevelDef> training) {
         TreeSet<String> known = new TreeSet<>(backstory.producedTags());
         known.addAll(streaks.producedTags());
-        for (IdeologyDef ideology : ideologies) {
-            known.addAll(ideology.tags());
-            ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
-        }
+        known.addAll(religions.producedTags());
+        known.addAll(regimeTags(ideologies));
         levels.forEach(level -> known.addAll(level.tags()));
         nuclear.forEach(status -> known.addAll(status.tags()));
         gdp.forEach(level -> known.addAll(level.tags()));
@@ -804,6 +808,16 @@ public final class ContentLoader {
         army.forEach(size -> known.addAll(size.tags()));
         training.forEach(level -> known.addAll(level.tags()));
         return known;
+    }
+
+    /** Мітки ідеологій і підкласифікацій: усі, які держава має до колеса релігії. */
+    private static TreeSet<String> regimeTags(List<IdeologyDef> ideologies) {
+        TreeSet<String> tags = new TreeSet<>();
+        for (IdeologyDef ideology : ideologies) {
+            tags.addAll(ideology.tags());
+            ideology.subIdeologies().forEach(sub -> tags.addAll(sub.tags()));
+        }
+        return tags;
     }
 
     /** Добавки до ваги типів постатей залежать лише від міток, які держава може мати. */
@@ -859,7 +873,8 @@ public final class ContentLoader {
         return at(STREAKS, "", () -> new StreakContent(wheels));
     }
 
-    private static ReligionContent religions(ContentYaml.ReligionsFile yaml) {
+    /** @param ideologies уже завантажені ідеології: світська держава залежить лише від міток ладу */
+    private static ReligionContent religions(ContentYaml.ReligionsFile yaml, List<IdeologyDef> ideologies) {
         TreeSet<ArchetypeId> archetypeIds = new TreeSet<>();
         List<ArchetypeDef> archetypes = list(
                 RELIGIONS,
@@ -1008,7 +1023,41 @@ public final class ContentLoader {
         polities.forEach(polity -> known.addAll(polity.tags()));
         checkWeightTags("polities", polities, ReligionPolityDef::weightTags, known);
 
-        return at(RELIGIONS, "", () -> new ReligionContent(archetypes, aspects, dogmas, polities, forms));
+        StateReligionDef stateReligion = stateReligion(yaml, ideologies);
+        return at(
+                RELIGIONS, "", () -> new ReligionContent(archetypes, aspects, dogmas, polities, forms, stateReligion));
+    }
+
+    private static StateReligionDef stateReligion(ContentYaml.ReligionsFile yaml, List<IdeologyDef> ideologies) {
+        ContentYaml.StateReligion stateYaml = at(RELIGIONS, "state_religion", () -> {
+            if (yaml.stateReligion() == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "state_religion"));
+            }
+            return yaml.stateReligion();
+        });
+        ContentYaml.Secular secularYaml = required(RELIGIONS, "state_religion", "secular", stateYaml.secular());
+        String location = "state_religion.secular";
+        SecularStateDef secular = at(
+                RELIGIONS,
+                location,
+                () -> new SecularStateDef(
+                        secularYaml.name(),
+                        secularYaml.description(),
+                        required("weight", secularYaml.weight()),
+                        new TreeMap<>(secularYaml.weightTags()),
+                        new TagCondition(secularYaml.requires(), secularYaml.requiresAny(), secularYaml.excludes()),
+                        secularYaml.tags()));
+        // Колесо крутиться одразу після ладу; перевіряється тут, щоб помилка вказувала на сектор.
+        TreeSet<String> regime = regimeTags(ideologies);
+        for (String tag : secular.referencedTags()) {
+            if (!regime.contains(tag)) {
+                throw invalid(RELIGIONS, location, unknown("tag", tag));
+            }
+        }
+        return at(
+                RELIGIONS,
+                "state_religion",
+                () -> new StateReligionDef(required("religion_weight", stateYaml.religionWeight()), secular));
     }
 
     private static <T> void checkWeightTags(
