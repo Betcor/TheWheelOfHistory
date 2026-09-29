@@ -50,7 +50,7 @@ public final class ContentPack {
      * @param traits риси постатей; кожному типу постаті доступна хоча б одна
      * @param names назви держав; кожній підкласифікації доступна хоча б одна форма державності
      * @param backstory фрагменти передісторії; кожна мітка в їхніх умовах і вагах має джерело: ідеологію,
-     *     підкласифікацію, ядерний статус, фрагмент або словник міток коліс генерації
+     *     підкласифікацію, рівень розвиненості, ядерний статус, фрагмент або словник міток коліс генерації
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
@@ -175,6 +175,7 @@ public final class ContentPack {
             known.addAll(ideology.tags());
             ideology.subIdeologies().forEach(sub -> known.addAll(sub.tags()));
         }
+        levelMap.values().forEach(level -> known.addAll(level.tags()));
         nuclearMap.values().forEach(status -> known.addAll(status.tags()));
         for (BackstoryFragmentDef fragment : backstory.fragments().values()) {
             for (String tag : fragment.referencedTags()) {

@@ -69,6 +69,10 @@ class ContentLoaderTest {
 
         assertThat(pack.techBranch(TechBranch.ENERGY_SCIENCE).name()).isEqualTo("Енергетика й наука");
         assertThat(pack.developmentLevel(-3).name()).isEqualTo("Глибоке відставання");
+        assertThat(pack.developmentLevel(-3).weight()).isEqualTo(8);
+        assertThat(pack.developmentLevel(-3).quality()).isEqualTo(5);
+        assertThat(pack.developmentLevel(-3).tags()).containsExactly("backward");
+        assertThat(pack.developmentLevel(0).tags()).isEmpty();
         assertThat(pack.nuclearStatus(NuclearStatus.ARSENAL).tags()).containsExactly("nuclear_power");
         assertThat(pack.nuclearStatus(NuclearStatus.NONE).tags()).isEmpty();
     }
@@ -449,6 +453,49 @@ class ContentLoaderTest {
                         .source(),
                 ErrorCode.CONTENT_MALFORMED,
                 Map.of("file", "development.yaml"));
+    }
+
+    @Test
+    void developmentLevelNeedsWeightAndQuality() {
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replace(", weight: 30", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "levels[3]", "cause", "blank_value", "field", "weight"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replace("quality: 95", "quality: 101"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "levels[5]", "cause", "value_out_of_range", "field", "development_level.2.quality"));
+        assertContentError(
+                Files.valid()
+                        .with(
+                                ContentLoader.DEVELOPMENT,
+                                Files.DEVELOPMENT.replace("weight: 8, quality: 95", "weight: 0, quality: 95"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "levels[5]", "cause", "value_out_of_range", "field", "development_level.2.weight"));
+    }
+
+    @Test
+    void developmentLevelTagIsASourceForBackstoryConditions() {
+        String backstory = Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, backward]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.DEVELOPMENT, Files.DEVELOPMENT.replace(", tags: [backward]", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "backward"));
     }
 
     @Test
