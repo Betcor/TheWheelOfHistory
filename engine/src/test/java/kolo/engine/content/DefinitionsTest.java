@@ -84,10 +84,29 @@ class DefinitionsTest {
     @Test
     void branchAndNuclearStatusNeedNames() {
         assertFails(() -> new TechBranchDef(TechBranch.SOCIETY, ""), ErrorCode.BLANK_VALUE);
-        assertFails(() -> new NuclearStatusDef(NuclearStatus.ARSENAL, null, List.of()), ErrorCode.BLANK_VALUE);
+        assertFails(() -> new NuclearStatusDef(NuclearStatus.ARSENAL, null, 7, 90, List.of()), ErrorCode.BLANK_VALUE);
         assertFails(
-                () -> new NuclearStatusDef(NuclearStatus.ARSENAL, "Арсенал", List.of("NuclearPower")),
+                () -> new NuclearStatusDef(NuclearStatus.ARSENAL, "Арсенал", 7, 90, List.of("NuclearPower")),
                 ErrorCode.INVALID_KEY_FORMAT);
+    }
+
+    @Test
+    void nuclearStatusWeightAndQualityAreBounded() {
+        assertThat(new NuclearStatusDef(NuclearStatus.PROGRAM, "Програма", 13, 70, List.of("nuclear_program")))
+                .extracting(NuclearStatusDef::weight, NuclearStatusDef::quality)
+                .containsExactly(13, 70);
+        assertFails(
+                () -> new NuclearStatusDef(NuclearStatus.NONE, "Немає", 0, 50, List.of()),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new NuclearStatusDef(NuclearStatus.NONE, "Немає", NuclearStatusDef.MAX_WEIGHT + 1, 50, List.of()),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new NuclearStatusDef(NuclearStatus.NONE, "Немає", 80, 101, List.of()),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new NuclearStatusDef(NuclearStatus.NONE, "Немає", 80, -1, List.of()),
+                ErrorCode.VALUE_OUT_OF_RANGE);
     }
 
     @Test

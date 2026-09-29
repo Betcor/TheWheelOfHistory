@@ -11,6 +11,7 @@
 # Перевага колеса розвиненості галузі (GD §4.1, №7): wheel:generation_development_<галузь>, де галузь —
 # economy, military, society або energy_science (development.yaml). Модифікатори ідеології й
 # підкласифікації складаються.
+# Перевага колеса ядерного статусу (GD §4.1, №14): wheel:generation_nuclear.
 
 ideologies:
   - id: democracy
@@ -75,6 +76,7 @@ ideologies:
         modifiers:
           - { target: "wheel:generation_development_energy_science", value: 20 }
           - { target: "wheel:generation_development_economy", value: 10 }
+          - { target: "wheel:generation_nuclear", value: 10 }
       - id: managed_democracy
         name: «Керована демократія»
         weight: 100
@@ -92,6 +94,7 @@ ideologies:
       - { target: "wheel:generation_development_military", value: 10 }
       - { target: "wheel:generation_development_society", value: -10 }
       - { target: "wheel:generation_development_energy_science", value: -10 }
+      - { target: "wheel:generation_nuclear", value: 10 }
     sub_ideologies:
       - id: personality_cult
         name: Культ особи
@@ -110,6 +113,7 @@ ideologies:
         modifiers:
           - { target: "stat:war_weariness", value: -5 }
           - { target: "wheel:generation_development_military", value: 15 }
+          - { target: "wheel:generation_nuclear", value: 10 }
       - id: isolationism
         name: Ізоляціонізм
         weight: 100

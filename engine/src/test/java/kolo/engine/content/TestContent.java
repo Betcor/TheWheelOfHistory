@@ -62,7 +62,7 @@ final class TestContent {
     /** По визначенню на кожен ядерний статус. */
     static List<NuclearStatusDef> nuclearStatuses() {
         return Arrays.stream(NuclearStatus.values())
-                .map(status -> new NuclearStatusDef(status, "Статус " + status.key(), List.of()))
+                .map(status -> new NuclearStatusDef(status, "Статус " + status.key(), 100, 50, List.of()))
                 .toList();
     }
 
@@ -191,7 +191,7 @@ final class TestContent {
                 new WheelBalanceDef(50, new TreeMap<>(), List.of(20, 10, 5)),
                 new StreakRulesDef(85, 15, 3),
                 Arrays.stream(PowerCorridor.values()).map(TestContent::corridor).toList(),
-                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3)));
+                new GenerationBalanceDef(new CountRange(2, 4), new CountRange(1, 3), new CountRange(2, 10), 10));
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {

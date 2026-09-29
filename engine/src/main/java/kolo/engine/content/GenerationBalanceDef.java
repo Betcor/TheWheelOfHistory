@@ -2,26 +2,37 @@ package kolo.engine.content;
 
 import java.util.Objects;
 import kolo.engine.error.Checks;
+import kolo.engine.wheel.Advantage;
 
 /**
- * Кількості в ланцюжку коліс генерації країни (GD §4.1).
+ * Числа ланцюжка коліс генерації країни (GD §4.1).
  *
  * @param backstoryFragments скільки фрагментів передісторії (GD §4.7), не менше одного
  * @param notablePeople скільки відомих людей на старті (GD §4.8), не менше одного
+ * @param warheads скільки боєголовок у стартовому арсеналі (GD §4.6), {@code 1..}{@value #MAX_WARHEADS}
+ * @param nuclearEnergyAdvantage перевага колеса ядерного статусу за кожен рівень розвиненості енергетики й науки
+ *     відносно світового (GD §4.6), {@code 0..}{@value Advantage#MAX}: рівень {@code −1} дає мінус стільки, {@code
+ *     +2} — удвічі більше
  */
-public record GenerationBalanceDef(CountRange backstoryFragments, CountRange notablePeople) {
+public record GenerationBalanceDef(
+        CountRange backstoryFragments, CountRange notablePeople, CountRange warheads, int nuclearEnergyAdvantage) {
 
     /** Більше фрагментів чи постатей перевантажили б картку країни. */
     public static final int MAX_COUNT = 10;
 
+    /** Стартовий арсенал — «кілька боєголовок», а не сотні: кожну боєголовку можна застосувати окремо. */
+    public static final int MAX_WARHEADS = 100;
+
     public GenerationBalanceDef {
-        check("generation.backstory_fragments", backstoryFragments);
-        check("generation.notable_people", notablePeople);
+        check("generation.backstory_fragments", backstoryFragments, MAX_COUNT);
+        check("generation.notable_people", notablePeople, MAX_COUNT);
+        check("generation.warheads", warheads, MAX_WARHEADS);
+        Checks.inRange("generation.nuclear_energy_advantage", nuclearEnergyAdvantage, 0, Advantage.MAX);
     }
 
-    private static void check(String field, CountRange range) {
+    private static void check(String field, CountRange range, int max) {
         Objects.requireNonNull(range, field);
-        Checks.inRange(field + ".min", range.min(), 1, MAX_COUNT);
-        Checks.inRange(field + ".max", range.max(), range.min(), MAX_COUNT);
+        Checks.inRange(field + ".min", range.min(), 1, max);
+        Checks.inRange(field + ".max", range.max(), range.min(), max);
     }
 }

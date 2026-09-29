@@ -75,6 +75,34 @@ class ContentLoaderTest {
         assertThat(pack.developmentLevel(0).tags()).isEmpty();
         assertThat(pack.nuclearStatus(NuclearStatus.ARSENAL).tags()).containsExactly("nuclear_power");
         assertThat(pack.nuclearStatus(NuclearStatus.NONE).tags()).isEmpty();
+        assertThat(pack.nuclearStatus(NuclearStatus.PROGRAM).weight()).isEqualTo(13);
+        assertThat(pack.nuclearStatus(NuclearStatus.ARSENAL).quality()).isEqualTo(90);
+    }
+
+    @Test
+    void missingNuclearWeightOrQualityIsAnErrorNotZero() {
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.NUCLEAR, Files.NUCLEAR.replace("    weight: 13\n", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "file", "nuclear.yaml",
+                        "location", "statuses[1]",
+                        "cause", "blank_value",
+                        "field", "weight"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.NUCLEAR, Files.NUCLEAR.replace("    quality: 90\n", ""))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "statuses[2]", "cause", "blank_value", "field", "quality"));
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.NUCLEAR, Files.NUCLEAR.replace("weight: 7", "weight: 0"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "statuses[2]", "cause", "value_out_of_range"));
     }
 
     @Test
@@ -433,7 +461,9 @@ class ContentLoaderTest {
                 Map.of("location", "levels", "cause", "missing_definition", "value", 2));
         assertContentError(
                 Files.valid()
-                        .with(ContentLoader.NUCLEAR, "statuses:\n  - { id: none, name: Немає }\n")
+                        .with(
+                                ContentLoader.NUCLEAR,
+                                "statuses:\n  - { id: none, name: Немає, weight: 80, quality: 50 }\n")
                         .source(),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("file", "nuclear.yaml", "location", "statuses", "value", "program"));
@@ -510,6 +540,8 @@ class ContentLoaderTest {
         assertThat(balance.corridor(PowerCorridor.FULL_CHAOS).npc()).isEqualTo(new MedianRange(10, 1000));
         assertThat(balance.generation().backstoryFragments()).isEqualTo(new CountRange(2, 4));
         assertThat(balance.generation().notablePeople()).isEqualTo(new CountRange(1, 3));
+        assertThat(balance.generation().warheads()).isEqualTo(new CountRange(2, 10));
+        assertThat(balance.generation().nuclearEnergyAdvantage()).isEqualTo(10);
     }
 
     @Test
@@ -562,6 +594,14 @@ class ContentLoaderTest {
                         "notable_people: { min: 1, max: 3 }", "notable_people: { min: 0, max: 3 }")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.notable_people.min"));
+        assertContentError(
+                balance(Files.BALANCE.replace("warheads: { min: 2, max: 10 }", "warheads: { min: 0, max: 10 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.warheads.min"));
+        assertContentError(
+                balance(Files.BALANCE.replace("nuclear_energy_advantage: 10", "nuclear_energy_advantage: 101")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.nuclear_energy_advantage"));
     }
 
     @Test
@@ -574,6 +614,20 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("{ min: 2, max: 4 }", "{ min: 2 }")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation.backstory_fragments", "cause", "blank_value", "field", "max"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  warheads: { min: 2, max: 10 }\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation.warheads", "cause", "blank_value"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  nuclear_energy_advantage: 10\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "generation.nuclear_energy_advantage",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "nuclear_energy_advantage"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,
