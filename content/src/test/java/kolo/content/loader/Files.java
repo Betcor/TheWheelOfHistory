@@ -274,17 +274,24 @@ final class Files {
                 description: Один материк.
                 weight: 20
                 provinces_pct: 90
+                land_pct: 40
                 continents: { min: 1, max: 1 }
               - id: archipelago
                 name: Архіпелаг
                 description: Багато островів.
                 weight: 15
                 provinces_pct: 120
+                land_pct: 30
                 continents: { min: 5, max: 8 }
             grid:
               cell_size: 100
               aspect: { width: 2, height: 1 }
               relaxation: 2
+            continents:
+              size_weight: { min: 1, max: 4 }
+              min_provinces: 20
+              roughness: 50
+              noise_cells: 6
             """;
 
     static final String RELIGIONS = """

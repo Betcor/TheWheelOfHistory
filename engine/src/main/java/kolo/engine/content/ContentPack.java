@@ -72,13 +72,15 @@ public final class ContentPack {
      * @param streaks колеса стріків генерації
      * @param religions шаблон релігій світу: архетипи, аспекти, догмати, устрої, форми назви віри, колесо релігії
      *     держави; мітки релігій — джерело міток передісторії й типів постатей
-     * @param map контент карти: шаблони
+     * @param map контент карти: шаблони, сітка, материки; найменший світ балансу вміщує мінімум провінцій кожного
+     *     материка будь-якого шаблону, а сітка найбільшого — не більше {@link MapGridDef#MAX_CELLS} комірок
      * @throws ValidationException якщо якась колекція порожня, id повторюється (зокрема id підкласифікацій різних
      *     ідеологій), бракує визначення галузі, рівня, статусу чи типу постаті, рівні ВВП, ІЛР, розміру армії
      *     чи вишколу не впорядковано від нижчого до вищого ({@link ErrorCode#OUT_OF_ORDER}), риса посилається на невідому рису,
      *     типу постаті не доступна жодна риса, форма державності посилається на невідому ідеологію чи
      *     підкласифікацію, підкласифікації не доступна жодна форма, фрагмент передісторії чи вага типу постаті
-     *     залежить від мітки без джерела або світська держава залежить від мітки, якої немає в ладу
+     *     залежить від мітки без джерела, світська держава залежить від мітки, якої немає в ладу, або межі
+     *     кількості провінцій балансу не узгоджені з шаблонами карти ({@link ErrorCode#VALUE_OUT_OF_RANGE})
      */
     public ContentPack(
             String hash,
@@ -287,6 +289,36 @@ public final class ContentPack {
 
         this.map = Objects.requireNonNull(map, "map");
         this.balance = Objects.requireNonNull(balance, "balance");
+        checkMapFitsWorld(map, balance.world());
+    }
+
+    /**
+     * Шаблон карти мусить уміщатися в межі кількості провінцій: найменший світ — мінімум провінцій на кожен материк,
+     * найбільший — сітку з морем. Інакше генерація карти падала б лише на деяких seed-ах.
+     */
+    private static void checkMapFitsWorld(MapContent map, WorldBalanceDef world) {
+        int minProvinces = map.continents().minProvinces();
+        for (MapTemplateDef template : map.templates()) {
+            String field = "map_template." + template.id();
+            long needed = (long) template.continents().max() * minProvinces;
+            if (world.provinces().min() < needed) {
+                throw new ValidationException(
+                        ErrorCode.VALUE_OUT_OF_RANGE,
+                        ErrorDetails.of(
+                                "field",
+                                field + ".continents.max",
+                                "value",
+                                world.provinces().min(),
+                                "min",
+                                needed));
+            }
+            int cells = template.gridCells(world.provinces().max());
+            if (cells > MapGridDef.MAX_CELLS) {
+                throw new ValidationException(
+                        ErrorCode.VALUE_OUT_OF_RANGE,
+                        ErrorDetails.of("field", field + ".land_pct", "value", cells, "max", MapGridDef.MAX_CELLS));
+            }
+        }
     }
 
     /** Хеш вихідних файлів контенту: однаковий на всіх машинах для однакових файлів. */

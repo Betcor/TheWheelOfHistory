@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.TreeMap;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
+import kolo.engine.generation.name.TestNames;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -42,12 +43,60 @@ class MapDefinitionsTest {
     @Test
     void templateRequiresNameAndDescription() {
         assertFails(
-                () -> new MapTemplateDef(new MapTemplateId("a"), " ", "Опис", 10, 100, new CountRange(1, 1)),
+                () -> new MapTemplateDef(new MapTemplateId("a"), " ", "Опис", 10, 100, 50, new CountRange(1, 1)),
                 ErrorCode.BLANK_VALUE);
         assertFails(
-                () -> new MapTemplateDef(new MapTemplateId("a"), "Назва", "", 10, 100, new CountRange(1, 1)),
+                () -> new MapTemplateDef(new MapTemplateId("a"), "Назва", "", 10, 100, 50, new CountRange(1, 1)),
                 ErrorCode.BLANK_VALUE);
         assertFails(() -> new MapTemplateId("Pangaea"), ErrorCode.INVALID_KEY_FORMAT);
+    }
+
+    @Test
+    void templateRejectsLandShareOutsideLimits() {
+        assertFails(
+                () -> TestMaps.template("a", 10, 100, MapTemplateDef.MIN_LAND_PCT - 1, 1, 1),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> TestMaps.template("a", 10, 100, MapTemplateDef.MAX_LAND_PCT + 1, 1, 1),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void gridCellsAddSeaForLandShareRoundingUp() {
+        assertThat(TestMaps.template("a", 10, 100, 50, 1, 1).gridCells(400)).isEqualTo(800);
+        assertThat(TestMaps.template("a", 10, 100, 30, 1, 1).gridCells(400)).isEqualTo(1334);
+        assertThat(TestMaps.template("a", 10, 100, 30, 1, 1).gridCells(3)).isEqualTo(10);
+        assertFails(() -> TestMaps.template("a", 10, 100, 30, 1, 1).gridCells(0), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void continentsKeepTheirValues() {
+        ContinentsDef continents = new ContinentsDef(new CountRange(1, 4), 20, 50, 6);
+
+        assertThat(continents.sizeWeight()).isEqualTo(new CountRange(1, 4));
+        assertThat(continents.minProvinces()).isEqualTo(20);
+        assertThat(continents.roughness()).isEqualTo(50);
+        assertThat(continents.noiseCells()).isEqualTo(6);
+    }
+
+    @Test
+    void continentsRejectValuesOutsideLimits() {
+        CountRange weight = new CountRange(1, 4);
+        assertFails(() -> new ContinentsDef(new CountRange(0, 4), 20, 50, 6), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new ContinentsDef(new CountRange(1, ContinentsDef.MAX_SIZE_WEIGHT + 1), 20, 50, 6),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new ContinentsDef(weight, 0, 50, 6), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new ContinentsDef(weight, ContinentsDef.MAX_MIN_PROVINCES + 1, 50, 6),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new ContinentsDef(weight, 20, -1, 6), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new ContinentsDef(weight, 20, ContinentsDef.MAX_ROUGHNESS + 1, 6), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new ContinentsDef(weight, 20, 50, 0), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new ContinentsDef(weight, 20, 50, ContinentsDef.MAX_NOISE_CELLS + 1),
+                ErrorCode.VALUE_OUT_OF_RANGE);
     }
 
     @Test
@@ -57,14 +106,17 @@ class MapDefinitionsTest {
         assertThat(content.templates()).containsExactly(TestMaps.PANGAEA, TestMaps.ARCHIPELAGO);
         assertThat(content.template(new MapTemplateId("archipelago"))).contains(TestMaps.ARCHIPELAGO);
         assertThat(content.template(new MapTemplateId("ring_world"))).isEmpty();
+        assertThat(content.continents()).isEqualTo(TestMaps.CONTINENTS);
     }
 
     @Test
     void mapContentRejectsEmptyAndDuplicateTemplates() {
-        assertFails(() -> new MapContent(List.of(), TestMaps.GRID), ErrorCode.EMPTY_COLLECTION);
+        assertFails(() -> new MapContent(List.of(), TestMaps.GRID, TestMaps.CONTINENTS), ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
-                        List.of(TestMaps.PANGAEA, TestMaps.template("pangaea", 1, 100, 1, 1)), TestMaps.GRID),
+                        List.of(TestMaps.PANGAEA, TestMaps.template("pangaea", 1, 100, 1, 1)),
+                        TestMaps.GRID,
+                        TestMaps.CONTINENTS),
                 ErrorCode.DUPLICATE_ID);
     }
 
@@ -121,6 +173,37 @@ class MapDefinitionsTest {
         assertFails(
                 () -> new WorldBalanceDef(npc, new StepRange(0, 10, 5), unclaimed, provinces),
                 ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void packRequiresSmallestWorldToHoldMinimumOfEveryContinent() {
+        // Архіпелаг — до 5 материків по 10 провінцій: найменший світ — щонайменше 50.
+        TestNames.pack(TestMaps.CONTENT, TestMaps.world(new CountRange(50, 3000)));
+
+        assertThatThrownBy(() -> TestNames.pack(TestMaps.CONTENT, TestMaps.world(new CountRange(49, 3000))))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE);
+                    assertThat(e.details())
+                            .containsEntry("field", "map_template.archipelago.continents.max")
+                            .containsEntry("value", 49)
+                            .containsEntry("min", 50L);
+                });
+    }
+
+    @Test
+    void packRequiresLargestWorldGridToFitCellLimit() {
+        // Суходолу 10%: 2000 провінцій — рівно 20 000 комірок, 2001 — уже більше.
+        MapContent map = TestMaps.content(List.of(TestMaps.template("sparse", 1, 100, 10, 1, 1)), TestMaps.CONTINENTS);
+        TestNames.pack(map, TestMaps.world(new CountRange(100, 2000)));
+
+        assertThatThrownBy(() -> TestNames.pack(map, TestMaps.world(new CountRange(100, 2001))))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE);
+                    assertThat(e.details())
+                            .containsEntry("field", "map_template.sparse.land_pct")
+                            .containsEntry("value", 20_010)
+                            .containsEntry("max", MapGridDef.MAX_CELLS);
+                });
     }
 
     @Test

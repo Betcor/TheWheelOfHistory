@@ -19,7 +19,7 @@ public record MapGridDef(int cellSize, int aspectWidth, int aspectHeight, int re
      */
     public static final int MIN_CELL_SIZE = 20;
 
-    /** Більша комірка на 20 000 комірок уже наближається до меж {@code int} у площі карти. */
+    /** Більша комірка на {@value #MAX_CELLS} комірок уже наближається до меж {@code int} у площі карти. */
     public static final int MAX_CELL_SIZE = 1_000;
 
     /** Карта, вужча за 1:4 в будь-який бік, — уже смуга, а не світ. */
@@ -27,6 +27,9 @@ public record MapGridDef(int cellSize, int aspectWidth, int aspectHeight, int re
 
     /** Після кількох ітерацій комірки майже не змінюються, а кожна ітерація — ще одна діаграма Вороного. */
     public static final int MAX_RELAXATION = 10;
+
+    /** Найбільша сітка: 3500 провінцій суходолу з морем при найменшій частці суходолу шаблону. */
+    public static final int MAX_CELLS = 20_000;
 
     public MapGridDef {
         Checks.inRange("map_grid.cell_size", cellSize, MIN_CELL_SIZE, MAX_CELL_SIZE);

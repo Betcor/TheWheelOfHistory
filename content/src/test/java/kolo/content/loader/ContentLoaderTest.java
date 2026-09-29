@@ -19,6 +19,7 @@ import kolo.engine.content.BackstoryFragmentDef;
 import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BalanceDef;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
 import kolo.engine.content.DogmaDef;
 import kolo.engine.content.DogmaId;
@@ -1306,11 +1307,13 @@ class ContentLoaderTest {
                         MapTemplateDef::name,
                         MapTemplateDef::weight,
                         MapTemplateDef::provincesPct,
+                        MapTemplateDef::landPct,
                         MapTemplateDef::continents)
                 .containsExactly(
-                        tuple(new MapTemplateId("pangaea"), "Пангея", 20, 90, new CountRange(1, 1)),
-                        tuple(new MapTemplateId("archipelago"), "Архіпелаг", 15, 120, new CountRange(5, 8)));
+                        tuple(new MapTemplateId("pangaea"), "Пангея", 20, 90, 40, new CountRange(1, 1)),
+                        tuple(new MapTemplateId("archipelago"), "Архіпелаг", 15, 120, 30, new CountRange(5, 8)));
         assertThat(pack.map().grid()).isEqualTo(new MapGridDef(100, 2, 1, 2));
+        assertThat(pack.map().continents()).isEqualTo(new ContinentsDef(new CountRange(1, 4), 20, 50, 6));
         WorldBalanceDef world = pack.balance().world();
         assertThat(world.npcExtra(NpcShare.FEW)).isEqualTo(new CountRange(1, 3));
         assertThat(world.npcExtra(NpcShare.NORMAL)).isEqualTo(new CountRange(2, 6));
@@ -1341,6 +1344,55 @@ class ContentLoaderTest {
                 Files.MAP.replace("continents: { min: 5, max: 8 }", "continents: { min: 5 }"),
                 Map.of("location", "templates[1].continents", "cause", "blank_value", "field", "max"));
         assertMapError("templates: []\n", Map.of("location", "templates", "cause", "empty_collection"));
+        assertMapError(
+                Files.MAP.replace("    land_pct: 30\n", ""),
+                Map.of("location", "templates[1]", "cause", "blank_value", "field", "land_pct"));
+        assertMapError(
+                Files.MAP.replace("land_pct: 30", "land_pct: 95"),
+                Map.of(
+                        "location",
+                        "templates[1]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "map_template.archipelago.land_pct"));
+    }
+
+    @Test
+    void invalidContinentsAreReportedAtTheirPosition() {
+        String continents = Files.MAP.substring(Files.MAP.indexOf("continents:\n"));
+        assertMapError(
+                Files.MAP.replace(continents, ""),
+                Map.of("location", "continents", "cause", "blank_value", "field", "continents"));
+        assertMapError(
+                Files.MAP.replace("  size_weight: { min: 1, max: 4 }\n", ""),
+                Map.of("location", "continents", "cause", "blank_value", "field", "size_weight"));
+        assertMapError(
+                Files.MAP.replace("size_weight: { min: 1, max: 4 }", "size_weight: { min: 1 }"),
+                Map.of("location", "continents", "cause", "blank_value", "field", "max"));
+        assertMapError(
+                Files.MAP.replace("  min_provinces: 20\n", ""),
+                Map.of("location", "continents", "cause", "blank_value", "field", "min_provinces"));
+        assertMapError(
+                Files.MAP.replace("roughness: 50", "roughness: 101"),
+                Map.of("location", "continents", "cause", "value_out_of_range", "field", "continents.roughness"));
+        assertMapError(
+                Files.MAP.replace("noise_cells: 6", "noise_cells: 0"),
+                Map.of("location", "continents", "cause", "value_out_of_range", "field", "continents.noise_cells"));
+    }
+
+    @Test
+    void mapInconsistentWithWorldBalanceIsRejected() {
+        // Архіпелаг — до 8 материків по 20 провінцій: найменший світ балансу (400) мусить бути ≥ 160.
+        assertThatThrownBy(() -> ContentLoader.load(Files.valid()
+                        .with(ContentLoader.MAP, Files.MAP.replace("min_provinces: 20", "min_provinces: 60"))
+                        .source()))
+                .isInstanceOfSatisfying(ContentException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.INVALID_CONTENT);
+                    assertThat(e.details())
+                            .containsEntry("cause", "value_out_of_range")
+                            .containsEntry("field", "map_template.archipelago.continents.max");
+                });
     }
 
     @Test

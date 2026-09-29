@@ -32,6 +32,7 @@ import kolo.engine.content.BackstoryFragmentId;
 import kolo.engine.content.BackstoryText;
 import kolo.engine.content.BalanceDef;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
@@ -1259,10 +1260,26 @@ public final class ContentLoader {
                                     template.description(),
                                     required("weight", template.weight()),
                                     required("provinces_pct", template.provincesPct()),
+                                    required("land_pct", template.landPct()),
                                     continents));
                 });
         MapGridDef grid = at(MAP, "grid", () -> grid(yaml.grid()));
-        return at(MAP, "", () -> new MapContent(templates, grid));
+        ContinentsDef continents = at(MAP, "continents", () -> continents(yaml.continents()));
+        return at(MAP, "", () -> new MapContent(templates, grid, continents));
+    }
+
+    private static ContinentsDef continents(ContentYaml.Continents continents) {
+        if (continents == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "continents"));
+        }
+        if (continents.sizeWeight() == null) {
+            throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "size_weight"));
+        }
+        return new ContinentsDef(
+                count(continents.sizeWeight()),
+                required("min_provinces", continents.minProvinces()),
+                required("roughness", continents.roughness()),
+                required("noise_cells", continents.noiseCells()));
     }
 
     private static MapGridDef grid(ContentYaml.MapGrid grid) {

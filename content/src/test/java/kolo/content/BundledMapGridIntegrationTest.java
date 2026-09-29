@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Сітка Вороного на вбудованому контенті: для розмірів світу, які дає колесо, комірки вкривають карту без щілин,
- * сусідство симетричне й зв'язне; найбільша карта вкладається в бюджет генерації.
+ * сусідство симетричне й зв'язне; найбільша карта (з морем) вкладається в бюджет генерації.
  */
 class BundledMapGridIntegrationTest {
 
@@ -41,7 +41,7 @@ class BundledMapGridIntegrationTest {
     @Test
     void largestMapHasExpectedSizeAndFitsBudget() {
         MapGridDef def = PACK.map().grid();
-        int cells = PACK.balance().world().provinces().max();
+        int cells = BundledContinentsIntegrationTest.largestGrid();
         VoronoiGrid.generate(Rng.of(0), def, cells);
 
         long start = System.nanoTime();
