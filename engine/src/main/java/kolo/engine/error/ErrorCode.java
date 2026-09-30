@@ -93,15 +93,24 @@ public enum ErrorCode {
      * file}, {@code line}, {@code column}, {@code problem} (опис для автора контенту, не для гравця).
      */
     CONTENT_MALFORMED(ContentException.class),
+    /**
+     * Файл світу не вдалося створити, відкрити, записати чи прочитати. Подробиці: {@code file} (ім'я файлу), {@code
+     * operation} ({@code create}, {@code open}, {@code save_turn}, {@code load}, {@code close}) і {@code problem}
+     * ({@code file_exists}, {@code file_missing}, {@code io_error}) або {@code sqlite_code}.
+     */
     SAVE_FILE_ERROR(SaveFileException.class),
     /**
      * Снапшот світу пошкоджений: не валідний JSON, не та структура, значення поза межами, порушено інваріант, не
-     * канонічний запис або снапшот стану не від цієї карти. Подробиці: {@code part} ({@code map} чи {@code state}),
-     * {@code location} (шлях усередині снапшота), {@code problem} (опис для розробника, не для гравця) або {@code
-     * cause} (код первинної помилки) з її подробицями.
+     * канонічний запис, снапшот стану не від цієї карти, або сам файл світу чужий чи неповний. Подробиці: {@code part}
+     * ({@code map}, {@code state} чи {@code file}), {@code location} (шлях усередині снапшота або таблиця файлу
+     * світу, {@code snapshots[3]}), {@code problem} (опис для розробника, не для гравця) або {@code cause} (код
+     * первинної помилки) з її подробицями.
      */
     SAVE_MALFORMED(SaveFileException.class),
-    /** Файл світу створено новішою версією гри. Подробиці: {@code version}, {@code supported}. */
+    /**
+     * Файл світу створено новішою версією гри. Подробиці: {@code version}, {@code supported}; для схеми файлу — ще
+     * {@code part} = {@code file}.
+     */
     SAVE_VERSION_TOO_NEW(SaveVersionException.class),
     INVARIANT_VIOLATION(InvariantViolationException.class);
 
