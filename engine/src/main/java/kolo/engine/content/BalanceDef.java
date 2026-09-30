@@ -11,7 +11,7 @@ import kolo.engine.state.PowerCorridor;
 
 /**
  * Числа балансу, що не належать жодному окремому визначенню: колеса, стріки, коридор сили, кількості генерації
- * країн і релігій, розмір світу.
+ * країн і релігій, розмір світу, кількість родовищ держави.
  *
  * <p>Правила гри (межі переваги, мінімум КП/КУ, ліміт жетонів долі) — не тут, а в коді: вони не налаштовуються.
  *
@@ -23,7 +23,8 @@ public record BalanceDef(
         SortedMap<PowerCorridor, PowerCorridorDef> corridors,
         GenerationBalanceDef generation,
         ReligionBalanceDef religion,
-        WorldBalanceDef world) {
+        WorldBalanceDef world,
+        ResourceBalanceDef resources) {
 
     public BalanceDef {
         Objects.requireNonNull(wheel, "wheel");
@@ -31,6 +32,7 @@ public record BalanceDef(
         Objects.requireNonNull(generation, "generation");
         Objects.requireNonNull(religion, "religion");
         Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(resources, "resources");
         TreeMap<PowerCorridor, PowerCorridorDef> copy = new TreeMap<>();
         corridors.forEach((key, def) -> {
             if (key != Objects.requireNonNull(def, "power_corridor").corridor()) {
@@ -54,7 +56,8 @@ public record BalanceDef(
             List<PowerCorridorDef> corridors,
             GenerationBalanceDef generation,
             ReligionBalanceDef religion,
-            WorldBalanceDef world) {
+            WorldBalanceDef world,
+            ResourceBalanceDef resources) {
         TreeMap<PowerCorridor, PowerCorridorDef> map = new TreeMap<>();
         for (PowerCorridorDef def : corridors) {
             Objects.requireNonNull(def, "power_corridor");
@@ -68,7 +71,7 @@ public record BalanceDef(
                                 def.corridor().key()));
             }
         }
-        return new BalanceDef(wheel, streaks, map, generation, religion, world);
+        return new BalanceDef(wheel, streaks, map, generation, religion, world, resources);
     }
 
     public PowerCorridorDef corridor(PowerCorridor corridor) {

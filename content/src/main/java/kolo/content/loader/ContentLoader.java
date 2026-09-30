@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -39,6 +40,7 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
 import kolo.engine.content.CoverDef;
+import kolo.engine.content.DepositDef;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.content.DoctrineDef;
 import kolo.engine.content.DoctrineId;
@@ -78,6 +80,8 @@ import kolo.engine.content.ReligionContent;
 import kolo.engine.content.ReligionCountDef;
 import kolo.engine.content.ReligionPolityDef;
 import kolo.engine.content.ReligionPolityId;
+import kolo.engine.content.ResourceBalanceDef;
+import kolo.engine.content.ResourceCountDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.RiverDef;
@@ -337,8 +341,32 @@ public final class ContentLoader {
         return list(
                 RESOURCES, "resources", nonEmpty(RESOURCES, "resources", yaml.resources()), (location, resource) -> {
                     ResourceId id = at(RESOURCES, location, () -> unique(ids, new ResourceId(resource.id())));
-                    return at(RESOURCES, location, () -> new ResourceDef(id, resource.name(), resource.tags()));
+                    Optional<DepositDef> deposits = resource.deposits() == null
+                            ? Optional.empty()
+                            : Optional.of(deposits(location + ".deposits", resource.deposits()));
+                    return at(
+                            RESOURCES, location, () -> new ResourceDef(id, resource.name(), resource.tags(), deposits));
                 });
+    }
+
+    private static DepositDef deposits(String location, ContentYaml.Deposits yaml) {
+        TreeMap<Terrain, Integer> terrains = new TreeMap<>();
+        yaml.terrains().forEach((key, value) -> {
+            String where = location + ".terrains." + key;
+            terrains.put(
+                    at(RESOURCES, where, () -> ContentKeys.parse("terrain", Terrain.values(), Terrain::key, key)),
+                    at(RESOURCES, where, () -> required(key, value)));
+        });
+        TreeMap<Climate, Integer> climates = new TreeMap<>();
+        yaml.climates().forEach((key, value) -> {
+            String where = location + ".climates." + key;
+            climates.put(
+                    at(RESOURCES, where, () -> climateKey("climate", key)),
+                    at(RESOURCES, where, () -> required(key, value)));
+        });
+        OptionalInt fertilityFrom =
+                yaml.fertilityFrom() == null ? OptionalInt.empty() : OptionalInt.of(yaml.fertilityFrom());
+        return at(RESOURCES, location, () -> new DepositDef(terrains, climates, fertilityFrom));
     }
 
     private static List<TechBranchDef> techBranches(ContentYaml.DevelopmentFile yaml) {
@@ -1258,7 +1286,19 @@ public final class ContentLoader {
         WorldBalanceDef world =
                 at(BALANCE, "world", () -> new WorldBalanceDef(npcExtra, provincesPerCountry, unclaimed, provinces));
 
-        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation, religion, world));
+        ContentYaml.Resources resourcesYaml = section("resources", yaml.resources());
+        List<ResourceCountDef> resourceCount =
+                list(BALANCE, "resources.count", resourcesYaml.count(), (location, row) -> {
+                    CountRange deposits =
+                            at(BALANCE, location, () -> count(new ContentYaml.Count(row.min(), row.max())));
+                    return at(
+                            BALANCE,
+                            location,
+                            () -> new ResourceCountDef(required("max_provinces", row.maxProvinces()), deposits));
+                });
+        ResourceBalanceDef resources = at(BALANCE, "resources", () -> new ResourceBalanceDef(resourceCount));
+
+        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation, religion, world, resources));
     }
 
     private static MapContent map(ContentYaml.MapFile yaml) {

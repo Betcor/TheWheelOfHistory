@@ -1,35 +1,71 @@
 # Природні ресурси (GD §4.5). Родовища — у провінціях; ресурси відкривають будівлі й технології
 # і є товаром для торгівлі.
 # Теги груп: energy, metal, strategic, food, construction.
+#
+# deposits — де трапляються родовища: придатність провінції без кидків. Колесо ресурсів держави
+# обирає ресурс вагою за сумою придатності її провінцій, а провінцію родовища — вагою за
+# придатністю. Ресурс без deposits від генерації на карті не буває. Два способи, не разом:
+#   terrains — придатність за типом місцевості (0..100; не вказаний тип — 0): plain, hills,
+#     mountains, forest, desert, tundra, swamp;
+#   climates — множник поясу, % (0..300; не вказаний пояс — 100): polar, boreal, temperate, arid,
+#     tropical; придатність = terrains × climates / 100 (вниз);
+#   fertility_from — придатність = родючість провінції (0..100, див. map.yaml → fertility), якщо
+#     вона не нижча за поріг, інакше 0.
 
 resources:
   - id: iron
     name: Залізо
     tags: [metal]
+    deposits:
+      terrains: { mountains: 40, hills: 30, plain: 10, forest: 10, tundra: 10, desert: 10 }
   - id: coal
     name: Вугілля
     tags: [energy]
+    deposits:
+      terrains: { hills: 30, forest: 25, mountains: 20, plain: 15, swamp: 10, tundra: 10 }
+      climates: { boreal: 150, temperate: 130, arid: 50, tropical: 70 }
   - id: oil
     name: Нафта
     tags: [energy, strategic]
+    deposits:
+      terrains: { desert: 40, swamp: 25, tundra: 20, plain: 15, hills: 10 }
+      climates: { arid: 150, polar: 120 }
   - id: gas
     name: Газ
     tags: [energy]
+    deposits:
+      terrains: { tundra: 35, desert: 25, plain: 15, swamp: 15, hills: 10 }
+      climates: { polar: 150, boreal: 130 }
   - id: uranium
     name: Уран
     tags: [energy, strategic, nuclear_fuel]
+    deposits:
+      terrains: { mountains: 20, hills: 15, desert: 15, tundra: 10 }
   - id: copper
     name: Мідь
     tags: [metal]
+    deposits:
+      terrains: { mountains: 35, hills: 25, desert: 15 }
+      climates: { arid: 130 }
   - id: gold
     name: Золото
     tags: [metal, precious]
+    deposits:
+      terrains: { mountains: 25, hills: 15 }
+      climates: { tropical: 120 }
   - id: rare_earths
     name: Рідкісноземельні метали
     tags: [metal, strategic]
+    deposits:
+      terrains: { mountains: 15, hills: 10, desert: 10 }
   - id: timber
     name: Деревина
     tags: [construction]
+    deposits:
+      terrains: { forest: 60, swamp: 15 }
+      climates: { boreal: 150, tropical: 120 }
   - id: fertile_land
     name: Родючі землі
     tags: [food]
+    deposits:
+      fertility_from: 60

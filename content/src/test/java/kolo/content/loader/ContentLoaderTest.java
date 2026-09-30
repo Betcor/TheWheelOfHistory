@@ -26,6 +26,7 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
 import kolo.engine.content.CoverDef;
+import kolo.engine.content.DepositDef;
 import kolo.engine.content.DogmaDef;
 import kolo.engine.content.DogmaId;
 import kolo.engine.content.FaithFormDef;
@@ -1290,6 +1291,109 @@ class ContentLoaderTest {
     }
 
     @Test
+    void loadsResourceDeposits() {
+        ContentPack pack = ContentLoader.load(Files.valid().source());
+
+        assertThat(pack.resource(new ResourceId("iron")).orElseThrow().deposits())
+                .hasValue(DepositDef.byTerrain(
+                        new TreeMap<>(Map.of(Terrain.MOUNTAINS, 40, Terrain.HILLS, 20)),
+                        new TreeMap<>(Map.of(Climate.ARID, 150))));
+        assertThat(pack.resource(new ResourceId("fertile_land")).orElseThrow().deposits())
+                .hasValue(DepositDef.byFertility(60));
+        // Без deposits — ресурс лише торгівлі й подій.
+        assertThat(pack.resource(new ResourceId("oil")).orElseThrow().deposits())
+                .isEmpty();
+    }
+
+    @Test
+    void invalidDepositsAreReportedAtTheirPosition() {
+        assertResourcesError(
+                Files.RESOURCES.replace("hills: 20 }", "hills: 20, lava: 5 }"),
+                Map.of(
+                        "location",
+                        "resources[0].deposits.terrains.lava",
+                        "cause",
+                        "unknown_reference",
+                        "value",
+                        "lava"));
+        assertResourcesError(
+                Files.RESOURCES.replace("{ arid: 150 }", "{ arctic: 150 }"),
+                Map.of("location", "resources[0].deposits.climates.arctic", "cause", "unknown_reference"));
+        assertResourcesError(
+                Files.RESOURCES.replace("hills: 20 }", "hills: }"),
+                Map.of("location", "resources[0].deposits.terrains.hills", "cause", "blank_value"));
+        assertResourcesError(
+                Files.RESOURCES.replace("mountains: 40", "mountains: 101"),
+                Map.of(
+                        "location",
+                        "resources[0].deposits",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "deposits.terrains.mountains"));
+        assertResourcesError(
+                Files.RESOURCES.replace("{ arid: 150 }", "{ arid: 301 }"),
+                Map.of("location", "resources[0].deposits", "cause", "value_out_of_range"));
+        assertResourcesError(
+                Files.RESOURCES.replace("fertility_from: 60", "fertility_from: 60\n      climates: { arid: 150 }"),
+                Map.of(
+                        "location",
+                        "resources[2].deposits",
+                        "cause",
+                        "conflicting_fields",
+                        "field",
+                        "deposits.fertility_from"));
+        assertResourcesError(
+                Files.RESOURCES.replace("terrains: { mountains: 40, hills: 20 }", "terrains: {}"),
+                Map.of("location", "resources[0].deposits", "cause", "empty_collection", "field", "deposits.terrains"));
+        assertResourcesError(
+                Files.RESOURCES.replace("fertility_from: 60", "fertility_from: 101"),
+                Map.of("location", "resources[2].deposits", "cause", "value_out_of_range"));
+        assertContentError(
+                Files.valid()
+                        .with(
+                                ContentLoader.RESOURCES,
+                                Files.RESOURCES.replace("fertility_from: 60", "fertility_min: 60"))
+                        .source(),
+                ErrorCode.CONTENT_MALFORMED,
+                Map.of("file", ContentLoader.RESOURCES));
+    }
+
+    @Test
+    void invalidResourceCountIsReportedAtItsPosition() {
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "    - { max_provinces: 50, min: 1, max: 2 }\n    - { max_provinces: 1000, min: 3, max: 5 }\n",
+                        "    []\n")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "resources", "cause", "empty_collection", "field", "resources.count"));
+        assertContentError(
+                balance(Files.BALANCE.replace("max_provinces: 1000", "max_provinces: 50")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "resources", "cause", "out_of_order", "field", "resources.count[1].max_provinces"));
+        assertContentError(
+                balance(Files.BALANCE.replace("{ max_provinces: 50, min: 1, max: 2 }", "{ min: 1, max: 2 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "resources.count[0]", "cause", "blank_value", "field", "max_provinces"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "{ max_provinces: 1000, min: 3, max: 5 }", "{ max_provinces: 1000, min: 3, max: 11 }")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "resources.count[1]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "resources.count.max"));
+        String withoutResources = Files.BALANCE.substring(0, Files.BALANCE.indexOf("resources:\n"));
+        assertContentError(
+                balance(withoutResources),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "resources", "cause", "blank_value"));
+    }
+
+    @Test
     void loadsBalance() {
         BalanceDef balance = ContentLoader.load(Files.valid().source()).balance();
 
@@ -1311,6 +1415,8 @@ class ContentLoaderTest {
         assertThat(balance.generation().personTraits()).isEqualTo(new CountRange(1, 3));
         assertThat(balance.generation().personAge()).isEqualTo(new CountRange(25, 70));
         assertThat(balance.generation().nameCandidates()).isEqualTo(5);
+        assertThat(balance.resources().deposits(50)).isEqualTo(new CountRange(1, 2));
+        assertThat(balance.resources().deposits(51)).isEqualTo(new CountRange(3, 5));
     }
 
     @Test
@@ -2144,6 +2250,14 @@ class ContentLoaderTest {
         assertThat(names).isNotEqualTo(Files.NAMES);
         assertContentError(
                 Files.valid().with(ContentLoader.NAMES, names).source(), ErrorCode.INVALID_CONTENT, expected);
+    }
+
+    private static void assertResourcesError(String resources, Map<String, ?> expected) {
+        assertThat(resources).isNotEqualTo(Files.RESOURCES);
+        assertContentError(
+                Files.valid().with(ContentLoader.RESOURCES, resources).source(),
+                ErrorCode.INVALID_CONTENT,
+                withFile(ContentLoader.RESOURCES, expected));
     }
 
     private static ContentSource balance(String yaml) {
