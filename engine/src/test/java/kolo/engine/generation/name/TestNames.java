@@ -39,6 +39,7 @@ import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.PowerCorridorDef;
 import kolo.engine.content.ReligionBalanceDef;
 import kolo.engine.content.ReligionContent;
+import kolo.engine.content.ResourceBalanceDef;
 import kolo.engine.content.ResourceDef;
 import kolo.engine.content.ResourceId;
 import kolo.engine.content.StateFormDef;
@@ -51,6 +52,7 @@ import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TestMaps;
 import kolo.engine.content.TestReligions;
+import kolo.engine.content.TestResources;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -219,19 +221,49 @@ public final class TestNames {
         return pack(5, TestReligions.content(), TestReligions.BALANCE, map, world);
     }
 
+    /** Пакет з цими ресурсами й балансом колеса ресурсів; решта — як у {@link #PACK}. */
+    public static ContentPack pack(List<ResourceDef> resources, ResourceBalanceDef resourceBalance) {
+        return pack(
+                5,
+                TestReligions.content(),
+                TestReligions.BALANCE,
+                TestMaps.CONTENT,
+                TestMaps.BALANCE,
+                resources,
+                resourceBalance);
+    }
+
     private static ContentPack pack(
             int nameCandidates,
             ReligionContent religions,
             ReligionBalanceDef religionBalance,
             MapContent map,
             WorldBalanceDef world) {
+        return pack(
+                nameCandidates,
+                religions,
+                religionBalance,
+                map,
+                world,
+                List.of(new ResourceDef(new ResourceId("iron"), "Залізо", List.of())),
+                TestResources.BALANCE);
+    }
+
+    private static ContentPack pack(
+            int nameCandidates,
+            ReligionContent religions,
+            ReligionBalanceDef religionBalance,
+            MapContent map,
+            WorldBalanceDef world,
+            List<ResourceDef> resources,
+            ResourceBalanceDef resourceBalance) {
         return new ContentPack(
                 "0".repeat(64),
                 List.of(
                         ideology("democracy", "liberal_democracy", "direct_democracy"),
                         ideology("monarchy", "absolute_monarchy")),
                 List.of(new DoctrineDef(new DoctrineId("armored"), "Бронетанкова", List.of(), List.of())),
-                List.of(new ResourceDef(new ResourceId("iron"), "Залізо", List.of())),
+                resources,
                 Arrays.stream(TechBranch.values())
                         .map(branch -> new TechBranchDef(branch, "Галузь"))
                         .toList(),
@@ -261,10 +293,14 @@ public final class TestNames {
                 TestStreaks.CONTENT,
                 religions,
                 map,
-                balance(nameCandidates, religionBalance, world));
+                balance(nameCandidates, religionBalance, world, resourceBalance));
     }
 
-    private static BalanceDef balance(int nameCandidates, ReligionBalanceDef religionBalance, WorldBalanceDef world) {
+    private static BalanceDef balance(
+            int nameCandidates,
+            ReligionBalanceDef religionBalance,
+            WorldBalanceDef world,
+            ResourceBalanceDef resourceBalance) {
         return BalanceDef.of(
                 new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                 new StreakRulesDef(85, 15, 3),
@@ -286,7 +322,8 @@ public final class TestNames {
                         new CountRange(25, 70),
                         nameCandidates),
                 religionBalance,
-                world);
+                world,
+                resourceBalance);
     }
 
     private static BackstoryContent backstory() {

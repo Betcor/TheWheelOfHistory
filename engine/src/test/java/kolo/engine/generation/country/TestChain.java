@@ -43,6 +43,7 @@ import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TestMaps;
 import kolo.engine.content.TestReligions;
+import kolo.engine.content.TestResources;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -249,7 +250,8 @@ final class TestChain {
                                 new CountRange(25, 70),
                                 5),
                         TestReligions.BALANCE,
-                        TestMaps.BALANCE));
+                        TestMaps.BALANCE,
+                        TestResources.BALANCE));
     }
 
     private static IdeologyDef ideology(String id, String... subs) {

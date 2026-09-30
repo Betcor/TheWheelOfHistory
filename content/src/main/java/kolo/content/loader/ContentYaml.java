@@ -59,9 +59,24 @@ final class ContentYaml {
         }
     }
 
-    record Resource(String id, String name, List<String> tags) {
+    record Resource(String id, String name, List<String> tags, Deposits deposits) {
         Resource {
             tags = orEmpty(tags);
+        }
+    }
+
+    /**
+     * @param terrains ключ типу місцевості → придатність
+     * @param climates ключ поясу → множник, %
+     * @param fertilityFrom поріг родючості; виключає {@code terrains} і {@code climates}
+     */
+    record Deposits(
+            Map<String, Integer> terrains,
+            Map<String, Integer> climates,
+            @JsonProperty("fertility_from") Integer fertilityFrom) {
+        Deposits {
+            terrains = terrains == null ? Map.of() : terrains;
+            climates = climates == null ? Map.of() : climates;
         }
     }
 
@@ -530,7 +545,8 @@ final class ContentYaml {
             @JsonProperty("power_corridors") List<PowerCorridor> powerCorridors,
             Generation generation,
             Religion religion,
-            World world) {
+            World world,
+            Resources resources) {
         BalanceFile {
             powerCorridors = orEmpty(powerCorridors);
         }
@@ -584,6 +600,14 @@ final class ContentYaml {
     }
 
     record ReligionCount(@JsonProperty("max_countries") Integer maxCountries, Integer min, Integer max) {}
+
+    record Resources(List<ResourceCount> count) {
+        Resources {
+            count = orEmpty(count);
+        }
+    }
+
+    record ResourceCount(@JsonProperty("max_provinces") Integer maxProvinces, Integer min, Integer max) {}
 
     record Count(Integer min, Integer max) {}
 

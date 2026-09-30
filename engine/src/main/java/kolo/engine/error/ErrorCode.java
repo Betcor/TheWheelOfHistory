@@ -50,6 +50,11 @@ public enum ErrorCode {
      * Подробиці: {@code field}, {@code value}.
      */
     OUT_OF_ORDER(ValidationException.class),
+    /**
+     * Задано поля, які виключають одне одного (напр. придатність до родовищ і за місцевістю, і за родючістю).
+     * Подробиці: {@code field}, {@code value} (друге поле).
+     */
+    CONFLICTING_FIELDS(ValidationException.class),
     /** Сума ваг колеса нульова. */
     WHEEL_ZERO_WEIGHT(ValidationException.class),
     /** Критичних секторів більше, ніж вміщує мінімум 1% кожному. Подробиці: {@code count}, {@code max}. */

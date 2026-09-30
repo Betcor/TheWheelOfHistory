@@ -287,7 +287,8 @@ final class TestContent {
                         new CountRange(25, 70),
                         5),
                 TestReligions.BALANCE,
-                TestMaps.BALANCE);
+                TestMaps.BALANCE,
+                TestResources.BALANCE);
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {

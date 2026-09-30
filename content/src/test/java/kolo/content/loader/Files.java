@@ -42,9 +42,16 @@ final class Files {
             resources:
               - id: iron
                 name: Залізо
+                deposits:
+                  terrains: { mountains: 40, hills: 20 }
+                  climates: { arid: 150 }
               - id: oil
                 name: Нафта
                 tags: [energy]
+              - id: fertile_land
+                name: Родючі землі
+                deposits:
+                  fertility_from: 60
             """;
 
     static final String DEVELOPMENT = """
@@ -265,6 +272,10 @@ final class Files {
               provinces_per_country: { min: 60, max: 100, step: 5 }
               unclaimed_bp: { min: 500, max: 1500, step: 100 }
               provinces: { min: 400, max: 3500 }
+            resources:
+              count:
+                - { max_provinces: 50, min: 1, max: 2 }
+                - { max_provinces: 1000, min: 3, max: 5 }
             """;
 
     static final String MAP = """
