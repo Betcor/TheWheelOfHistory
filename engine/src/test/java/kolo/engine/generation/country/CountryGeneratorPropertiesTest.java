@@ -2,9 +2,7 @@ package kolo.engine.generation.country;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 import kolo.engine.content.ContentPack;
-import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.FateTokens;
@@ -14,8 +12,8 @@ import net.jqwik.api.Property;
 /** Властивості ланцюжка коліс генерації на довільних seed. */
 class CountryGeneratorPropertiesTest {
 
-    private static final List<StartReligion> NEUTRAL_RELIGIONS = TestChain.religions(TestChain.NEUTRAL);
-    private static final List<StartReligion> STREAKY_RELIGIONS = TestChain.religions(TestChain.STREAKY);
+    private static final CountryGenerationInput NEUTRAL_INPUT = TestChain.input(TestChain.NEUTRAL);
+    private static final CountryGenerationInput STREAKY_INPUT = TestChain.input(TestChain.STREAKY);
 
     @Property
     void sameSeedGivesSameCountry(@ForAll long seed, @ForAll boolean streaky) {
@@ -34,6 +32,9 @@ class CountryGeneratorPropertiesTest {
         assertThat(country.fateTokens()).isBetween(0, FateTokens.MAX);
         assertThat(country.streaks()).extracting(StreakBonus::streak).doesNotHaveDuplicates();
         assertThat(country.tags())
+                .containsAll(country.territory().tags())
+                .containsAll(country.geography().tags())
+                .containsAll(country.population().tags())
                 .containsAll(country.regime().tags())
                 .containsAll(country.religion().tags())
                 .containsAll(country.development().tags())
@@ -43,9 +44,11 @@ class CountryGeneratorPropertiesTest {
         assertThat(country.modifiers()).extracting(Modifier::id).doesNotHaveDuplicates();
         assertThat(country.modifiers()).allMatch(modifier -> modifier.isActiveAt(0));
         assertThat(pack.subIdeology(country.regime().subIdeology().id())).isPresent();
+        assertThat(country.totalGdp()).isPositive();
+        assertThat(country.armyStrength()).isNotNegative();
     }
 
     private static CountryGenerationInput input(boolean streaky) {
-        return CountryGenerationInput.of(streaky ? STREAKY_RELIGIONS : NEUTRAL_RELIGIONS);
+        return streaky ? STREAKY_INPUT : NEUTRAL_INPUT;
     }
 }

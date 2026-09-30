@@ -258,6 +258,8 @@ final class Files {
               person_traits: { min: 1, max: 3 }
               person_age: { min: 25, max: 70 }
               name_candidates: 5
+              development_population_advantage: 5
+              gdp_population_advantage: -5
             religion:
               count:
                 - { max_countries: 8, min: 3, max: 4 }
@@ -320,11 +322,13 @@ final class Files {
                   name: Без моря
                   description: Жодного берега.
                   min_pct: 0
+                  gdp_advantage: -15
                   tags: [inland]
                 - id: seaside
                   name: Морська
                   description: Має берег.
                   min_pct: 1
+                  gdp_advantage: 5
                   tags: [seaside]
               terrains:
                 - terrains: [hills, mountains]

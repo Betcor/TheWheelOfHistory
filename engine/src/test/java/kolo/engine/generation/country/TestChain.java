@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import kolo.engine.content.ArmySizeDef;
 import kolo.engine.content.ArmySizeId;
 import kolo.engine.content.BackstoryContent;
@@ -24,13 +25,15 @@ import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MapContent;
 import kolo.engine.content.MedianRange;
 import kolo.engine.content.ModifierDef;
 import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
+import kolo.engine.content.PlacementDef;
+import kolo.engine.content.PopulationDef;
+import kolo.engine.content.PopulationLevelDef;
 import kolo.engine.content.PowerCorridorDef;
-import kolo.engine.content.ResourceDef;
-import kolo.engine.content.ResourceId;
 import kolo.engine.content.StreakContent;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
@@ -48,12 +51,16 @@ import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
 import kolo.engine.content.WheelBalanceDef;
+import kolo.engine.generation.map.MapGenerator;
+import kolo.engine.generation.map.WorldMap;
+import kolo.engine.generation.map.WorldSizeInput;
 import kolo.engine.generation.name.TestNames;
 import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.generation.religion.WorldReligionsWheel;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.Development;
+import kolo.engine.state.NpcShare;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.PowerCorridor;
@@ -69,8 +76,14 @@ import kolo.engine.wheel.OutcomeTier;
  * <ul>
  *   <li>{@link #NEUTRAL} — якість 50 усюди, стріків немає;
  *   <li>{@link #STREAKY} — розвиненість, ВВП та ІЛР дуже добрі («Золота доба» після ІЛР), армія, вишкіл і ядерний
- *       статус дуже погані («Андердог» після ядерного статусу).
+ *       статус дуже погані («Андердог» після ядерного статусу);
+ *   <li>{@link #MAP_STREAKY} — площа, населення й розвиненість дуже добрі («Золота доба» після розвиненості), решта
+ *       нейтральна.
  * </ul>
+ *
+ * <p>Карта — {@link TestMaps#CONTENT} з рівнями площі й населення потрібної якості, ресурси — {@link
+ * TestResources#RESOURCES}; населення дає ±5 розвиненості й ∓5 ВВП за крок рівня. Світ для пакета генерується один
+ * раз ({@link #world}).
  *
  * <p>«Золота доба» дає постать, 2 жетони й перевагу колесу розміру армії; «Андердог» — ще 2 жетони й стабільність на
  * 10 років. Фрагмент {@link #GLORY} доступний лише з міткою {@code golden_age} і має модифікатори на 5 років.
@@ -151,8 +164,20 @@ final class TestChain {
                     List.of(),
                     new BackstoryText("text", "Ворожнеча з {neighbor.instrumental} {year} року.")));
 
-    static final ContentPack NEUTRAL = pack(NEUTRAL_QUALITY, NEUTRAL_QUALITY);
-    static final ContentPack STREAKY = pack(GOOD, BAD);
+    /** Перевага розвиненості за крок рівня населення. */
+    static final int DEVELOPMENT_PER_STEP = 5;
+
+    /** Перевага ВВП за крок рівня населення. */
+    static final int GDP_PER_STEP = -5;
+
+    /** Seed карти світу: один материк на п'ять держав, у кожної є сусіди по суходолу. */
+    static final long WORLD_SEED = 1961;
+
+    static final ContentPack NEUTRAL = pack(NEUTRAL_QUALITY, NEUTRAL_QUALITY, NEUTRAL_QUALITY);
+    static final ContentPack STREAKY = pack(GOOD, BAD, NEUTRAL_QUALITY);
+    static final ContentPack MAP_STREAKY = pack(GOOD, NEUTRAL_QUALITY, GOOD);
+
+    private static final Map<ContentPack, WorldMap> WORLDS = new ConcurrentHashMap<>();
 
     private TestChain() {}
 
@@ -161,25 +186,34 @@ final class TestChain {
         return WorldReligionsWheel.generate(Rng.of(7), pack, 4).religions();
     }
 
-    /** Світ з релігіями пакета, без ресурсів, сусідів і зайнятих назв. */
+    /** Карта світу пакета: один гравець, звичайна частка NPC, seed {@link #WORLD_SEED}. */
+    static WorldMap world(ContentPack pack) {
+        return WORLDS.computeIfAbsent(
+                pack, key -> MapGenerator.generate(Rng.of(WORLD_SEED), key, WorldSizeInput.of(1, NpcShare.NORMAL)));
+    }
+
+    /** Держава 0 світу пакета з його релігіями, без зайнятих назв. */
     static CountryGenerationInput input(ContentPack pack) {
-        return CountryGenerationInput.of(religions(pack));
+        return input(pack, 0);
+    }
+
+    static CountryGenerationInput input(ContentPack pack, int country) {
+        return CountryGenerationInput.of(world(pack), country, religions(pack));
     }
 
     /**
      * @param early якість кожного рівня розвиненості, ВВП та ІЛР
      * @param late якість кожного рівня розміру й вишколу армії та ядерного статусу
+     * @param map якість кожного рівня площі й населення
      */
-    static ContentPack pack(int early, int late) {
+    static ContentPack pack(int early, int late, int map) {
         return new ContentPack(
                 "0".repeat(64),
                 List.of(
                         ideology("democracy", "liberal_democracy", "direct_democracy"),
                         ideology("monarchy", "absolute_monarchy")),
                 List.of(new DoctrineDef(new DoctrineId("armored"), "Бронетанкова", List.of(), List.of())),
-                List.of(
-                        new ResourceDef(new ResourceId("iron"), "Залізо", List.of()),
-                        new ResourceDef(new ResourceId("uranium"), "Уран", List.of("nuclear_fuel"))),
+                TestResources.RESOURCES,
                 Arrays.stream(TechBranch.values())
                         .map(branch -> new TechBranchDef(branch, "Галузь"))
                         .toList(),
@@ -228,7 +262,7 @@ final class TestChain {
                 new BackstoryContent(Map.of(), FRAGMENTS),
                 STREAKS,
                 TestReligions.content(),
-                TestMaps.CONTENT,
+                map(map),
                 BalanceDef.of(
                         new WheelBalanceDef(50, new TreeMap<>(), List.of(10)),
                         new StreakRulesDef(85, 15, 3),
@@ -248,10 +282,54 @@ final class TestChain {
                                 10,
                                 new CountRange(1, 1),
                                 new CountRange(25, 70),
-                                5),
+                                5,
+                                DEVELOPMENT_PER_STEP,
+                                GDP_PER_STEP),
                         TestReligions.BALANCE,
                         TestMaps.BALANCE,
                         TestResources.BALANCE));
+    }
+
+    /** {@link TestMaps#CONTENT} з рівнями площі й населення якості {@code quality}. */
+    private static MapContent map(int quality) {
+        PlacementDef placement = new PlacementDef(
+                List.of(
+                        TestMaps.area("small", 50, 30, quality),
+                        TestMaps.area("medium", 100, 50, quality),
+                        TestMaps.area("large", 200, 20, quality)),
+                TestMaps.PLACEMENT.minProvinces(),
+                TestMaps.PLACEMENT.roughness(),
+                TestMaps.PLACEMENT.noiseCells());
+        List<PopulationLevelDef> levels = TestMaps.POPULATION.levels().stream()
+                .map(level -> new PopulationLevelDef(
+                        level.id(),
+                        level.name(),
+                        level.description(),
+                        level.populationK(),
+                        level.tier(),
+                        level.weight(),
+                        quality,
+                        level.tags()))
+                .toList();
+        PopulationDef population = new PopulationDef(
+                levels,
+                TestMaps.POPULATION.areaAdvantage(),
+                TestMaps.POPULATION.fertilityAdvantage(),
+                TestMaps.POPULATION.provinceBase(),
+                TestMaps.POPULATION.coastBonus());
+        MapContent base = TestMaps.CONTENT;
+        return new MapContent(
+                base.templates(),
+                base.grid(),
+                base.continents(),
+                base.relief(),
+                base.climate(),
+                base.sea(),
+                base.rivers(),
+                base.fertility(),
+                placement,
+                base.geography(),
+                population);
     }
 
     private static IdeologyDef ideology(String id, String... subs) {

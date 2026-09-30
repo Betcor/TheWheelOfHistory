@@ -61,8 +61,8 @@ public final class TestMaps {
     public static final PlacementDef PLACEMENT = placement(2);
 
     /**
-     * Берег: без виходу до моря (0%, {@code landlocked}), прибережна (з 1%, {@code coastal}), морська (з 50%, {@code
-     * coastal} і {@code maritime}); місцевість: гори ≥ 20% — {@code mountainous}, пагорби й гори разом ≥ 50% — {@code
+     * Берег: без виходу до моря (0%, {@code landlocked}, ВВП −10), прибережна (з 1%, {@code coastal}), морська (з 50%,
+     * {@code coastal} і {@code maritime}, ВВП +10); місцевість: гори ≥ 20% — {@code mountainous}, пагорби й гори разом ≥ 50% — {@code
      * highland}.
      */
     public static final GeographyDef GEOGRAPHY = geography(List.of(
@@ -249,14 +249,18 @@ public final class TestMaps {
     public static GeographyDef geography(List<TerrainTagDef> terrains) {
         return new GeographyDef(
                 List.of(
-                        coast("landlocked", 0, List.of("landlocked")),
-                        coast("coastal", 1, List.of("coastal")),
-                        coast("maritime", 50, List.of("coastal", "maritime"))),
+                        coast("landlocked", 0, -10, List.of("landlocked")),
+                        coast("coastal", 1, 0, List.of("coastal")),
+                        coast("maritime", 50, 10, List.of("coastal", "maritime"))),
                 terrains);
     }
 
     public static CoastLevelDef coast(String id, int minPct, List<String> tags) {
-        return new CoastLevelDef(new CoastLevelId(id), "Берег " + id, "Опис берега " + id, minPct, tags);
+        return coast(id, minPct, 0, tags);
+    }
+
+    public static CoastLevelDef coast(String id, int minPct, int gdpAdvantage, List<String> tags) {
+        return new CoastLevelDef(new CoastLevelId(id), "Берег " + id, "Опис берега " + id, minPct, gdpAdvantage, tags);
     }
 
     /** Населення {@link #POPULATION} з іншими числами переваги й розподілу. */

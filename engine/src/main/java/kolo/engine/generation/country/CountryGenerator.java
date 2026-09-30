@@ -5,47 +5,73 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeSet;
+import kolo.engine.content.AreaLevelDef;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.StreakKind;
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.InvariantViolationException;
+import kolo.engine.error.ValidationException;
+import kolo.engine.generation.map.PlacedCountry;
+import kolo.engine.generation.map.WorldMap;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.FateTokens;
 import kolo.engine.wheel.RollRecord;
 
 /**
- * Ланцюжок коліс генерації держави (GD §4.1) без коліс карти.
+ * Ланцюжок коліс генерації держави (GD §4.1).
  *
- * <p>Порядок: лад → релігія → розвиненість → ВВП → ІЛР → розмір армії → вишкіл армії → ядерний статус → передісторія
- * → назва → відомі люди. Назва крутиться перед людьми: людей звуть у мовному стилі назви, а обидва колеса нейтральні
- * для стріків, тож порядок на результат гри не впливає.
+ * <p>Порядок: материк і площа (їх уже обрало розміщення держав на карті, {@link WorldMap#placement()}) → географія →
+ * населення → лад → релігія → розвиненість → ВВП → ІЛР → розмір армії → вишкіл армії → ресурси → ядерний статус →
+ * передісторія → назва → відомі люди. Назва крутиться перед людьми: людей звуть у мовному стилі назви, а обидва
+ * колеса нейтральні для стріків, тож порядок на результат гри не впливає.
  *
  * <p>Кожне колесо бачить усе, що дали попередні: мітки держави й модифікатори, що вже діють (ладу, релігії, нагород
- * стріків). Якість коліс розвиненості, ВВП, ІЛР, армії, ядерного статусу й передісторії йде в лічильник стріків
- * ({@link Streaks}); коли стрік спрацьовує, колесо стріку ({@link StreakWheel}) крутиться одразу, і його нагорода діє
- * на наступні колеса: мітки — на передісторію й людей, модифікатори — на перевагу, додаткові постаті — на колесо
- * людей. Жетони долі нагород складаються й обрізаються до {@link FateTokens#MAX}.
+ * стріків). Населення зсуває розвиненість і ВВП, вихід до моря — ВВП; родовища з провінцій держави йдуть у колесо
+ * ядерного статусу (уран), сусіди по суходолу — у передісторію. Якість коліс площі, населення, розвиненості, ВВП, ІЛР,
+ * армії, ядерного статусу й передісторії йде в лічильник стріків ({@link Streaks}); материк, ресурси, лад, релігія,
+ * назва й люди нейтральні. Коли стрік спрацьовує, колесо стріку ({@link StreakWheel}) крутиться одразу, і його
+ * нагорода діє на наступні колеса: мітки — на передісторію й людей, модифікатори — на перевагу, додаткові постаті — на
+ * колесо людей. Жетони долі нагород складаються й обрізаються до {@link FateTokens#MAX}.
  *
- * <p>Модифікатори фрагментів передісторії стають модифікаторами держави. Бюджет сили (GD §4.11) потребує населення,
- * тож з'явиться разом із колесами карти.
+ * <p>Модифікатори фрагментів передісторії стають модифікаторами держави. Бюджет сили (GD §4.11) — окремим кроком.
  */
 public final class CountryGenerator {
 
     private CountryGenerator() {}
 
     /**
-     * @param rng окремий потік генерації держави; розгалужується за колесами ({@code regime}, {@code religion},
-     *     {@code development}, {@code gdp}, {@code hdi}, {@code army_size}, {@code army_training}, {@code nuclear},
-     *     {@code backstory}, {@code name}, {@code people}) і стріками ({@code streak:<вид>}), тож зміна одного колеса
-     *     не зсуває інших
+     * @param rng окремий потік генерації держави; розгалужується за колесами ({@code population}, {@code regime},
+     *     {@code religion}, {@code development}, {@code gdp}, {@code hdi}, {@code army_size}, {@code army_training},
+     *     {@code resources}, {@code nuclear}, {@code backstory}, {@code name}, {@code people}) і стріками ({@code
+     *     streak:<вид>}), тож зміна одного колеса не зсуває інших; колеса материка й площі крутило розміщення
      * @throws InvariantViolationException якщо якесь колесо не має жодного сектора або не вдалося скласти вільну
      *     назву чи ім'я
+     * @throws ValidationException якщо карта не узгоджується з контентом (рівня площі чи провінції немає)
      */
     public static StartCountry generate(Rng rng, ContentPack content, CountryGenerationInput input) {
         Objects.requireNonNull(rng, "rng");
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(input, "input");
         Chain chain = new Chain(rng, content);
+        WorldMap map = input.map();
+
+        PlacedCountry territory = input.territory();
+        AreaLevelDef area = content.map()
+                .placement()
+                .area(territory.area())
+                .orElseThrow(() -> new ValidationException(
+                        ErrorCode.UNKNOWN_REFERENCE,
+                        ErrorDetails.of(
+                                "field", "area", "value", territory.area().value())));
+        chain.rated(territory.tags(), area.quality(), territory.rolls());
+        StartGeography geography =
+                Geography.generate(content, territory.cells(), map.sea(), map.climate(), map.fertility());
+        chain.tags.addAll(geography.tags());
+        StartPopulation population = PopulationWheel.generate(
+                rng.fork("population"), content, chain.modifiers(), territory.area(), geography, map.fertility());
+        chain.rated(population.tags(), population.quality(), population.rolls());
 
         Regime regime = RegimeWheel.generate(rng.fork("regime"), content);
         chain.neutral(regime.tags(), regime.modifiers(), regime.rolls());
@@ -53,9 +79,11 @@ public final class CountryGenerator {
                 StateReligionWheel.generate(rng.fork("religion"), content, chain.tags, input.religions());
         chain.neutral(religion.tags(), religion.modifiers(), religion.rolls());
 
-        StartDevelopment development = DevelopmentWheel.generate(rng.fork("development"), content, chain.modifiers());
+        StartDevelopment development =
+                DevelopmentWheel.generate(rng.fork("development"), content, chain.modifiers(), population);
         chain.rated(development.tags(), development.quality(), development.rolls());
-        StartGdp gdp = GdpWheel.generate(rng.fork("gdp"), content, chain.modifiers(), development);
+        StartGdp gdp =
+                GdpWheel.generate(rng.fork("gdp"), content, chain.modifiers(), development, population, geography);
         chain.rated(gdp.tags(), gdp.quality(), gdp.rolls());
         StartHdi hdi = HdiWheel.generate(rng.fork("hdi"), content, chain.modifiers(), gdp);
         chain.rated(hdi.tags(), hdi.quality(), hdi.rolls());
@@ -64,8 +92,11 @@ public final class CountryGenerator {
         StartArmyTraining armyTraining =
                 ArmyTrainingWheel.generate(rng.fork("army_training"), content, chain.modifiers(), gdp, development);
         chain.rated(armyTraining.tags(), armyTraining.quality(), armyTraining.rolls());
-        StartNuclear nuclear =
-                NuclearWheel.generate(rng.fork("nuclear"), content, chain.modifiers(), development, input.resources());
+        StartResources resources =
+                ResourceWheel.generate(rng.fork("resources"), content, map.suitability(), territory.cells());
+        chain.rolls.addAll(resources.rolls());
+        StartNuclear nuclear = NuclearWheel.generate(
+                rng.fork("nuclear"), content, chain.modifiers(), development, resources.resources());
         chain.rated(nuclear.tags(), nuclear.quality(), nuclear.rolls());
 
         Backstory backstory = BackstoryWheel.generate(rng.fork("backstory"), content, chain.tags, input.neighbors());
@@ -84,6 +115,9 @@ public final class CountryGenerator {
         List<Modifier> modifiers = new ArrayList<>(chain.modifiers);
         modifiers.addAll(backstory.modifiers());
         return new StartCountry(
+                territory,
+                geography,
+                population,
                 regime,
                 religion,
                 development,
@@ -91,6 +125,7 @@ public final class CountryGenerator {
                 hdi,
                 armySize,
                 armyTraining,
+                resources,
                 nuclear,
                 backstory,
                 chain.streaks,

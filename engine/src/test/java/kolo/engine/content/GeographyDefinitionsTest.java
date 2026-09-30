@@ -49,7 +49,11 @@ class GeographyDefinitionsTest {
         assertFails(() -> TestMaps.coast("under", -1, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(() -> TestMaps.coast("twice", 0, List.of("a", "a")), ErrorCode.DUPLICATE_ID);
         assertFails(
-                () -> new CoastLevelDef(new CoastLevelId("blank"), "Назва", " ", 0, List.of()), ErrorCode.BLANK_VALUE);
+                () -> new CoastLevelDef(new CoastLevelId("blank"), "Назва", " ", 0, 0, List.of()),
+                ErrorCode.BLANK_VALUE);
+        assertFails(() -> TestMaps.coast("rich", 0, 101, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> TestMaps.coast("poor", 0, -101, List.of()), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThat(TestMaps.coast("poor", 0, -100, List.of()).gdpAdvantage()).isEqualTo(-100);
     }
 
     @Test

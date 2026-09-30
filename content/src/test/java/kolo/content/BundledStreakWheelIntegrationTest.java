@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.IntPredicate;
+import java.util.stream.LongStream;
 import kolo.content.loader.ContentLoader;
 import kolo.engine.content.ContentPack;
-import kolo.engine.content.ResourceId;
 import kolo.engine.content.StreakKind;
 import kolo.engine.content.StreakRewardDef;
 import kolo.engine.content.StreakRulesDef;
@@ -17,10 +17,14 @@ import kolo.engine.generation.country.CountryGenerationInput;
 import kolo.engine.generation.country.CountryGenerator;
 import kolo.engine.generation.country.StreakBonus;
 import kolo.engine.generation.country.StreakWheel;
+import kolo.engine.generation.map.MapGenerator;
+import kolo.engine.generation.map.WorldMap;
+import kolo.engine.generation.map.WorldSizeInput;
 import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.generation.religion.WorldReligionsWheel;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.NpcShare;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,6 +37,11 @@ class BundledStreakWheelIntegrationTest {
     private static final int SEEDS = 5_000;
     private static final List<StartReligion> RELIGIONS =
             WorldReligionsWheel.generate(Rng.of(0), PACK, 20).religions();
+
+    /** Кілька карт з різними шаблонами — держави на них різні за площею, берегом і населенням. */
+    private static final List<WorldMap> MAPS = LongStream.range(0, 8)
+            .mapToObj(seed -> MapGenerator.generate(Rng.of(seed), PACK, WorldSizeInput.of(4, NpcShare.NORMAL)))
+            .toList();
 
     @Test
     void goldenAgeAlwaysDrawsWorldAttention() {
@@ -87,6 +96,12 @@ class BundledStreakWheelIntegrationTest {
         // рахується середньою за галузями, тож її межі — межі рівнів; передісторія — середньою за фрагментами.
         StreakRulesDef rules = PACK.balance().streaks();
         List<List<Integer>> wheels = List.of(
+                PACK.map().placement().areas().stream()
+                        .map(level -> level.quality())
+                        .toList(),
+                PACK.map().population().levels().stream()
+                        .map(level -> level.quality())
+                        .toList(),
                 PACK.developmentLevels().values().stream()
                         .map(level -> level.quality())
                         .toList(),
@@ -118,8 +133,7 @@ class BundledStreakWheelIntegrationTest {
             }
         }
 
-        // Стрік — подія, а не норма: не частіше, ніж у кожної четвертої держави. Без коліс карти стрік дуже
-        // рідкісний; частоту переглянемо, коли ланцюжок буде повним.
+        // Стрік — подія, а не норма: не частіше, ніж у кожної четвертої держави.
         counts.values().forEach(count -> assertThat(count * 4).isLessThan(SEEDS));
     }
 
@@ -134,14 +148,11 @@ class BundledStreakWheelIntegrationTest {
         return longest;
     }
 
-    /** Стріки держави з ланцюжка коліс генерації без карти; уран — у кожної другої. */
+    /** Стріки держави з ланцюжка коліс генерації: карта й держава на ній — за seed. */
     private static List<StreakKind> streaksOf(long seed) {
-        TreeSet<ResourceId> resources = new TreeSet<>();
-        if (seed % 2 == 0) {
-            resources.add(new ResourceId("uranium"));
-        }
+        WorldMap map = MAPS.get((int) (seed % MAPS.size()));
         CountryGenerationInput input =
-                new CountryGenerationInput(RELIGIONS, resources, new TreeSet<>(), new TreeSet<>(), new TreeSet<>());
+                CountryGenerationInput.of(map, (int) ((seed / MAPS.size()) % map.countries()), RELIGIONS);
         return CountryGenerator.generate(Rng.of(seed), PACK, input).streaks().stream()
                 .map(StreakBonus::streak)
                 .toList();

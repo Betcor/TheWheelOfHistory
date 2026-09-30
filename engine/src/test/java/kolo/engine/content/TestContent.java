@@ -285,7 +285,9 @@ final class TestContent {
                         10,
                         new CountRange(1, 3),
                         new CountRange(25, 70),
-                        5),
+                        5,
+                        0,
+                        0),
                 TestReligions.BALANCE,
                 TestMaps.BALANCE,
                 TestResources.BALANCE);

@@ -17,7 +17,16 @@ class SimSmokeTest {
         Run run = run("country", "--seed", "42", "--rolls");
 
         assertThat(run.code()).isEqualTo(SimMain.OK);
-        assertThat(run.out()).contains("Seed 42", "Назва: ", "Лад: ", "Відомі люди:", "Обертання:");
+        assertThat(run.out())
+                .contains(
+                        "Seed 42",
+                        "Держава 0",
+                        "Назва: ",
+                        "Територія: ",
+                        "Населення: ",
+                        "Лад: ",
+                        "Відомі люди:",
+                        "Обертання:");
         assertThat(run.err()).isEmpty();
     }
 
@@ -35,6 +44,7 @@ class SimSmokeTest {
         assertUsage(run("world"));
         assertUsage(run("country"));
         assertUsage(run("country", "--seed", "x"));
+        assertUsage(run("country", "--seed", "1", "--npc", "few", "--country", "39"));
     }
 
     @Test

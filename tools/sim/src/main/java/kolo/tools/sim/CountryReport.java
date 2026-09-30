@@ -6,18 +6,24 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.SortedSet;
 import java.util.stream.Collectors;
 import kolo.engine.content.ContentPack;
 import kolo.engine.generation.country.BackstoryEntry;
 import kolo.engine.generation.country.StartCountry;
 import kolo.engine.generation.country.StartDevelopment;
+import kolo.engine.generation.country.StartGeography;
 import kolo.engine.generation.country.StartName;
 import kolo.engine.generation.country.StartPerson;
 import kolo.engine.generation.country.StreakBonus;
+import kolo.engine.generation.map.PlacedCountry;
+import kolo.engine.generation.map.WorldMap;
+import kolo.engine.generation.map.WorldSize;
 import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.generation.religion.StartReligions;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.modifier.ModifierTarget;
+import kolo.engine.state.CountryId;
 import kolo.engine.state.LocalizedName;
 import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.Stat;
@@ -36,22 +42,49 @@ final class CountryReport {
     /** Рік ходу 0 (1 хід = 1 рік). */
     private static final int START_YEAR = 1970;
 
+    private static final long MILLION = 1_000_000;
+
     private final ContentPack content;
+    private final WorldMap map;
     private final StartReligions religions;
+    private final List<StartCountry> countries;
+    private final int number;
     private final StartCountry country;
     private final List<String> lines = new ArrayList<>();
 
-    CountryReport(ContentPack content, StartReligions religions, StartCountry country) {
-        this.content = content;
-        this.religions = religions;
-        this.country = country;
+    CountryReport(CountryCommand.Result result) {
+        this.content = result.content();
+        this.map = result.map();
+        this.religions = result.religions();
+        this.countries = result.countries();
+        this.number = result.number();
+        this.country = result.country();
     }
 
-    List<String> lines(long seed, int countries, boolean rolls) {
+    List<String> lines(long seed, boolean rolls) {
         lines.clear();
-        add("country.header", seed, countries, content.hash().substring(0, 12));
+        WorldSize size = map.size();
+        add(
+                "country.header",
+                seed,
+                size.players(),
+                size.npc(),
+                content.map().template(size.template()).orElseThrow().name(),
+                content.hash().substring(0, 12));
+        add("country.number", number, countries.size() - 1);
         lines.add("");
         name();
+        territory();
+        geography();
+        add(
+                "country.population",
+                thousands(country.population().populationK()),
+                content.map()
+                        .population()
+                        .level(country.population().level())
+                        .orElseThrow()
+                        .name());
+        neighbors();
         add(
                 "country.regime",
                 country.regime().ideology().name(),
@@ -61,19 +94,22 @@ final class CountryReport {
         add(
                 "country.gdp",
                 country.gdp().perCapita(),
-                content.gdpLevel(country.gdp().level()).orElseThrow().name());
+                content.gdpLevel(country.gdp().level()).orElseThrow().name(),
+                country.totalGdp() / MILLION);
         add(
                 "country.hdi",
                 country.hdi().hdi(),
                 content.hdiLevel(country.hdi().level()).orElseThrow().name());
         add(
                 "country.army_size",
+                country.armyStrength(),
                 percent(country.armySize().shareBp()),
                 content.armySize(country.armySize().size()).orElseThrow().name());
         add(
                 "country.army_training",
                 content.trainingLevel(country.armyTraining().level()).name(),
                 signed(country.armyTraining().combatModifier()));
+        resources();
         nuclear();
         add("country.fate_tokens", country.fateTokens());
         streaks();
@@ -97,6 +133,59 @@ final class CountryReport {
                 .map(candidate -> candidate.name().fullName().nominative())
                 .collect(Collectors.joining(", "));
         add("country.name_candidates", candidates);
+    }
+
+    private void territory() {
+        PlacedCountry territory = country.territory();
+        add(
+                "country.territory",
+                territory.continent(),
+                content.map().placement().area(territory.area()).orElseThrow().name(),
+                territory.provinces());
+    }
+
+    private void geography() {
+        StartGeography geography = country.geography();
+        String coast = content.map().geography().coast().stream()
+                .filter(level -> level.id().equals(geography.coast()))
+                .findFirst()
+                .orElseThrow()
+                .name();
+        add(
+                "country.geography",
+                coast,
+                geography.coastalPct(),
+                text("terrain." + geography.dominant().key()),
+                geography.fertility());
+    }
+
+    private void neighbors() {
+        SortedSet<Integer> neighbors = map.neighbors(number);
+        if (neighbors.isEmpty()) {
+            add("country.neighbors", text("country.none"));
+            return;
+        }
+        String names = neighbors.stream()
+                .map(neighbor -> text(
+                        "country.neighbor",
+                        neighbor,
+                        countries.get(neighbor).name().name().shortName().nominative()))
+                .collect(Collectors.joining(", "));
+        add("country.neighbors", names);
+    }
+
+    private void resources() {
+        if (country.resources().deposits().isEmpty()) {
+            add("country.resources", text("country.none"));
+            return;
+        }
+        String deposits = country.resources().deposits().stream()
+                .map(deposit -> text(
+                        "country.deposit",
+                        content.resource(deposit.resource()).orElseThrow().name(),
+                        deposit.cell()))
+                .collect(Collectors.joining(", "));
+        add("country.resources", deposits);
     }
 
     private void religion() {
@@ -157,9 +246,11 @@ final class CountryReport {
             add("country.list_empty");
         }
         LocalizedName name = country.name().name();
+        Optional<LocalizedName> neighbor = country.backstory()
+                .neighbor()
+                .map(id -> countries.get(numberOf(id)).name().name());
         for (BackstoryEntry entry : country.backstory().entries()) {
-            // Сусідів CLI не задає, тож фрагментів із сусідом передісторія не обирає.
-            add("country.backstory_entry", entry.year(), entry.text(name, Optional.empty()));
+            add("country.backstory_entry", entry.year(), entry.text(name, neighbor));
         }
     }
 
@@ -242,6 +333,21 @@ final class CountryReport {
 
     private void add(String key, Object... args) {
         lines.add(text(key, args));
+    }
+
+    /** Номер держави з її ідентифікатора {@code cty_<номер>}. */
+    static int numberOf(CountryId id) {
+        return Integer.parseInt(id.value().substring(CountryId.PREFIX.length()));
+    }
+
+    /** Тисячі людей для читання: до мільйона — «850 тис.», далі — мільйони з однією цифрою після коми вниз. */
+    static String thousands(long thousands) {
+        if (thousands < 1_000) {
+            return text("country.thousands", thousands);
+        }
+        long tenths = thousands / 100;
+        String value = tenths % 10 == 0 ? String.valueOf(tenths / 10) : tenths / 10 + "," + tenths % 10;
+        return text("country.millions", value);
     }
 
     /** Базисні пункти як відсотки з українською комою без зайвих нулів: 150 → «1,5%», 800 → «8%». */

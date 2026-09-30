@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
 import java.util.List;
+import kolo.engine.state.NpcShare;
+import kolo.engine.state.WorldLimits;
 import org.junit.jupiter.api.Test;
 
 class CountryOptionsTest {
@@ -14,8 +16,9 @@ class CountryOptionsTest {
         CountryOptions options = CountryOptions.parse(List.of("--seed", "42"));
 
         assertThat(options.seed()).isEqualTo(42);
-        assertThat(options.countries()).isEqualTo(CountryOptions.DEFAULT_COUNTRIES);
-        assertThat(options.resources()).isEmpty();
+        assertThat(options.players()).isEqualTo(CountryOptions.DEFAULT_PLAYERS);
+        assertThat(options.npcShare()).isEqualTo(NpcShare.NORMAL);
+        assertThat(options.country()).isZero();
         assertThat(options.rolls()).isFalse();
         assertThat(options.content()).isEmpty();
     }
@@ -23,28 +26,34 @@ class CountryOptionsTest {
     @Test
     void readsEveryOptionInAnyOrder() {
         CountryOptions options = CountryOptions.parse(List.of(
-                "--rolls", "--resources", "uranium, oil", "--content", "mods/x", "--countries", "40", "--seed", "-7"));
+                "--rolls", "--npc", "many", "--content", "mods/x", "--country", "3", "--players", "4", "--seed", "-7"));
 
         assertThat(options.seed()).isEqualTo(-7);
-        assertThat(options.countries()).isEqualTo(40);
-        assertThat(options.resources()).containsExactly("oil", "uranium");
+        assertThat(options.players()).isEqualTo(4);
+        assertThat(options.npcShare()).isEqualTo(NpcShare.MANY);
+        assertThat(options.country()).isEqualTo(3);
         assertThat(options.rolls()).isTrue();
         assertThat(options.content()).contains(Path.of("mods/x"));
     }
 
     @Test
-    void acceptsCountryLimits() {
-        assertThat(CountryOptions.parse(List.of("--seed", "1", "--countries", "1"))
-                        .countries())
-                .isEqualTo(1);
-        assertThat(CountryOptions.parse(List.of("--seed", "1", "--countries", "1000"))
-                        .countries())
-                .isEqualTo(CountryOptions.MAX_COUNTRIES);
+    void acceptsWorldLimits() {
+        assertThat(CountryOptions.parse(List.of("--seed", "1", "--players", "1"))
+                        .players())
+                .isEqualTo(WorldLimits.MIN_PLAYERS);
+        assertThat(CountryOptions.parse(List.of("--seed", "1", "--players", "16"))
+                        .players())
+                .isEqualTo(WorldLimits.MAX_PLAYERS);
+        assertThat(CountryOptions.parse(List.of("--seed", "1", "--country", "39"))
+                        .country())
+                .isEqualTo(WorldLimits.MAX_COUNTRIES - 1);
+        assertThat(CountryOptions.parse(List.of("--seed", "1", "--npc", "few")).npcShare())
+                .isEqualTo(NpcShare.FEW);
     }
 
     @Test
     void requiresSeed() {
-        assertUsage(List.of("--countries", "5"), "error.usage.missing_seed");
+        assertUsage(List.of("--players", "5"), "error.usage.missing_seed");
         assertUsage(List.of(), "error.usage.missing_seed");
     }
 
@@ -52,9 +61,13 @@ class CountryOptionsTest {
     void rejectsBadValues() {
         assertUsage(List.of("--seed", "abc"), "error.usage.not_a_number");
         assertUsage(List.of("--seed", "99999999999999999999"), "error.usage.not_a_number");
-        assertUsage(List.of("--seed", "1", "--countries", "0"), "error.usage.out_of_range");
-        assertUsage(List.of("--seed", "1", "--countries", "1001"), "error.usage.out_of_range");
-        assertUsage(List.of("--seed", "1", "--countries", "99999999999"), "error.usage.out_of_range");
+        assertUsage(List.of("--seed", "1", "--players", "0"), "error.usage.out_of_range");
+        assertUsage(List.of("--seed", "1", "--players", "17"), "error.usage.out_of_range");
+        assertUsage(List.of("--seed", "1", "--players", "99999999999"), "error.usage.out_of_range");
+        assertUsage(List.of("--seed", "1", "--country", "-1"), "error.usage.out_of_range");
+        assertUsage(List.of("--seed", "1", "--country", "40"), "error.usage.out_of_range");
+        assertUsage(List.of("--seed", "1", "--npc", "lots"), "error.usage.unknown_npc_share");
+        assertUsage(List.of("--seed", "1", "--npc", "NORMAL"), "error.usage.unknown_npc_share");
     }
 
     @Test
@@ -69,14 +82,20 @@ class CountryOptionsTest {
         assertUsage(List.of("--seed", "1", "--year", "3"), "error.usage.unknown_option");
         assertUsage(List.of("--seed", "1", "--seed", "2"), "error.usage.duplicate_option");
         assertUsage(List.of("--seed", "1", "--rolls", "--rolls"), "error.usage.duplicate_option");
-        assertUsage(List.of("--seed", "1", "--resources", "a", "--resources", "b"), "error.usage.duplicate_option");
+        assertUsage(List.of("--seed", "1", "--npc", "few", "--npc", "many"), "error.usage.duplicate_option");
+        assertUsage(List.of("--seed", "1", "--country", "1", "--country", "2"), "error.usage.duplicate_option");
+        assertUsage(List.of("--seed", "1", "--players", "1", "--players", "2"), "error.usage.duplicate_option");
+        assertUsage(List.of("--seed", "1", "--countries", "20"), "error.usage.unknown_option");
     }
 
     @Test
     void everyUsageErrorHasText() {
-        UsageException e = new UsageException("error.usage.out_of_range", "--countries", "0", 1, 1000);
+        UsageException e = new UsageException("error.usage.out_of_range", "--players", "0", 1, 16);
 
-        assertThat(e.text()).contains("--countries", "0", "1..1000").doesNotContain("{");
+        assertThat(e.text()).contains("--players", "0", "1..16").doesNotContain("{");
+        assertThat(new UsageException("error.usage.no_such_country", 7, 5, 4).text())
+                .contains("7", "5", "0..4")
+                .doesNotContain("{");
     }
 
     private static void assertUsage(List<String> args, String key) {

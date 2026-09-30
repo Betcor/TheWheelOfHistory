@@ -8,6 +8,7 @@ import kolo.engine.content.AreaLevelId;
 import kolo.engine.content.CoastLevelId;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.ModifierDef;
+import kolo.engine.content.PopulationLevelId;
 import kolo.engine.content.TestMaps;
 import kolo.engine.generation.map.FertilityMap;
 import kolo.engine.generation.name.TestNames;
@@ -16,6 +17,7 @@ import kolo.engine.modifier.ModifierSource;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.modifier.SourceKind;
 import kolo.engine.state.Terrain;
+import kolo.engine.wheel.OutcomeTier;
 
 /**
  * Фікстура колеса населення: пакет з {@link TestMaps#POPULATION} (рівні 100 / 1000 / 5000 / 20 000 / 100 000 тисяч,
@@ -49,6 +51,31 @@ final class TestPopulation {
             new TreeSet<>(List.of("coastal")));
 
     private TestPopulation() {}
+
+    /** Населення рівня {@code id} з рівнем результату {@code tier}, усе в одній провінції. */
+    static StartPopulation population(String id, OutcomeTier tier) {
+        return new StartPopulation(
+                new PopulationLevelId(id),
+                1_000,
+                tier,
+                new TreeSet<>(),
+                50,
+                new TreeMap<>(Map.of(0, 1_000)),
+                List.of());
+    }
+
+    /** {@link #GEOGRAPHY} з іншим рівнем виходу до моря. */
+    static StartGeography geography(String coast) {
+        return new StartGeography(
+                GEOGRAPHY.provinces(),
+                GEOGRAPHY.coastal(),
+                new CoastLevelId(coast),
+                GEOGRAPHY.seaZones(),
+                GEOGRAPHY.terrains(),
+                GEOGRAPHY.dominant(),
+                GEOGRAPHY.fertility(),
+                GEOGRAPHY.tags());
+    }
 
     /** Модифікатор переваги колеса населення від довільної події. */
     static Modifier modifier(String id, int value) {
