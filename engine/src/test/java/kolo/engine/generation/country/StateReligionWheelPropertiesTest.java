@@ -17,6 +17,7 @@ import kolo.engine.generation.religion.WorldReligionsWheel;
 import kolo.engine.rng.Rng;
 import kolo.engine.wheel.Sector;
 import kolo.engine.wheel.Wheel;
+import net.jqwik.api.Example;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.IntRange;
@@ -29,6 +30,16 @@ class StateReligionWheelPropertiesTest {
         List<StartReligion> religions = world(seed, countries);
 
         assertThat(generate(seed, religions)).isEqualTo(generate(seed, religions));
+    }
+
+    /** Колись падав: п'ять релігій «Шлях …» з чоловічою постаттю вичерпували чоловічі імена фікстури. */
+    @Example
+    void fiveMalePathReligionsStillGetUniqueNames() {
+        List<StartReligion> religions = world(-6951732506361L, 9);
+
+        assertThat(religions).hasSize(5);
+        assertThat(religions.stream().map(religion -> religion.name().nominative()))
+                .doesNotHaveDuplicates();
     }
 
     @Property

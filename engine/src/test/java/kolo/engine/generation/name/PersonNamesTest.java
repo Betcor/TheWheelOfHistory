@@ -70,9 +70,9 @@ class PersonNamesTest {
                     .nominative());
         }
 
-        // Ім'я: 2 початки × (без вставки + 1 вставка) × кінцівки статі; прізвище: 2 початки × 1 кінцівка.
-        assertThat(male).hasSize(2 * 2 * 1 * 2);
-        assertThat(female).hasSize(2 * 2 * 2 * 2);
+        // Ім'я: 2 початки × (без вставки + 3 вставки) × кінцівки статі; прізвище: 2 початки × 1 кінцівка.
+        assertThat(male).hasSize(2 * 4 * 1 * 2);
+        assertThat(female).hasSize(2 * 4 * 2 * 2);
         assertThat(male).contains("Велор Торвер", "Веларор Гальмер", "Торор Торвер");
         assertThat(female).contains("Велена Торвер", "Торарія Гальмер", "Велія Гальмер");
     }

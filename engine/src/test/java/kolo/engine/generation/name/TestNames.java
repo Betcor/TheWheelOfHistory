@@ -104,10 +104,14 @@ public final class TestNames {
             0,
             List.of(new NameFinalDef("ан", MASC_HARD.id())));
 
-    /** Велор / Веларор; Велена / Велія; прізвища Торвер / Гальмер (жіночі не відмінюються). */
+    /**
+     * Велор / Веларор / Велімор / Веленор; Велена / Велія; прізвища Торвер / Гальмер (жіночі не відмінюються). Разом з
+     * південним — 9 чоловічих імен: з запасом на 5 релігій з чоловічою постаттю, інакше остання релігія за 100 спроб
+     * зрідка не влучала в єдине вільне ім'я.
+     */
     static final PersonNameStyleDef NORTHERN_PEOPLE = new PersonNameStyleDef(
             NORTHERN.id(),
-            new NamePartsDef(List.of("вел", "тор"), List.of("ар"), 5000),
+            new NamePartsDef(List.of("вел", "тор"), List.of("ар", "ім", "ен"), 5000),
             List.of(new NameFinalDef("ор", PERSON_MASC.id())),
             List.of(new NameFinalDef("ен", FEM_HARD.id()), new NameFinalDef("і", FEM_IYA.id())),
             new NamePartsDef(List.of("торв", "гальм"), List.of(), 0),
