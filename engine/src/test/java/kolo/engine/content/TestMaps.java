@@ -55,8 +55,11 @@ public final class TestMaps {
      */
     public static final FertilityDef FERTILITY = fertility(20);
 
-    public static final MapContent CONTENT =
-            new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY);
+    /** Три рівні площі: половина, середня, подвійна; мінімум — 2 провінції. */
+    public static final PlacementDef PLACEMENT = placement(2);
+
+    public static final MapContent CONTENT = new MapContent(
+            List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY, PLACEMENT);
 
     /** NPC: мало 0–1, звичайно 2–4, багато 10–20; 60–100 провінцій на державу з кроком 20; 5–15% нічийних; 100–3000. */
     public static final WorldBalanceDef BALANCE = world(new CountRange(100, 3000));
@@ -83,32 +86,63 @@ public final class TestMaps {
 
     /** Контент {@link #CONTENT} з іншими шаблонами й числами материків. */
     public static MapContent content(List<MapTemplateDef> templates, ContinentsDef continents) {
-        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY);
+        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY, PLACEMENT);
     }
 
     /** Контент {@link #CONTENT} з іншим рельєфом. */
     public static MapContent content(ReliefDef relief) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE, SEA, RIVERS, FERTILITY);
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE, SEA, RIVERS, FERTILITY, PLACEMENT);
     }
 
     /** Контент {@link #CONTENT} з іншим кліматом. */
     public static MapContent content(ClimateDef climate) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate, SEA, RIVERS, FERTILITY);
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate, SEA, RIVERS, FERTILITY, PLACEMENT);
     }
 
     /** Контент {@link #CONTENT} з іншими числами моря. */
     public static MapContent content(SeaDef sea) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, sea, RIVERS, FERTILITY);
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, sea, RIVERS, FERTILITY, PLACEMENT);
     }
 
     /** Контент {@link #CONTENT} з іншими числами річок. */
     public static MapContent content(RiverDef rivers) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, rivers, FERTILITY);
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, rivers, FERTILITY, PLACEMENT);
     }
 
     /** Контент {@link #CONTENT} з іншою родючістю. */
     public static MapContent content(FertilityDef fertility) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, fertility);
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, fertility, PLACEMENT);
+    }
+
+    public static MapContent content(PlacementDef placement) {
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY, placement);
+    }
+
+    /** Розміщення {@link #PLACEMENT} з іншим мінімумом провінцій держави. */
+    public static PlacementDef placement(int minProvinces) {
+        return new PlacementDef(
+                List.of(area("small", 50, 30, 20), area("medium", 100, 50, 50), area("large", 200, 20, 80)),
+                minProvinces,
+                50,
+                3);
+    }
+
+    /** Рівень площі з міткою {@code <id>_country}. */
+    public static AreaLevelDef area(String id, int sharePct, int weight, int quality) {
+        return new AreaLevelDef(
+                new AreaLevelId(id),
+                "Площа " + id,
+                "Опис площі " + id,
+                sharePct,
+                weight,
+                quality,
+                List.of(id + "_country"));
     }
 
     /** Родючість {@link #FERTILITY} з іншим бонусом річки. */

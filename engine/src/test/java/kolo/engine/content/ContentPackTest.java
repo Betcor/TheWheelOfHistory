@@ -798,6 +798,24 @@ class ContentPackTest {
     }
 
     @Test
+    void areaLevelTagsAreBackstoryTagSources() {
+        // large_country — мітка рівня площі розміщення.
+        BackstoryFragmentDef empire = TestContent.fragment(
+                "empire", new TagCondition(List.of("large_country"), List.of(), List.of()), List.of());
+        BackstoryContent backstory = new BackstoryContent(Map.of(), List.of(empire));
+        MapContent withoutTag = TestMaps.content(new PlacementDef(
+                List.of(TestMaps.area("small", 50, 1, 20), TestMaps.area("medium", 100, 1, 50)), 2, 50, 3));
+
+        assertThat(withMap(TestMaps.CONTENT, backstory).backstory().fragments()).hasSize(1);
+        assertThatThrownBy(() -> withMap(withoutTag, backstory))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "backstory.empire.tags"), entry("value", "large_country"));
+                });
+    }
+
+    @Test
     void religionAndSecularTagsAreBackstoryTagSources() {
         // secular — мітка світської держави, dogma_holy_war — мітка догмату.
         BackstoryFragmentDef crusade = TestContent.fragment(
@@ -869,6 +887,30 @@ class ContentPackTest {
                 TestContent.streaks(),
                 religions,
                 TestMaps.CONTENT,
+                TestContent.balance());
+    }
+
+    private static ContentPack withMap(MapContent map, BackstoryContent backstory) {
+        List<IdeologyDef> ideologies = List.of(ideology("democracy", "a"));
+        return new ContentPack(
+                HASH,
+                ideologies,
+                List.of(doctrine("armored")),
+                List.of(resource("iron")),
+                branches(),
+                levels(),
+                nuclearStatuses(),
+                TestContent.gdpLevels(),
+                TestContent.hdiLevels(),
+                TestContent.armySizes(),
+                TestContent.trainingLevels(),
+                personKinds(),
+                traits(),
+                names(ideologies),
+                backstory,
+                TestContent.streaks(),
+                TestReligions.content(),
+                map,
                 TestContent.balance());
     }
 

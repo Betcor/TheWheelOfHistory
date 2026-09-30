@@ -289,6 +289,7 @@ class MapDefinitionsTest {
         assertThat(content.sea()).isEqualTo(TestMaps.SEA);
         assertThat(content.rivers()).isEqualTo(TestMaps.RIVERS);
         assertThat(content.fertility()).isEqualTo(TestMaps.FERTILITY);
+        assertThat(content.placement()).isEqualTo(TestMaps.PLACEMENT);
     }
 
     @Test
@@ -302,7 +303,8 @@ class MapDefinitionsTest {
                         TestMaps.CLIMATE,
                         TestMaps.SEA,
                         TestMaps.RIVERS,
-                        TestMaps.FERTILITY),
+                        TestMaps.FERTILITY,
+                        TestMaps.PLACEMENT),
                 ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
@@ -313,7 +315,8 @@ class MapDefinitionsTest {
                         TestMaps.CLIMATE,
                         TestMaps.SEA,
                         TestMaps.RIVERS,
-                        TestMaps.FERTILITY),
+                        TestMaps.FERTILITY,
+                        TestMaps.PLACEMENT),
                 ErrorCode.DUPLICATE_ID);
     }
 

@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import kolo.engine.content.ArchetypeDef;
 import kolo.engine.content.ArchetypeId;
+import kolo.engine.content.AreaLevelDef;
+import kolo.engine.content.AreaLevelId;
 import kolo.engine.content.ArmySizeDef;
 import kolo.engine.content.ArmySizeId;
 import kolo.engine.content.BackstoryContent;
@@ -48,6 +50,7 @@ import kolo.engine.content.NameParadigmId;
 import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonNameStyleDef;
+import kolo.engine.content.PlacementDef;
 import kolo.engine.content.ReliefDef;
 import kolo.engine.content.ReliefLevelDef;
 import kolo.engine.content.ReligionBalanceDef;
@@ -1616,6 +1619,100 @@ class ContentLoaderTest {
                         "value_out_of_range",
                         "field",
                         "fertility.terrains.mountains"));
+    }
+
+    @Test
+    void loadsPlacement() {
+        PlacementDef placement =
+                ContentLoader.load(Files.valid().source()).map().placement();
+
+        assertThat(placement.areas())
+                .extracting(
+                        AreaLevelDef::id,
+                        AreaLevelDef::name,
+                        AreaLevelDef::sharePct,
+                        AreaLevelDef::weight,
+                        AreaLevelDef::quality,
+                        AreaLevelDef::tags)
+                .containsExactly(
+                        tuple(new AreaLevelId("small"), "Мала держава", 60, 30, 30, List.of("tiny_land")),
+                        tuple(new AreaLevelId("large"), "Велика держава", 150, 20, 70, List.of()));
+        assertThat(List.of(placement.minProvinces(), placement.roughness(), placement.noiseCells()))
+                .containsExactly(4, 30, 5);
+    }
+
+    @Test
+    void invalidPlacementIsReportedAtItsPosition() {
+        String placement = Files.MAP.substring(Files.MAP.indexOf("placement:\n"), Files.MAP.indexOf("relief:\n"));
+        assertMapError(
+                Files.MAP.replace(placement, ""),
+                Map.of("location", "placement", "cause", "blank_value", "field", "placement"));
+        assertMapError(
+                Files.MAP.replace("  min_provinces: 4\n", ""),
+                Map.of("location", "placement", "cause", "blank_value", "field", "min_provinces"));
+        assertMapError(
+                Files.MAP.replace("roughness: 30", "roughness: 101"),
+                Map.of("location", "placement", "cause", "value_out_of_range", "field", "placement.roughness"));
+        assertMapError(
+                Files.MAP.replace("noise_cells: 5", "noise_cells: 0"),
+                Map.of("location", "placement", "cause", "value_out_of_range", "field", "placement.noise_cells"));
+        assertMapError(
+                Files.MAP.replace("      share_pct: 150\n", ""),
+                Map.of("location", "placement.areas[1]", "cause", "blank_value", "field", "share_pct"));
+        assertMapError(
+                Files.MAP.replace("share_pct: 150", "share_pct: 60"),
+                Map.of(
+                        "location",
+                        "placement.areas[1]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "area_level.large.share_pct"));
+        assertMapError(
+                Files.MAP.replace("id: large", "id: small"),
+                Map.of("location", "placement.areas[1]", "cause", "duplicate_id", "value", "small"));
+        assertMapError(
+                Files.MAP.replace("quality: 70", "quality: 101"),
+                Map.of(
+                        "location",
+                        "placement.areas[1]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "area_level.large.quality"));
+    }
+
+    @Test
+    void areaTagIsASourceForBackstoryConditions() {
+        String backstory = Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, tiny_land]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.MAP, Files.MAP.replace("tags: [tiny_land]", "tags: []"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "tiny_land"));
+    }
+
+    @Test
+    void placementThatDoesNotFitWorldBalanceIsRejected() {
+        // Найменший материк (20 провінцій) за найбільшої частки нічийних земель (15%) вміщує 17 — менше за 18.
+        assertThatThrownBy(() -> ContentLoader.load(Files.valid()
+                        .with(ContentLoader.MAP, Files.MAP.replace("min_provinces: 4", "min_provinces: 18"))
+                        .source()))
+                .isInstanceOfSatisfying(ContentException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.INVALID_CONTENT);
+                    assertThat(e.details())
+                            .containsEntry("cause", "value_out_of_range")
+                            .containsEntry("field", "placement.min_provinces");
+                });
     }
 
     @Test

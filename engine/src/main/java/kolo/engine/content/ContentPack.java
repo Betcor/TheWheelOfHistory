@@ -16,6 +16,7 @@ import kolo.engine.state.NuclearStatus;
 import kolo.engine.state.PersonKind;
 import kolo.engine.state.TechBranch;
 import kolo.engine.state.Training;
+import kolo.engine.state.WorldLimits;
 
 /**
  * Увесь контент гри: незмінний, зібраний і перевірений при старті.
@@ -272,6 +273,7 @@ public final class ContentPack {
         hdiMap.values().forEach(hdi -> known.addAll(hdi.tags()));
         armyMap.values().forEach(army -> known.addAll(army.tags()));
         trainingMap.values().forEach(training -> known.addAll(training.tags()));
+        known.addAll(Objects.requireNonNull(map, "map").placement().producedTags());
         for (BackstoryFragmentDef fragment : backstory.fragments().values()) {
             for (String tag : fragment.referencedTags()) {
                 if (!known.contains(tag)) {
@@ -290,6 +292,7 @@ public final class ContentPack {
         this.map = Objects.requireNonNull(map, "map");
         this.balance = Objects.requireNonNull(balance, "balance");
         checkMapFitsWorld(map, balance.world());
+        checkPlacementFitsWorld(map, balance.world());
     }
 
     /**
@@ -317,6 +320,47 @@ public final class ContentPack {
                 throw new ValidationException(
                         ErrorCode.VALUE_OUT_OF_RANGE,
                         ErrorDetails.of("field", field + ".land_pct", "value", cells, "max", MapGridDef.MAX_CELLS));
+            }
+        }
+    }
+
+    /**
+     * Кожна держава мусить знайти материк, де їй вистачить мінімуму провінцій (ADR 0033): найменший материк за
+     * найбільшої частки нічийних земель приймає хоча б одну державу, а суходолу будь-якого світу вистачає на мінімум
+     * кожній державі з запасом на округлення по материках ({@code держав + материків} мінімумів). Інакше розміщення
+     * падало б лише на деяких seed-ах.
+     */
+    private static void checkPlacementFitsWorld(MapContent map, WorldBalanceDef world) {
+        int minimum = map.placement().minProvinces();
+        long claimableBp = 10_000L - world.unclaimedBp().max();
+        long smallest = map.continents().minProvinces() * claimableBp / 10_000;
+        if (smallest < minimum) {
+            throw new ValidationException(
+                    ErrorCode.VALUE_OUT_OF_RANGE,
+                    ErrorDetails.of("field", "placement.min_provinces", "value", minimum, "max", smallest));
+        }
+        for (MapTemplateDef template : map.templates()) {
+            int continents = template.continents().max();
+            for (int countries = 1; countries <= WorldLimits.MAX_COUNTRIES; countries++) {
+                long provinces = Math.clamp(
+                        (long) countries * world.provincesPerCountry().min() * template.provincesPct() / 100,
+                        world.provinces().min(),
+                        world.provinces().max());
+                long claimable = provinces * claimableBp / 10_000 - continents;
+                long needed = (long) minimum * (countries + continents);
+                if (claimable < needed) {
+                    throw new ValidationException(
+                            ErrorCode.VALUE_OUT_OF_RANGE,
+                            ErrorDetails.of(
+                                    "field",
+                                    "map_template." + template.id() + ".provinces_pct",
+                                    "value",
+                                    claimable,
+                                    "min",
+                                    needed,
+                                    "countries",
+                                    countries));
+                }
             }
         }
     }
