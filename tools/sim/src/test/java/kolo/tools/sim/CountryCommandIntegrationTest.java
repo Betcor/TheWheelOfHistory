@@ -82,7 +82,7 @@ class CountryCommandIntegrationTest {
                 .anySatisfy(line -> assertThat(line)
                         .startsWith("Сила: " + result.country().power().strengthPct() + "% медіани")
                         .contains("рівні шанси")
-                        .contains("75–133%"));
+                        .contains("90–110%"));
     }
 
     @Test

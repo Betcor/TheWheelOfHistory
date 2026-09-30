@@ -13,24 +13,26 @@ wheel:
   # Скільки переваги дає кожне наступне вкладення в дію: спадна віддача, разом не більше +100.
   investment_curve: [20, 12, 7, 4]
 
-# Стріки генерації (GD §4.10).
+# Стріки генерації (GD §4.10). За порогів 85/15 стріки майже не траплялися (0 на ~1600 держав):
+# за 70/30 «Золота доба» — ~3% держав, «Андердог» — ~4,5%.
 streaks:
-  very_good_quality: 85
-  very_bad_quality: 15
+  very_good_quality: 70
+  very_bad_quality: 30
   length: 3
 
 # Коридор бюджету сили (GD §4.11): межі проміжної сили держави у відсотках медіани.
 # Варіант обирає хост (GD §3.4); для NPC коридор ширший — світ має і наддержави, і карликові держави.
+# Сила — середня якість коліс і сама тримається в ~70–126% медіани, тож межі — під цю шкалу (GD §24.1).
 power_corridors:
   - id: equal_chances
+    players: { min_pct: 90, max_pct: 110 }
+    npc: { min_pct: 75, max_pct: 133 }
+  - id: classic
     players: { min_pct: 75, max_pct: 133 }
     npc: { min_pct: 50, max_pct: 200 }
-  - id: classic
+  - id: full_chaos
     players: { min_pct: 50, max_pct: 200 }
     npc: { min_pct: 33, max_pct: 300 }
-  - id: full_chaos
-    players: { min_pct: 20, max_pct: 500 }
-    npc: { min_pct: 10, max_pct: 1000 }
 
 # Бюджет сили (GD §4.11): як рахувати проміжну силу держави й зсувати колеса за межами коридору.
 power_budget:
