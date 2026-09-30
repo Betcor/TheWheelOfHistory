@@ -40,6 +40,7 @@ import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
+import kolo.engine.content.HolyCenterDef;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MapContent;
@@ -1122,7 +1123,8 @@ class ContentLoaderTest {
                                 new ReligionCountDef(8, new CountRange(3, 4)),
                                 new ReligionCountDef(40, new CountRange(4, 6))),
                         new CountRange(2, 3),
-                        new CountRange(2, 4)));
+                        new CountRange(2, 4),
+                        new HolyCenterDef(10, 100, 30, 20)));
     }
 
     @Test
@@ -1270,6 +1272,29 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("dogmas: { min: 2, max: 4 }", "dogmas: { min: 2, max: 7 }")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "religion", "cause", "value_out_of_range", "field", "religion.dogmas.max"));
+    }
+
+    @Test
+    void invalidHolyCenterIsReportedAtItsPosition() {
+        String holyCenter = "  holy_center: { base: 10, fertility_pct: 100, river: 30, unclaimed_pct: 20 }\n";
+        assertContentError(
+                balance(Files.BALANCE.replace(holyCenter, "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion.holy_center", "cause", "blank_value", "field", "holy_center"));
+        assertContentError(
+                balance(Files.BALANCE.replace("river: 30, ", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "religion.holy_center", "cause", "blank_value", "field", "river"));
+        assertContentError(
+                balance(Files.BALANCE.replace("unclaimed_pct: 20", "unclaimed_pct: 0")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "religion.holy_center",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "religion.holy_center.unclaimed_pct"));
     }
 
     @Test

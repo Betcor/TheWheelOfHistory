@@ -597,14 +597,27 @@ final class ContentYaml {
 
             @JsonProperty("gdp_population_advantage") Integer gdpPopulationAdvantage) {}
 
-    /** @param count таблиця кількості релігій за кількістю держав */
-    record Religion(List<ReligionCount> count, Count aspects, Count dogmas) {
+    /**
+     * @param count таблиця кількості релігій за кількістю держав
+     * @param holyCenter вага провінцій на колесі святого центру
+     */
+    record Religion(
+            List<ReligionCount> count,
+            Count aspects,
+            Count dogmas,
+            @JsonProperty("holy_center") HolyCenter holyCenter) {
         Religion {
             count = orEmpty(count);
         }
     }
 
     record ReligionCount(@JsonProperty("max_countries") Integer maxCountries, Integer min, Integer max) {}
+
+    record HolyCenter(
+            Integer base,
+            @JsonProperty("fertility_pct") Integer fertilityPct,
+            Integer river,
+            @JsonProperty("unclaimed_pct") Integer unclaimedPct) {}
 
     record Resources(List<ResourceCount> count) {
         Resources {

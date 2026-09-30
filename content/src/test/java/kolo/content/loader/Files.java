@@ -266,6 +266,7 @@ final class Files {
                 - { max_countries: 40, min: 4, max: 6 }
               aspects: { min: 2, max: 3 }
               dogmas: { min: 2, max: 4 }
+              holy_center: { base: 10, fertility_pct: 100, river: 30, unclaimed_pct: 20 }
             world:
               npc_extra:
                 few: { min: 1, max: 3 }

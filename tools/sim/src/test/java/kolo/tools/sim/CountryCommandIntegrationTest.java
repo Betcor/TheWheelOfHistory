@@ -13,14 +13,10 @@ import java.util.TreeSet;
 import kolo.content.loader.ContentLoader;
 import kolo.content.loader.ContentSource;
 import kolo.engine.content.ContentPack;
-import kolo.engine.generation.country.CountryGenerationInput;
-import kolo.engine.generation.country.CountryGenerator;
 import kolo.engine.generation.country.StartCountry;
-import kolo.engine.generation.map.MapGenerator;
-import kolo.engine.generation.map.WorldMap;
 import kolo.engine.generation.map.WorldSizeInput;
-import kolo.engine.generation.religion.StartReligion;
-import kolo.engine.generation.religion.WorldReligionsWheel;
+import kolo.engine.generation.world.StartWorld;
+import kolo.engine.generation.world.WorldGenerator;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.CountryId;
 import org.junit.jupiter.api.Test;
@@ -55,26 +51,29 @@ class CountryCommandIntegrationTest {
     }
 
     @Test
-    void generatesTheCountriesOfTheEngineWorld() {
-        Rng world = Rng.of(7);
-        WorldMap map = MapGenerator.generate(
-                world.fork(CountryCommand.MAP_STREAM),
-                PACK,
-                WorldSizeInput.of(CountryOptions.DEFAULT_PLAYERS, CountryOptions.DEFAULT_NPC_SHARE));
-        List<StartReligion> religions = WorldReligionsWheel.generate(
-                        world.fork(CountryCommand.RELIGIONS_STREAM), PACK, map.countries())
-                .religions();
-        CountryGenerationInput input = CountryGenerationInput.of(map, 0, religions);
-        StartCountry expected = CountryGenerator.generate(world.fork(CountryCommand.COUNTRY_STREAM + 0), PACK, input);
+    void generatesTheEngineWorld() {
+        StartWorld expected = WorldGenerator.generate(
+                Rng.of(7), PACK, WorldSizeInput.of(CountryOptions.DEFAULT_PLAYERS, CountryOptions.DEFAULT_NPC_SHARE));
 
         CountryCommand.Result result = CountryCommand.generate(PACK, options(7));
 
-        assertThat(result.map()).isEqualTo(map);
-        assertThat(result.countries()).hasSize(map.countries());
-        assertThat(result.country()).isEqualTo(expected);
+        assertThat(result.world()).isEqualTo(expected);
+        assertThat(result.country()).isEqualTo(expected.country(0));
         assertThat(card(options(7)))
                 .anySatisfy(line -> assertThat(line)
-                        .contains(expected.name().name().fullName().nominative()));
+                        .contains(expected.country(0).name().name().fullName().nominative()));
+    }
+
+    @Test
+    void cardShowsTheHolyCenterOfEveryReligion() {
+        CountryCommand.Result result = CountryCommand.generate(PACK, options(7));
+        List<String> card = CountryCommand.render(result, options(7));
+
+        for (int r = 0; r < result.religions().religions().size(); r++) {
+            String name = result.religions().religions().get(r).name().nominative();
+            int cell = result.world().holyCenters().cell(r);
+            assertThat(card).anySatisfy(line -> assertThat(line).contains(name).contains("провінція " + cell));
+        }
     }
 
     @Test

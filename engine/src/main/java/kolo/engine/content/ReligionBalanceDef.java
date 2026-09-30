@@ -8,13 +8,15 @@ import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 
 /**
- * Числа генерації релігій світу (GD §25.1).
+ * Числа генерації релігій світу (GD §25.1): кількість, частини й святі центри.
  *
  * @param count таблиця кількості релігій за кількістю держав; рядки — за строго зростаючим {@code max_countries}
  * @param aspects скільки аспектів у божества, {@code 1..}{@value #MAX_PARTS}
  * @param dogmas скільки догматів у релігії, {@code 1..}{@value #MAX_PARTS}
+ * @param holyCenter вага провінцій на колесі святого центру
  */
-public record ReligionBalanceDef(List<ReligionCountDef> count, CountRange aspects, CountRange dogmas) {
+public record ReligionBalanceDef(
+        List<ReligionCountDef> count, CountRange aspects, CountRange dogmas, HolyCenterDef holyCenter) {
 
     /** Більше аспектів чи догматів перевантажили б картку релігії й розмили б її характер. */
     public static final int MAX_PARTS = 6;
@@ -38,6 +40,7 @@ public record ReligionBalanceDef(List<ReligionCountDef> count, CountRange aspect
         }
         check("religion.aspects", aspects);
         check("religion.dogmas", dogmas);
+        Objects.requireNonNull(holyCenter, "holyCenter");
     }
 
     /**

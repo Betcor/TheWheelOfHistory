@@ -59,6 +59,7 @@ import kolo.engine.content.GenerationBalanceDef;
 import kolo.engine.content.GeographyDef;
 import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
+import kolo.engine.content.HolyCenterDef;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
 import kolo.engine.content.MapContent;
@@ -1288,8 +1289,17 @@ public final class ContentLoader {
                             location,
                             () -> new ReligionCountDef(required("max_countries", row.maxCountries()), religions));
                 });
+        ContentYaml.HolyCenter holyCenterYaml = required(BALANCE, "religion", "holy_center", religionYaml.holyCenter());
+        HolyCenterDef holyCenter = at(
+                BALANCE,
+                "religion.holy_center",
+                () -> new HolyCenterDef(
+                        required("base", holyCenterYaml.base()),
+                        required("fertility_pct", holyCenterYaml.fertilityPct()),
+                        required("river", holyCenterYaml.river()),
+                        required("unclaimed_pct", holyCenterYaml.unclaimedPct())));
         ReligionBalanceDef religion =
-                at(BALANCE, "religion", () -> new ReligionBalanceDef(religionCount, aspects, dogmas));
+                at(BALANCE, "religion", () -> new ReligionBalanceDef(religionCount, aspects, dogmas, holyCenter));
 
         ContentYaml.World worldYaml = section("world", yaml.world());
         TreeMap<NpcShare, CountRange> npcExtra = new TreeMap<>();

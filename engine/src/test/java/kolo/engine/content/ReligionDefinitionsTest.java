@@ -361,19 +361,57 @@ class ReligionDefinitionsTest {
         assertThat(TestReligions.BALANCE.aspects()).isEqualTo(new CountRange(2, 3));
         List<ReligionCountDef> count = List.of(TestReligions.FEW_COUNTRIES);
         assertFails(
-                () -> new ReligionBalanceDef(count, new CountRange(0, 2), new CountRange(1, 2)),
+                () -> new ReligionBalanceDef(
+                        count, new CountRange(0, 2), new CountRange(1, 2), TestReligions.HOLY_CENTER),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertFails(
                 () -> new ReligionBalanceDef(
-                        count, new CountRange(1, 2), new CountRange(1, ReligionBalanceDef.MAX_PARTS + 1)),
+                        count,
+                        new CountRange(1, 2),
+                        new CountRange(1, ReligionBalanceDef.MAX_PARTS + 1),
+                        TestReligions.HOLY_CENTER),
                 ErrorCode.VALUE_OUT_OF_RANGE);
         assertThat(new ReligionBalanceDef(
                                 count,
                                 new CountRange(ReligionBalanceDef.MAX_PARTS, ReligionBalanceDef.MAX_PARTS),
-                                new CountRange(1, 1))
+                                new CountRange(1, 1),
+                                TestReligions.HOLY_CENTER)
                         .aspects()
                         .max())
                 .isEqualTo(ReligionBalanceDef.MAX_PARTS);
+    }
+
+    @Test
+    void holyCenterWeightFollowsFertilityRiverAndOwner() {
+        HolyCenterDef def = TestReligions.HOLY_CENTER;
+        assertThat(def.weight(false, 0, false)).isEqualTo(10);
+        assertThat(def.weight(false, 50, false)).isEqualTo(60);
+        assertThat(def.weight(false, 50, true)).isEqualTo(90);
+        assertThat(def.weight(true, 50, true)).isEqualTo(18);
+        // Нічийна безплідна провінція: 10 × 20% = 2; навіть 1% не дає нуля.
+        assertThat(def.weight(true, 0, false)).isEqualTo(2);
+        assertThat(new HolyCenterDef(1, 0, 0, 1).weight(true, 100, true)).isEqualTo(1);
+        assertThat(new HolyCenterDef(10, 50, 0, 100).weight(true, 33, false)).isEqualTo(26);
+        assertFails(() -> def.weight(false, 101, false), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> def.weight(false, -1, false), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void holyCenterLimitsNumbers() {
+        int max = HolyCenterDef.MAX_WEIGHT;
+        assertThat(new HolyCenterDef(max, max, max, 100).weight(false, 100, true))
+                .isEqualTo(max * 3);
+        assertFails(() -> new HolyCenterDef(0, 100, 30, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new HolyCenterDef(max + 1, 100, 30, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new HolyCenterDef(10, -1, 30, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new HolyCenterDef(10, max + 1, 30, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new HolyCenterDef(10, 100, -1, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new HolyCenterDef(10, 100, max + 1, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new HolyCenterDef(10, 100, 30, 0), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new HolyCenterDef(10, 100, 30, 101), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertThatThrownBy(() -> new ReligionBalanceDef(
+                        List.of(TestReligions.FEW_COUNTRIES), new CountRange(1, 2), new CountRange(1, 2), null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -390,15 +428,23 @@ class ReligionDefinitionsTest {
     @Test
     void religionCountTableMustGrow() {
         CountRange parts = new CountRange(1, 2);
-        assertFails(() -> new ReligionBalanceDef(List.of(), parts, parts), ErrorCode.EMPTY_COLLECTION);
+        assertFails(
+                () -> new ReligionBalanceDef(List.of(), parts, parts, TestReligions.HOLY_CENTER),
+                ErrorCode.EMPTY_COLLECTION);
         ReligionCountDef eight = new ReligionCountDef(8, new CountRange(3, 4));
         assertFails(
                 () -> new ReligionBalanceDef(
-                        List.of(eight, new ReligionCountDef(8, new CountRange(4, 5))), parts, parts),
+                        List.of(eight, new ReligionCountDef(8, new CountRange(4, 5))),
+                        parts,
+                        parts,
+                        TestReligions.HOLY_CENTER),
                 ErrorCode.OUT_OF_ORDER);
         assertFails(
                 () -> new ReligionBalanceDef(
-                        List.of(eight, new ReligionCountDef(5, new CountRange(4, 5))), parts, parts),
+                        List.of(eight, new ReligionCountDef(5, new CountRange(4, 5))),
+                        parts,
+                        parts,
+                        TestReligions.HOLY_CENTER),
                 ErrorCode.OUT_OF_ORDER);
     }
 
