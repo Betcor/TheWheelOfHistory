@@ -2,41 +2,53 @@ package kolo.engine.generation.country;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import kolo.engine.content.ResourceId;
+import kolo.engine.error.Checks;
+import kolo.engine.generation.map.PlacedCountry;
+import kolo.engine.generation.map.WorldMap;
 import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.state.CountryId;
 
 /**
  * Світ, у якому генерується держава: те, що {@link CountryGenerator} бере не з коліс держави, а ззовні.
  *
- * <p>Ресурси й сусіди дає карта; доки коліс карти немає, їх передають вручну.
- *
+ * @param map карта світу з розміщеними державами
+ * @param country номер держави в {@link WorldMap#placement()}; її ідентифікатор — {@code CountryId.of(country)}
  * @param religions релігії світу в порядку генерації (GD §25.1)
- * @param resources ресурси держави; кожен має бути в контенті, порядок і повтори не важливі
- * @param neighbors держави, з якими передісторія може пов'язати цю; порядок не важливий
  * @param takenCountryNames повні назви держав у називному відмінку, вже зайняті в світі
  * @param takenPersonNames повні імена людей у називному відмінку, вже зайняті в світі
  */
 public record CountryGenerationInput(
+        WorldMap map,
+        int country,
         List<StartReligion> religions,
-        SortedSet<ResourceId> resources,
-        SortedSet<CountryId> neighbors,
         SortedSet<String> takenCountryNames,
         SortedSet<String> takenPersonNames) {
 
     public CountryGenerationInput {
+        Objects.requireNonNull(map, "map");
+        Checks.inRange("country", country, 0, map.countries() - 1);
         religions = List.copyOf(religions);
-        resources = Collections.unmodifiableSortedSet(new TreeSet<>(resources));
-        neighbors = Collections.unmodifiableSortedSet(new TreeSet<>(neighbors));
         takenCountryNames = Collections.unmodifiableSortedSet(new TreeSet<>(takenCountryNames));
         takenPersonNames = Collections.unmodifiableSortedSet(new TreeSet<>(takenPersonNames));
     }
 
-    /** Світ з цими релігіями, без ресурсів, сусідів і зайнятих назв. */
-    public static CountryGenerationInput of(List<StartReligion> religions) {
-        return new CountryGenerationInput(
-                religions, new TreeSet<>(), new TreeSet<>(), new TreeSet<>(), new TreeSet<>());
+    /** Держава {@code country} світу з цими релігіями, без зайнятих назв. */
+    public static CountryGenerationInput of(WorldMap map, int country, List<StartReligion> religions) {
+        return new CountryGenerationInput(map, country, religions, new TreeSet<>(), new TreeSet<>());
+    }
+
+    /** Територія держави. */
+    public PlacedCountry territory() {
+        return map.country(country);
+    }
+
+    /** Сусіди держави по суходолу — кандидати для передісторії. */
+    public SortedSet<CountryId> neighbors() {
+        TreeSet<CountryId> ids = new TreeSet<>();
+        map.neighbors(country).forEach(neighbor -> ids.add(CountryId.of(neighbor)));
+        return Collections.unmodifiableSortedSet(ids);
     }
 }

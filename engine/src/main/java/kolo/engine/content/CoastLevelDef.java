@@ -6,6 +6,7 @@ import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
+import kolo.engine.wheel.Advantage;
 
 /**
  * Рівень виходу держави до моря (GD §4.1, № 3 — географія): за часткою її провінцій, що межують з морем.
@@ -17,15 +18,19 @@ import kolo.engine.error.ValidationException;
  * @param name назва українською, напр. «Морська держава»
  * @param description що означає рівень, для підказки гравцеві
  * @param minPct з якої частки прибережних провінцій діє рівень, {@code 0..100} %; перший рівень — з нуля
+ * @param gdpAdvantage перевага колеса ВВП на душу для держави цього рівня, {@code −}{@value Advantage#MAX}{@code
+ *     ..}{@value Advantage#MAX}: морська торгівля збагачує, відрізаність від моря — навпаки
  * @param tags мітки, які рівень дає державі (напр. {@code landlocked}), — вхід для наступних коліс
  */
-public record CoastLevelDef(CoastLevelId id, String name, String description, int minPct, List<String> tags) {
+public record CoastLevelDef(
+        CoastLevelId id, String name, String description, int minPct, int gdpAdvantage, List<String> tags) {
 
     public CoastLevelDef {
         Objects.requireNonNull(id, "coast_level.id");
         Checks.notBlank("coast_level." + id + ".name", name);
         Checks.notBlank("coast_level." + id + ".description", description);
         Checks.inRange("coast_level." + id + ".min_pct", minPct, 0, 100);
+        Checks.inRange("coast_level." + id + ".gdp_advantage", gdpAdvantage, -Advantage.MAX, Advantage.MAX);
         tags = Defs.tags("coast_level." + id + ".tags", tags);
     }
 

@@ -590,7 +590,12 @@ final class ContentYaml {
 
             @JsonProperty("person_traits") Count personTraits,
             @JsonProperty("person_age") Count personAge,
-            @JsonProperty("name_candidates") Integer nameCandidates) {}
+            @JsonProperty("name_candidates") Integer nameCandidates,
+
+            @JsonProperty("development_population_advantage")
+            Integer developmentPopulationAdvantage,
+
+            @JsonProperty("gdp_population_advantage") Integer gdpPopulationAdvantage) {}
 
     /** @param count таблиця кількості релігій за кількістю держав */
     record Religion(List<ReligionCount> count, Count aspects, Count dogmas) {
@@ -711,6 +716,7 @@ final class ContentYaml {
             String name,
             String description,
             @JsonProperty("min_pct") Integer minPct,
+            @JsonProperty("gdp_advantage") Integer gdpAdvantage,
             List<String> tags) {
         CoastLevel {
             tags = orEmpty(tags);

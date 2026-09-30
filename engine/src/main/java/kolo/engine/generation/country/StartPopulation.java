@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -14,6 +15,7 @@ import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
+import kolo.engine.wheel.AppliedModifier;
 import kolo.engine.wheel.OutcomeTier;
 import kolo.engine.wheel.RollRecord;
 
@@ -57,5 +59,18 @@ public record StartPopulation(
                     ErrorCode.VALUE_OUT_OF_RANGE, ErrorDetails.of("field", "provinces", "value", total));
         }
         rolls = List.copyOf(rolls);
+    }
+
+    /**
+     * Внесок населення в перевагу наступного колеса генерації: крок рівня результату ({@link OutcomeTier#step()}) ×
+     * {@code perStep}. Рядок пояснення має id {@code population:<рівень>} і ключ {@code population.<рівень>}; на
+     * частковому рівні внеску немає.
+     */
+    public Optional<AppliedModifier> advantage(int perStep) {
+        int value = tier.step() * perStep;
+        if (value == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(new AppliedModifier("population:" + level, "population." + level, value));
     }
 }

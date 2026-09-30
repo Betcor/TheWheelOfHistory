@@ -320,7 +320,9 @@ public final class TestNames {
                         10,
                         new CountRange(1, 3),
                         new CountRange(25, 70),
-                        nameCandidates),
+                        nameCandidates,
+                        0,
+                        0),
                 religionBalance,
                 world,
                 resourceBalance);

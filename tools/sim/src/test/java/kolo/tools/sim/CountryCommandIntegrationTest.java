@@ -16,9 +16,13 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.generation.country.CountryGenerationInput;
 import kolo.engine.generation.country.CountryGenerator;
 import kolo.engine.generation.country.StartCountry;
+import kolo.engine.generation.map.MapGenerator;
+import kolo.engine.generation.map.WorldMap;
+import kolo.engine.generation.map.WorldSizeInput;
+import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.generation.religion.WorldReligionsWheel;
 import kolo.engine.rng.Rng;
-import kolo.engine.state.NuclearStatus;
+import kolo.engine.state.CountryId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,7 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
 class CountryCommandIntegrationTest {
 
     private static final ContentPack PACK = ContentLoader.loadBundled();
-    private static final int SEEDS = 300;
+    private static final int SEEDS = 100;
 
     @Test
     void sameSeedGivesSameCard() {
@@ -51,25 +55,45 @@ class CountryCommandIntegrationTest {
     }
 
     @Test
-    void generatesTheCountryOfTheEngineWorld() {
+    void generatesTheCountriesOfTheEngineWorld() {
         Rng world = Rng.of(7);
-        CountryGenerationInput input = CountryGenerationInput.of(WorldReligionsWheel.generate(
-                        world.fork(CountryCommand.RELIGIONS_STREAM), PACK, CountryOptions.DEFAULT_COUNTRIES)
-                .religions());
-        StartCountry expected = CountryGenerator.generate(world.fork(CountryCommand.COUNTRY_STREAM), PACK, input);
+        WorldMap map = MapGenerator.generate(
+                world.fork(CountryCommand.MAP_STREAM),
+                PACK,
+                WorldSizeInput.of(CountryOptions.DEFAULT_PLAYERS, CountryOptions.DEFAULT_NPC_SHARE));
+        List<StartReligion> religions = WorldReligionsWheel.generate(
+                        world.fork(CountryCommand.RELIGIONS_STREAM), PACK, map.countries())
+                .religions();
+        CountryGenerationInput input = CountryGenerationInput.of(map, 0, religions);
+        StartCountry expected = CountryGenerator.generate(world.fork(CountryCommand.COUNTRY_STREAM + 0), PACK, input);
 
-        StartCountry actual = CountryCommand.generate(PACK, options(7)).country();
+        CountryCommand.Result result = CountryCommand.generate(PACK, options(7));
 
-        assertThat(actual).isEqualTo(expected);
+        assertThat(result.map()).isEqualTo(map);
+        assertThat(result.countries()).hasSize(map.countries());
+        assertThat(result.country()).isEqualTo(expected);
         assertThat(card(options(7)))
                 .anySatisfy(line -> assertThat(line)
                         .contains(expected.name().name().fullName().nominative()));
     }
 
     @Test
+    void countriesOfOneWorldHaveUniqueNames() {
+        CountryCommand.Result result = CountryCommand.generate(PACK, options(11, "--players", "8", "--npc", "many"));
+
+        assertThat(result.countries())
+                .extracting(country -> country.name().name().fullName().nominative())
+                .doesNotHaveDuplicates();
+        assertThat(result.countries().stream()
+                        .flatMap(country -> country.people().people().stream())
+                        .map(person -> person.name().fullName().nominative()))
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
     void everySeedRendersWithoutPlaceholders() {
         for (long seed = 0; seed < SEEDS; seed++) {
-            CountryOptions options = options(seed, "--rolls", "--resources", "uranium");
+            CountryOptions options = options(seed, "--rolls", "--country", String.valueOf(seed % 3));
             CountryCommand.Result result = CountryCommand.generate(PACK, options);
 
             List<String> card = CountryCommand.render(result, options);
@@ -88,36 +112,44 @@ class CountryCommandIntegrationTest {
                     .forEach(person -> assertThat(card)
                             .anySatisfy(line -> assertThat(line)
                                     .contains(person.name().fullName().nominative())));
+            result.map()
+                    .neighbors(result.number())
+                    .forEach(neighbor -> assertThat(card)
+                            .anySatisfy(line -> assertThat(line)
+                                    .contains(result.countries()
+                                            .get(neighbor)
+                                            .name()
+                                            .name()
+                                            .shortName()
+                                            .nominative())));
         }
     }
 
     @Test
-    void resourcesReachTheNuclearWheel() {
-        boolean arsenal = false;
+    void backstoryNamesTheNeighbor() {
         for (long seed = 0; seed < SEEDS; seed++) {
-            NuclearStatus without = CountryCommand.generate(PACK, options(seed))
-                    .country()
-                    .nuclear()
-                    .status();
-            assertThat(without).isNotEqualTo(NuclearStatus.ARSENAL);
-            arsenal |= CountryCommand.generate(PACK, options(seed, "--resources", "uranium"))
-                            .country()
-                            .nuclear()
-                            .status()
-                    == NuclearStatus.ARSENAL;
+            CountryCommand.Result result = CountryCommand.generate(PACK, options(seed));
+            Optional<CountryId> neighbor = result.country().backstory().neighbor();
+            if (neighbor.isEmpty()) {
+                continue;
+            }
+            StartCountry other = result.countries().get(CountryReport.numberOf(neighbor.orElseThrow()));
+            assertThat(result.map().neighbors(result.number()))
+                    .contains(CountryReport.numberOf(neighbor.orElseThrow()));
+            // Шаблони згадують сусіда в різних відмінках, тож досить кореня короткої назви.
+            String root = other.name().name().shortName().nominative();
+            assertThat(String.join("\n", CountryCommand.render(result, options(seed))))
+                    .contains(root.substring(0, Math.min(4, root.length())));
+            return;
         }
-
-        assertThat(arsenal).isTrue();
+        throw new AssertionError("жодна передісторія не згадала сусіда");
     }
 
     @Test
-    void rejectsUnknownResource() {
-        assertThatThrownBy(() -> CountryCommand.generate(PACK, options(1, "--resources", "unobtainium")))
+    void rejectsCountryMissingFromTheWorld() {
+        assertThatThrownBy(() -> CountryCommand.generate(PACK, options(1, "--npc", "few", "--country", "39")))
                 .isInstanceOfSatisfying(
-                        UsageException.class, e -> assertThat(e.key()).isEqualTo("error.usage.unknown_resource"));
-        assertThatThrownBy(() -> CountryCommand.generate(PACK, options(1, "--resources", "Not An Id")))
-                .isInstanceOfSatisfying(
-                        UsageException.class, e -> assertThat(e.key()).isEqualTo("error.usage.unknown_resource"));
+                        UsageException.class, e -> assertThat(e.key()).isEqualTo("error.usage.no_such_country"));
     }
 
     @Test

@@ -3,9 +3,14 @@ package kolo.engine.generation.country;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TreeSet;
+import kolo.engine.content.CoastLevelDef;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.GdpLevelDef;
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
+import kolo.engine.error.ValidationException;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.modifier.Modifiers;
@@ -24,7 +29,9 @@ import kolo.engine.wheel.WheelSpin;
  * <p>Сектори — рівні ВВП з контенту від найбіднішого до найбагатшого, з базовими вагами й рівнями результату з
  * контенту: додатна перевага зсуває шанси до багатших рівнів. Перевага складається з модифікаторів держави з ціллю
  * {@link #KIND} (лад) і внесків розвиненості {@link #DEVELOPMENT_BRANCHES}: рівень кожної з галузей × {@code
- * generation.gdp_development_advantage} з балансу. Внесок населення й географії — разом із картою.
+ * generation.gdp_development_advantage} з балансу; із картою — ще внесок населення (крок рівня результату рівня
+ * населення × {@code generation.gdp_population_advantage}) і берега ({@link CoastLevelDef#gdpAdvantage()} рівня виходу
+ * до моря держави).
  */
 public final class GdpWheel {
 
@@ -46,15 +53,50 @@ public final class GdpWheel {
      */
     public static StartGdp generate(
             Rng rng, ContentPack content, List<Modifier> modifiers, StartDevelopment development) {
+        return generate(rng, content, modifiers, development, List.of());
+    }
+
+    /**
+     * Те саме з внесками населення й берега: кидок той самий, змінюється лише перевага.
+     *
+     * @param population стартове населення держави
+     * @param geography географія держави — рівень виходу до моря
+     * @throws ValidationException якщо рівня виходу до моря немає в контенті ({@link ErrorCode#UNKNOWN_REFERENCE})
+     */
+    public static StartGdp generate(
+            Rng rng,
+            ContentPack content,
+            List<Modifier> modifiers,
+            StartDevelopment development,
+            StartPopulation population,
+            StartGeography geography) {
+        Objects.requireNonNull(content, "content");
+        Objects.requireNonNull(population, "population");
+        Objects.requireNonNull(geography, "geography");
+        List<AppliedModifier> extra = new ArrayList<>();
+        population
+                .advantage(content.balance().generation().gdpPopulationAdvantage())
+                .ifPresent(extra::add);
+        coast(content, geography).ifPresent(extra::add);
+        return generate(rng, content, modifiers, development, extra);
+    }
+
+    private static StartGdp generate(
+            Rng rng,
+            ContentPack content,
+            List<Modifier> modifiers,
+            StartDevelopment development,
+            List<AppliedModifier> extra) {
         Objects.requireNonNull(rng, "rng");
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(modifiers, "modifiers");
         Objects.requireNonNull(development, "development");
+        Advantage advantage = advantage(content, modifiers, development, extra);
         WheelSpin<GdpLevelDef> spin = Wheel.spin(
                 rng.fork("per_capita"),
                 KIND,
                 sectors(content),
-                advantage(content, modifiers, development),
+                advantage,
                 content.balance().wheel().strength(KIND),
                 TURN,
                 null);
@@ -68,15 +110,35 @@ public final class GdpWheel {
                 List.of(spin.record()));
     }
 
-    /** Модифікатори з ціллю {@link #KIND}, потім ненульові внески галузей у порядку {@link #DEVELOPMENT_BRANCHES}. */
-    static Advantage advantage(ContentPack content, List<Modifier> modifiers, StartDevelopment development) {
+    /**
+     * Модифікатори з ціллю {@link #KIND}, потім ненульові внески галузей у порядку {@link #DEVELOPMENT_BRANCHES},
+     * потім {@code extra} (населення, берег).
+     */
+    static Advantage advantage(
+            ContentPack content, List<Modifier> modifiers, StartDevelopment development, List<AppliedModifier> extra) {
         List<AppliedModifier> contributions =
                 new ArrayList<>(Modifiers.contributions(modifiers, ModifierTarget.wheel(KIND), TURN));
         int perLevel = content.balance().generation().gdpDevelopmentAdvantage();
         for (TechBranch branch : DEVELOPMENT_BRANCHES) {
             development.advantage(branch, perLevel).ifPresent(contributions::add);
         }
+        contributions.addAll(extra);
         return Advantage.of(contributions);
+    }
+
+    /** Внесок рівня виходу до моря: id {@code coast:<рівень>}, ключ {@code coast.<рівень>}; нуль — без рядка. */
+    static Optional<AppliedModifier> coast(ContentPack content, StartGeography geography) {
+        CoastLevelDef level = content.map().geography().coast().stream()
+                .filter(def -> def.id().equals(geography.coast()))
+                .findFirst()
+                .orElseThrow(() -> new ValidationException(
+                        ErrorCode.UNKNOWN_REFERENCE,
+                        ErrorDetails.of(
+                                "field", "coast", "value", geography.coast().value())));
+        if (level.gdpAdvantage() == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(new AppliedModifier("coast:" + level.id(), "coast." + level.id(), level.gdpAdvantage()));
     }
 
     /** Сектор на кожен рівень у порядку контенту; id сектора — id рівня. */

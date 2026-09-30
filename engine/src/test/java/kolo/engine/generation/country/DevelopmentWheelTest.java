@@ -13,6 +13,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import kolo.engine.content.ContentPack;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
@@ -241,5 +242,26 @@ class DevelopmentWheelTest {
             result.put(TechBranch.values()[i], development.rolls().get(i));
         }
         return result;
+    }
+
+    @Test
+    void populationShiftsEveryBranchWithoutChangingTheDraws() {
+        ContentPack pack = TestChain.NEUTRAL;
+        StartPopulation population = TestPopulation.population("huge", OutcomeTier.CRIT_SUCCESS);
+
+        StartDevelopment plain = DevelopmentWheel.generate(Rng.of(11), pack, List.of());
+        StartDevelopment shifted = DevelopmentWheel.generate(Rng.of(11), pack, List.of(), population);
+
+        for (int i = 0; i < TechBranch.values().length; i++) {
+            RollRecord roll = shifted.rolls().get(i);
+            assertThat(roll.advantage()).isEqualTo(2 * TestChain.DEVELOPMENT_PER_STEP);
+            assertThat(roll.modifiers())
+                    .containsExactly(new AppliedModifier(
+                            "population:huge", "population.huge", 2 * TestChain.DEVELOPMENT_PER_STEP));
+            assertThat(roll.roll()).isEqualTo(plain.rolls().get(i).roll());
+        }
+        StartDevelopment partial = DevelopmentWheel.generate(
+                Rng.of(11), pack, List.of(), TestPopulation.population("medium", OutcomeTier.PARTIAL));
+        assertThat(partial).isEqualTo(plain);
     }
 }

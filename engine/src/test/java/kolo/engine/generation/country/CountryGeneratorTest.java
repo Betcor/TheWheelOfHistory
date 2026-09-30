@@ -6,16 +6,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.IntStream;
+import kolo.engine.content.CoastLevelId;
 import kolo.engine.content.ContentPack;
-import kolo.engine.content.ResourceId;
 import kolo.engine.content.StreakKind;
+import kolo.engine.generation.map.PlacedCountry;
+import kolo.engine.generation.map.PlacementGenerator;
+import kolo.engine.generation.map.WorldMap;
 import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.modifier.SourceKind;
 import kolo.engine.rng.Rng;
-import kolo.engine.state.CountryId;
 import kolo.engine.state.FateTokens;
 import kolo.engine.state.TechBranch;
 import kolo.engine.wheel.AppliedModifier;
@@ -40,6 +42,9 @@ class CountryGeneratorTest {
         }
         assertThat(firsts)
                 .containsSubsequence(
+                        PlacementGenerator.CONTINENT_KIND,
+                        PlacementGenerator.AREA_KIND,
+                        PopulationWheel.KIND,
                         RegimeWheel.IDEOLOGY_KIND,
                         StateReligionWheel.KIND,
                         DevelopmentWheel.kind(TechBranch.ECONOMY),
@@ -47,6 +52,7 @@ class CountryGeneratorTest {
                         HdiWheel.KIND,
                         ArmySizeWheel.KIND,
                         ArmyTrainingWheel.KIND,
+                        ResourceWheel.COUNT_KIND,
                         NuclearWheel.KIND,
                         BackstoryWheel.COUNT_KIND,
                         NameWheel.KIND,
@@ -58,6 +64,8 @@ class CountryGeneratorTest {
         StartCountry country = generate(STREAKY, 2);
 
         List<RollRecord> expected = new ArrayList<>();
+        expected.addAll(country.territory().rolls());
+        expected.addAll(country.population().rolls());
         expected.addAll(country.regime().rolls());
         expected.addAll(country.religion().rolls());
         expected.addAll(country.development().rolls());
@@ -66,6 +74,7 @@ class CountryGeneratorTest {
         expected.add(country.streaks().get(0).roll());
         expected.addAll(country.armySize().rolls());
         expected.addAll(country.armyTraining().rolls());
+        expected.addAll(country.resources().rolls());
         expected.addAll(country.nuclear().rolls());
         expected.add(country.streaks().get(1).roll());
         expected.addAll(country.backstory().rolls());
@@ -187,32 +196,114 @@ class CountryGeneratorTest {
     }
 
     @Test
-    void neighborAndResourcesComeFromInput() {
-        List<StartReligion> religions = TestChain.religions(NEUTRAL);
-        CountryGenerationInput input = new CountryGenerationInput(
-                religions,
-                new TreeSet<>(Set.of(new ResourceId("uranium"))),
-                new TreeSet<>(Set.of(CountryId.of(3))),
-                new TreeSet<>(),
-                new TreeSet<>());
+    void mapWheelsCountInStreaks() {
+        StartCountry country = generate(TestChain.MAP_STREAKY, 6);
+
+        // Площа, населення й розвиненість — три дуже добрі поспіль; ВВП та ІЛР уже не дають другої «Золотої доби».
+        assertThat(country.streaks()).extracting(StreakBonus::streak).containsExactly(StreakKind.GOLDEN_AGE);
+        List<RollRecord> rolls = country.rolls();
+        int golden = rolls.indexOf(country.streaks().get(0).roll());
+        assertThat(rolls.get(golden - 1))
+                .isEqualTo(country.development().rolls().getLast());
+        assertThat(rolls.get(golden + 1)).isEqualTo(country.gdp().rolls().getFirst());
+    }
+
+    @Test
+    void countryLivesOnItsTerritory() {
+        WorldMap world = TestChain.world(NEUTRAL);
+        for (int number = 0; number < world.countries(); number++) {
+            CountryGenerationInput input = TestChain.input(NEUTRAL, number);
+            StartCountry country = CountryGenerator.generate(Rng.of(number), NEUTRAL, input);
+
+            PlacedCountry territory = world.country(number);
+            assertThat(country.territory()).isEqualTo(territory);
+            assertThat(country.geography())
+                    .isEqualTo(Geography.generate(
+                            NEUTRAL, territory.cells(), world.sea(), world.climate(), world.fertility()));
+            assertThat(country.population().provinces().keySet()).containsExactlyElementsOf(territory.cells());
+            assertThat(country.resources().deposits())
+                    .allSatisfy(deposit -> assertThat(territory.cells()).contains(deposit.cell()));
+            assertThat(country.tags())
+                    .containsAll(territory.tags())
+                    .containsAll(country.geography().tags())
+                    .containsAll(country.population().tags());
+        }
+    }
+
+    @Test
+    void neighborComesFromTheMap() {
+        WorldMap world = TestChain.world(NEUTRAL);
+        int number = IntStream.range(0, world.countries())
+                .filter(candidate -> !world.neighbors(candidate).isEmpty())
+                .findFirst()
+                .orElseThrow();
+        CountryGenerationInput input = TestChain.input(NEUTRAL, number);
         boolean neighbor = false;
         for (long seed = 0; seed < SEEDS; seed++) {
             StartCountry country = CountryGenerator.generate(Rng.of(seed), NEUTRAL, input);
             neighbor |= country.backstory().neighbor().isPresent();
-            country.backstory().neighbor().ifPresent(id -> assertThat(id).isEqualTo(CountryId.of(3)));
+            country.backstory()
+                    .neighbor()
+                    .ifPresent(id -> assertThat(input.neighbors()).contains(id));
         }
         assertThat(neighbor).isTrue();
     }
 
     @Test
+    void populationShiftsDevelopmentAndGdp() {
+        boolean shifted = false;
+        for (long seed = 0; seed < SEEDS; seed++) {
+            StartCountry country = generate(NEUTRAL, seed);
+
+            int step = country.population().tier().step();
+            String id = "population:" + country.population().level();
+            for (RollRecord roll : country.development().rolls()) {
+                assertThat(contribution(roll, id)).isEqualTo(step * TestChain.DEVELOPMENT_PER_STEP);
+            }
+            assertThat(contribution(country.gdp().rolls().getFirst(), id)).isEqualTo(step * TestChain.GDP_PER_STEP);
+            shifted |= step != 0;
+        }
+        assertThat(shifted).isTrue();
+    }
+
+    @Test
+    void coastShiftsGdp() {
+        WorldMap world = TestChain.world(NEUTRAL);
+        TreeSet<Integer> seen = new TreeSet<>();
+        for (int number = 0; number < world.countries(); number++) {
+            StartCountry country = CountryGenerator.generate(Rng.of(number), NEUTRAL, TestChain.input(NEUTRAL, number));
+
+            CoastLevelId coast = country.geography().coast();
+            int expected = NEUTRAL.map().geography().coast().stream()
+                    .filter(level -> level.id().equals(coast))
+                    .findFirst()
+                    .orElseThrow()
+                    .gdpAdvantage();
+            assertThat(contribution(country.gdp().rolls().getFirst(), "coast:" + coast))
+                    .isEqualTo(expected);
+            seen.add(expected);
+        }
+        assertThat(seen).isNotEmpty();
+    }
+
+    @Test
+    void totalGdpAndArmyFollowPopulation() {
+        StartCountry country = generate(NEUTRAL, 7);
+
+        long people = country.population().populationK() * 1_000L;
+        assertThat(country.totalGdp()).isEqualTo(people * country.gdp().perCapita());
+        assertThat(country.armyStrength()).isEqualTo(people * country.armySize().shareBp() / 10_000);
+    }
+
+    @Test
     void takenNamesAreNotRepeated() {
         List<StartReligion> religions = TestChain.religions(NEUTRAL);
+        WorldMap world = TestChain.world(NEUTRAL);
         TreeSet<String> countries = new TreeSet<>();
         TreeSet<String> people = new TreeSet<>();
         // У північному стилі лише 8 чоловічих імен: трьох держав досить, щоб повтори стали ймовірними.
-        for (long seed = 0; seed < 3; seed++) {
-            CountryGenerationInput input =
-                    new CountryGenerationInput(religions, new TreeSet<>(), new TreeSet<>(), countries, people);
+        for (int seed = 0; seed < 3; seed++) {
+            CountryGenerationInput input = new CountryGenerationInput(world, 0, religions, countries, people);
             StartCountry country = CountryGenerator.generate(Rng.of(seed), NEUTRAL, input);
 
             assertThat(countries.add(country.name().name().fullName().nominative()))
@@ -221,6 +312,14 @@ class CountryGeneratorTest {
                 assertThat(people.add(person.name().fullName().nominative())).isTrue();
             }
         }
+    }
+
+    /** Внесок з цим id у перевагу обертання; 0, якщо рядка немає. */
+    private static int contribution(RollRecord roll, String id) {
+        return roll.modifiers().stream()
+                .filter(modifier -> modifier.sourceId().equals(id))
+                .mapToInt(AppliedModifier::value)
+                .sum();
     }
 
     /** Скільки постатей обрало колесо кількості: сектор {@code people_<n>}. */

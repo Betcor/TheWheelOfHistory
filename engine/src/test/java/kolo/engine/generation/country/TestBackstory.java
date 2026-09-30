@@ -485,7 +485,9 @@ final class TestBackstory {
                                 armyTrainingDevelopmentAdvantage,
                                 persons.traitCount(),
                                 persons.age(),
-                                5),
+                                5,
+                                0,
+                                0),
                         TestReligions.BALANCE,
                         TestMaps.BALANCE,
                         TestResources.BALANCE));

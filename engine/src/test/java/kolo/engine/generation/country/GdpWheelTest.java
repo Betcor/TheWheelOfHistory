@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import kolo.engine.content.ContentPack;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.error.ErrorCode;
@@ -52,7 +53,7 @@ class GdpWheelTest {
 
     @Test
     void advantageIsRegimeThenEconomyThenSociety() {
-        Advantage advantage = GdpWheel.advantage(PACK, REGIME.modifiers(), development(2, -1));
+        Advantage advantage = GdpWheel.advantage(PACK, REGIME.modifiers(), development(2, -1), List.of());
 
         assertThat(advantage.value()).isEqualTo(20 + 10 + 20 - 10);
         assertThat(advantage.modifiers())
@@ -76,14 +77,16 @@ class GdpWheelTest {
                 50,
                 List.of());
 
-        assertThat(GdpWheel.advantage(PACK, List.of(), development)).isEqualTo(Advantage.NONE);
-        assertThat(GdpWheel.advantage(PACK, List.of(), development(-3, -3)).value())
+        assertThat(GdpWheel.advantage(PACK, List.of(), development, List.of())).isEqualTo(Advantage.NONE);
+        assertThat(GdpWheel.advantage(PACK, List.of(), development(-3, -3), List.of())
+                        .value())
                 .isEqualTo(-60);
     }
 
     @Test
     void advantageIsClampedButExplainsEveryContribution() {
-        Advantage advantage = GdpWheel.advantage(PACK, List.of(TestGdp.modifier("event", 90)), development(2, 1));
+        Advantage advantage =
+                GdpWheel.advantage(PACK, List.of(TestGdp.modifier("event", 90)), development(2, 1), List.of());
 
         assertThat(advantage.value()).isEqualTo(Advantage.MAX);
         assertThat(advantage.modifiers()).extracting(AppliedModifier::value).containsExactly(90, 20, 10);
@@ -172,5 +175,60 @@ class GdpWheelTest {
         assertThatThrownBy(action::run)
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE));
+    }
+
+    @Test
+    void populationAndCoastComeAfterDevelopment() {
+        ContentPack pack = TestChain.NEUTRAL;
+        StartDevelopment development = development(1, 1);
+        StartPopulation population = TestPopulation.population("tiny", OutcomeTier.CRIT_FAIL);
+
+        StartGdp gdp = GdpWheel.generate(
+                Rng.of(12), pack, List.of(), development, population, TestPopulation.geography("landlocked"));
+
+        RollRecord roll = gdp.rolls().getFirst();
+        assertThat(roll.modifiers())
+                .extracting(AppliedModifier::sourceId, AppliedModifier::value)
+                .containsExactly(
+                        tuple("development:economy", 10),
+                        tuple("development:society", 10),
+                        tuple("population:tiny", -2 * TestChain.GDP_PER_STEP),
+                        tuple("coast:landlocked", -10));
+        assertThat(roll.roll())
+                .isEqualTo(GdpWheel.generate(Rng.of(12), pack, List.of(), development)
+                        .rolls()
+                        .getFirst()
+                        .roll());
+    }
+
+    @Test
+    void neutralCoastAndPopulationAddNoLines() {
+        ContentPack pack = TestChain.NEUTRAL;
+        StartDevelopment development = development(0, 0);
+
+        StartGdp gdp = GdpWheel.generate(
+                Rng.of(13),
+                pack,
+                List.of(),
+                development,
+                TestPopulation.population("medium", OutcomeTier.PARTIAL),
+                TestPopulation.geography("coastal"));
+
+        assertThat(gdp).isEqualTo(GdpWheel.generate(Rng.of(13), pack, List.of(), development));
+    }
+
+    @Test
+    void unknownCoastIsRejected() {
+        ContentPack pack = TestChain.NEUTRAL;
+
+        assertThatThrownBy(() -> GdpWheel.generate(
+                        Rng.of(14),
+                        pack,
+                        List.of(),
+                        development(0, 0),
+                        TestPopulation.population("medium", OutcomeTier.PARTIAL),
+                        TestPopulation.geography("lagoon")))
+                .isInstanceOfSatisfying(
+                        ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE));
     }
 }

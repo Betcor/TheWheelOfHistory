@@ -8,10 +8,13 @@ import java.util.TreeSet;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.DevelopmentLevelDef;
 import kolo.engine.modifier.Modifier;
+import kolo.engine.modifier.ModifierTarget;
 import kolo.engine.modifier.Modifiers;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.Development;
 import kolo.engine.state.TechBranch;
+import kolo.engine.wheel.Advantage;
+import kolo.engine.wheel.AppliedModifier;
 import kolo.engine.wheel.OutcomeTier;
 import kolo.engine.wheel.RollRecord;
 import kolo.engine.wheel.Sector;
@@ -23,7 +26,8 @@ import kolo.engine.wheel.WheelSpin;
  * Колесо технологічної розвиненості (GD §4.1, колесо 7; GD §4.3): окреме обертання для кожної галузі.
  *
  * <p>Сектори — рівні {@link Development#MIN}..{@link Development#MAX} з базовими вагами з контенту. Залежність від
- * ладу — через перевагу: модифікатори з ціллю {@link #kind(TechBranch)}. Рівні нижче світового — провали, вище —
+ * ладу — через перевагу: модифікатори з ціллю {@link #kind(TechBranch)}; від населення — крок рівня результату
+ * рівня населення × {@code generation.development_population_advantage} з балансу, однаково для всіх галузей. Рівні нижче світового — провали, вище —
  * успіхи, тож додатна перевага зсуває шанси до вищих рівнів, а крайні рівні ніколи не зникають (GD §2.3).
  */
 public final class DevelopmentWheel {
@@ -48,6 +52,26 @@ public final class DevelopmentWheel {
      *     що мають ціль {@link #kind(TechBranch)}
      */
     public static StartDevelopment generate(Rng rng, ContentPack content, List<Modifier> modifiers) {
+        return generate(rng, content, modifiers, List.of());
+    }
+
+    /**
+     * Те саме з внеском населення: кидки ті самі, змінюється лише перевага.
+     *
+     * @param population стартове населення держави
+     */
+    public static StartDevelopment generate(
+            Rng rng, ContentPack content, List<Modifier> modifiers, StartPopulation population) {
+        Objects.requireNonNull(content, "content");
+        Objects.requireNonNull(population, "population");
+        int perStep = content.balance().generation().developmentPopulationAdvantage();
+        return generate(
+                rng, content, modifiers, population.advantage(perStep).stream().toList());
+    }
+
+    /** @param extra внески в перевагу кожної галузі після модифікаторів */
+    private static StartDevelopment generate(
+            Rng rng, ContentPack content, List<Modifier> modifiers, List<AppliedModifier> extra) {
         Objects.requireNonNull(rng, "rng");
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(modifiers, "modifiers");
@@ -63,7 +87,7 @@ public final class DevelopmentWheel {
                     rng.fork(branch.key()),
                     kind,
                     sectors,
-                    Modifiers.advantage(modifiers, kind, TURN),
+                    advantage(modifiers, kind, extra),
                     content.balance().wheel().strength(kind),
                     TURN,
                     null);
@@ -74,6 +98,14 @@ public final class DevelopmentWheel {
         }
         int quality = Math.floorDiv(qualitySum, TechBranch.values().length);
         return new StartDevelopment(levels, tags, quality, rolls);
+    }
+
+    /** Модифікатори з ціллю колеса галузі, потім {@code extra}. */
+    static Advantage advantage(List<Modifier> modifiers, WheelKind kind, List<AppliedModifier> extra) {
+        List<AppliedModifier> contributions =
+                new ArrayList<>(Modifiers.contributions(modifiers, ModifierTarget.wheel(kind), TURN));
+        contributions.addAll(extra);
+        return Advantage.of(contributions);
     }
 
     /** Сектор на кожен рівень за зростанням; однакові для всіх галузей. */

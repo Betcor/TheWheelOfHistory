@@ -27,6 +27,12 @@ import kolo.engine.wheel.Advantage;
  * @param personTraits скільки рис у стартової постаті (GD §12.3), {@code 1..}{@value #MAX_TRAITS}
  * @param personAge вік стартової постаті на 1970 рік, {@value #MIN_PERSON_AGE}{@code ..}{@value #MAX_PERSON_AGE}
  * @param nameCandidates скільки назв-кандидатів на колесі назви (GD §4.9), {@code 1..}{@value #MAX_NAME_CANDIDATES}
+ * @param developmentPopulationAdvantage перевага колеса розвиненості кожної галузі за кожен крок рівня результату
+ *     рівня населення від часткового, {@code −}{@value Advantage#MAX}{@code ..}{@value Advantage#MAX}: додатна —
+ *     багатолюдніша держава має більше фахівців
+ * @param gdpPopulationAdvantage перевага колеса ВВП на душу за кожен крок рівня результату рівня населення від
+ *     часткового, {@code −}{@value Advantage#MAX}{@code ..}{@value Advantage#MAX}: від'ємна — у багатолюднішої
+ *     держави більше ротів на той самий продукт
  */
 public record GenerationBalanceDef(
         CountRange backstoryFragments,
@@ -40,7 +46,9 @@ public record GenerationBalanceDef(
         int armyTrainingDevelopmentAdvantage,
         CountRange personTraits,
         CountRange personAge,
-        int nameCandidates) {
+        int nameCandidates,
+        int developmentPopulationAdvantage,
+        int gdpPopulationAdvantage) {
 
     /** Більше фрагментів чи постатей перевантажили б картку країни. */
     public static final int MAX_COUNT = 10;
@@ -75,6 +83,12 @@ public record GenerationBalanceDef(
         Checks.inRange("generation.person_age.min", personAge.min(), MIN_PERSON_AGE, MAX_PERSON_AGE);
         Checks.inRange("generation.person_age.max", personAge.max(), personAge.min(), MAX_PERSON_AGE);
         Checks.inRange("generation.name_candidates", nameCandidates, 1, MAX_NAME_CANDIDATES);
+        Checks.inRange(
+                "generation.development_population_advantage",
+                developmentPopulationAdvantage,
+                -Advantage.MAX,
+                Advantage.MAX);
+        Checks.inRange("generation.gdp_population_advantage", gdpPopulationAdvantage, -Advantage.MAX, Advantage.MAX);
     }
 
     private static void check(String field, CountRange range, int max) {

@@ -1425,6 +1425,8 @@ class ContentLoaderTest {
         assertThat(balance.generation().personTraits()).isEqualTo(new CountRange(1, 3));
         assertThat(balance.generation().personAge()).isEqualTo(new CountRange(25, 70));
         assertThat(balance.generation().nameCandidates()).isEqualTo(5);
+        assertThat(balance.generation().developmentPopulationAdvantage()).isEqualTo(5);
+        assertThat(balance.generation().gdpPopulationAdvantage()).isEqualTo(-5);
         assertThat(balance.resources().deposits(50)).isEqualTo(new CountRange(1, 2));
         assertThat(balance.resources().deposits(51)).isEqualTo(new CountRange(3, 5));
     }
@@ -1713,10 +1715,15 @@ class ContentLoaderTest {
         MapContent map = ContentLoader.load(Files.valid().source()).map();
 
         assertThat(map.geography().coast())
-                .extracting(CoastLevelDef::id, CoastLevelDef::name, CoastLevelDef::minPct, CoastLevelDef::tags)
+                .extracting(
+                        CoastLevelDef::id,
+                        CoastLevelDef::name,
+                        CoastLevelDef::minPct,
+                        CoastLevelDef::gdpAdvantage,
+                        CoastLevelDef::tags)
                 .containsExactly(
-                        tuple(new CoastLevelId("inland"), "Без моря", 0, List.of("inland")),
-                        tuple(new CoastLevelId("seaside"), "Морська", 1, List.of("seaside")));
+                        tuple(new CoastLevelId("inland"), "Без моря", 0, -15, List.of("inland")),
+                        tuple(new CoastLevelId("seaside"), "Морська", 1, 5, List.of("seaside")));
         assertThat(map.geography().terrains())
                 .extracting(TerrainTagDef::terrains, TerrainTagDef::minPct, TerrainTagDef::tags)
                 .containsExactly(tuple(List.of(Terrain.HILLS, Terrain.MOUNTAINS), 40, List.of("highland")));
@@ -1758,6 +1765,18 @@ class ContentLoaderTest {
                         "out_of_order",
                         "field",
                         "coast_level.seaside.min_pct"));
+        assertMapError(
+                Files.MAP.replace("      gdp_advantage: 5\n", ""),
+                Map.of("location", "geography.coast[1]", "cause", "blank_value", "field", "gdp_advantage"));
+        assertMapError(
+                Files.MAP.replace("gdp_advantage: 5", "gdp_advantage: 101"),
+                Map.of(
+                        "location",
+                        "geography.coast[1]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "coast_level.seaside.gdp_advantage"));
         assertMapError(
                 Files.MAP.replace("id: seaside", "id: inland"),
                 Map.of("location", "geography.coast[1]", "cause", "duplicate_id", "value", "inland"));
@@ -2131,6 +2150,15 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("name_candidates: 5", "name_candidates: 13")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation", "field", "generation.name_candidates"));
+        assertContentError(
+                balance(Files.BALANCE.replace(
+                        "development_population_advantage: 5", "development_population_advantage: -101")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.development_population_advantage"));
+        assertContentError(
+                balance(Files.BALANCE.replace("gdp_population_advantage: -5", "gdp_population_advantage: 101")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "generation", "field", "generation.gdp_population_advantage"));
     }
 
     @Test
@@ -2219,6 +2247,16 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("  name_candidates: 5\n", "")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "generation.name_candidates", "cause", "blank_value", "field", "name_candidates"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  gdp_population_advantage: -5\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of(
+                        "location",
+                        "generation.gdp_population_advantage",
+                        "cause",
+                        "blank_value",
+                        "field",
+                        "gdp_population_advantage"));
         assertContentError(
                 balance(Files.BALANCE.replace("    players: { min_pct: 75, max_pct: 133 }\n", "")),
                 ErrorCode.INVALID_CONTENT,

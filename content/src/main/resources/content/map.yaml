@@ -270,6 +270,7 @@ placement:
 # провінцій держави з округленням вгору.
 #   coast — рівні виходу до моря від найменшої частки прибережних провінцій (min_pct строго зростає, перший — 0):
 #     держава отримує останній рівень, чий min_pct не більший за її частку; озеро виходу до моря не дає;
+#     gdp_advantage (−100..100) — перевага колеса ВВП на душу для держави цього рівня;
 #   terrains — мітки за переважною місцевістю: якщо типи terrains (plain, hills, mountains, forest, desert, tundra,
 #     swamp) разом займають щонайменше min_pct (1..100) провінцій, держава отримує tags; правила незалежні.
 geography:
@@ -278,16 +279,19 @@ geography:
       name: Без виходу до моря
       description: Жодна провінція не межує з морем — торгівля й флот лише через сусідів.
       min_pct: 0
+      gdp_advantage: -10
       tags: [landlocked]
     - id: coastal
       name: Прибережна держава
       description: Має вихід до моря, але живе переважно суходолом.
       min_pct: 1
+      gdp_advantage: 0
       tags: [coastal]
     - id: maritime
       name: Морська держава
       description: Щонайменше половина провінцій виходить до моря — флот і торгівля в крові.
       min_pct: 50
+      gdp_advantage: 10
       tags: [coastal, maritime]
   terrains:
     - terrains: [mountains]

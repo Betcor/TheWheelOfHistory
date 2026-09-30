@@ -1249,6 +1249,14 @@ public final class ContentLoader {
                 BALANCE,
                 "generation.name_candidates",
                 () -> required("name_candidates", generationYaml.nameCandidates()));
+        int developmentPopulationAdvantage = at(
+                BALANCE,
+                "generation.development_population_advantage",
+                () -> required("development_population_advantage", generationYaml.developmentPopulationAdvantage()));
+        int gdpPopulationAdvantage = at(
+                BALANCE,
+                "generation.gdp_population_advantage",
+                () -> required("gdp_population_advantage", generationYaml.gdpPopulationAdvantage()));
         GenerationBalanceDef generation = at(
                 BALANCE,
                 "generation",
@@ -1264,7 +1272,9 @@ public final class ContentLoader {
                         trainingDevelopmentAdvantage,
                         traitCount,
                         age,
-                        nameCandidates));
+                        nameCandidates,
+                        developmentPopulationAdvantage,
+                        gdpPopulationAdvantage));
 
         ContentYaml.Religion religionYaml = section("religion", yaml.religion());
         CountRange aspects = at(BALANCE, "religion.aspects", () -> count(religionYaml.aspects()));
@@ -1381,6 +1391,7 @@ public final class ContentLoader {
                                     level.name(),
                                     level.description(),
                                     required("min_pct", level.minPct()),
+                                    required("gdp_advantage", level.gdpAdvantage()),
                                     level.tags()));
                 });
         // Порядок перевіряється тут, щоб помилка вказувала на рівень, що стоїть не на своєму місці.

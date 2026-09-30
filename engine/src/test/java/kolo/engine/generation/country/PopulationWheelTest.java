@@ -225,4 +225,18 @@ class PopulationWheelTest {
                 .isInstanceOfSatisfying(
                         ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE));
     }
+
+    @Test
+    void populationAdvantageIsStepTimesPerStep() {
+        assertThat(TestPopulation.population("huge", OutcomeTier.CRIT_SUCCESS).advantage(5))
+                .contains(new AppliedModifier("population:huge", "population.huge", 10));
+        assertThat(TestPopulation.population("tiny", OutcomeTier.CRIT_FAIL).advantage(-5))
+                .contains(new AppliedModifier("population:tiny", "population.tiny", 10));
+        assertThat(TestPopulation.population("small", OutcomeTier.FAIL).advantage(7))
+                .contains(new AppliedModifier("population:small", "population.small", -7));
+        assertThat(TestPopulation.population("medium", OutcomeTier.PARTIAL).advantage(5))
+                .isEmpty();
+        assertThat(TestPopulation.population("large", OutcomeTier.SUCCESS).advantage(0))
+                .isEmpty();
+    }
 }

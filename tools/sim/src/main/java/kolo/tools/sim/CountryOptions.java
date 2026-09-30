@@ -1,33 +1,29 @@
 package kolo.tools.sim;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import kolo.engine.state.NpcShare;
+import kolo.engine.state.WorldLimits;
 
 /**
  * Параметри команди {@code country}.
  *
- * @param seed seed світу: з нього — релігії світу й сама держава
- * @param countries скільки держав у світі; від цього залежить кількість релігій (таблиця {@code religion.count} у
- *     {@code balance.yaml})
- * @param resources id ресурсів держави (доки немає карти, їх задають вручну); перевіряються за контентом
+ * @param seed seed світу: з нього — карта, релігії світу й усі держави
+ * @param players скільки гравців у світі, {@value WorldLimits#MIN_PLAYERS}..{@value WorldLimits#MAX_PLAYERS}
+ * @param npcShare частка NPC-держав, яку задав би хост
+ * @param country номер держави, чию картку друкувати; чи є така в світі, видно лише після генерації карти
  * @param rolls чи друкувати всі обертання коліс
  * @param content каталог з YAML-файлами контенту; порожньо — вбудований контент
  */
-record CountryOptions(long seed, int countries, SortedSet<String> resources, boolean rolls, Optional<Path> content) {
+record CountryOptions(long seed, int players, NpcShare npcShare, int country, boolean rolls, Optional<Path> content) {
 
-    /** Типовий розмір світу — середина таблиці кількості релігій. */
-    static final int DEFAULT_COUNTRIES = 20;
-
-    /** Верхня межа лише від помилок набору; справжній розмір світу обмежить карта. */
-    static final int MAX_COUNTRIES = 1000;
+    static final int DEFAULT_PLAYERS = 1;
+    static final NpcShare DEFAULT_NPC_SHARE = NpcShare.NORMAL;
 
     CountryOptions {
-        resources = Collections.unmodifiableSortedSet(new TreeSet<>(resources));
+        Objects.requireNonNull(npcShare, "npcShare");
         Objects.requireNonNull(content, "content");
     }
 
@@ -38,8 +34,9 @@ record CountryOptions(long seed, int countries, SortedSet<String> resources, boo
      */
     static CountryOptions parse(List<String> args) {
         Long seed = null;
-        Integer countries = null;
-        TreeSet<String> resources = null;
+        Integer players = null;
+        NpcShare npcShare = null;
+        Integer country = null;
         boolean rolls = false;
         Path content = null;
         for (int i = 0; i < args.size(); i++) {
@@ -49,16 +46,18 @@ record CountryOptions(long seed, int countries, SortedSet<String> resources, boo
                     once(option, seed);
                     seed = parseLong(option, value(args, ++i, option));
                 }
-                case "--countries" -> {
-                    once(option, countries);
-                    countries = parseInt(option, value(args, ++i, option), 1, MAX_COUNTRIES);
+                case "--players" -> {
+                    once(option, players);
+                    players = parseInt(
+                            option, value(args, ++i, option), WorldLimits.MIN_PLAYERS, WorldLimits.MAX_PLAYERS);
                 }
-                case "--resources" -> {
-                    once(option, resources);
-                    resources = new TreeSet<>();
-                    for (String id : value(args, ++i, option).split(",", -1)) {
-                        resources.add(id.strip());
-                    }
+                case "--npc" -> {
+                    once(option, npcShare);
+                    npcShare = npcShare(value(args, ++i, option));
+                }
+                case "--country" -> {
+                    once(option, country);
+                    country = parseInt(option, value(args, ++i, option), 0, WorldLimits.MAX_COUNTRIES - 1);
                 }
                 case "--rolls" -> {
                     if (rolls) {
@@ -78,10 +77,20 @@ record CountryOptions(long seed, int countries, SortedSet<String> resources, boo
         }
         return new CountryOptions(
                 seed,
-                countries == null ? DEFAULT_COUNTRIES : countries,
-                resources == null ? new TreeSet<>() : resources,
+                players == null ? DEFAULT_PLAYERS : players,
+                npcShare == null ? DEFAULT_NPC_SHARE : npcShare,
+                country == null ? 0 : country,
                 rolls,
                 Optional.ofNullable(content));
+    }
+
+    private static NpcShare npcShare(String value) {
+        for (NpcShare share : NpcShare.values()) {
+            if (share.key().equals(value)) {
+                return share;
+            }
+        }
+        throw new UsageException("error.usage.unknown_npc_share", value);
     }
 
     private static void once(String option, Object current) {
