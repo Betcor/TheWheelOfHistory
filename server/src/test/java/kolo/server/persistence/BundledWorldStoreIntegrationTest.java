@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
 import kolo.engine.state.WorldState;
+import kolo.server.Budget;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

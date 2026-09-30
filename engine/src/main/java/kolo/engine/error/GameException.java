@@ -11,7 +11,8 @@ import java.util.TreeMap;
  *
  * <p>Подробиці — впорядкована за ключами незмінна мапа, тож повідомлення й серіалізація детерміновані. Значення
  * зберігаються як {@link String}, {@link Number} або {@link Boolean}; усе інше (зокрема {@code null}) перетворюється на рядок, щоб
- * подробиці завжди можна було передати клієнтові в {@code ServerMessage.Error}.
+ * подробиці завжди можна було передати клієнтові в {@code ServerMessage.Error}. Обов'язкові подробиці коду ({@link
+ * ErrorCode#requiredDetails()}) мусять бути.
  */
 public abstract class GameException extends RuntimeException {
 
@@ -38,6 +39,10 @@ public abstract class GameException extends RuntimeException {
             throw new IllegalArgumentException(
                     "код " + code + " належить " + code.exceptionType().getSimpleName() + ", а не "
                             + getClass().getSimpleName());
+        }
+        if (!details.keySet().containsAll(code.requiredDetails())) {
+            throw new IllegalArgumentException("коду " + code + " бракує подробиць: потрібні " + code.requiredDetails()
+                    + ", є " + details.keySet());
         }
         this.code = code;
         this.details = details;

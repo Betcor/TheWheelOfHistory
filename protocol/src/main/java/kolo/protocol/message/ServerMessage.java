@@ -1,0 +1,114 @@
+package kolo.protocol.message;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import kolo.engine.error.Checks;
+import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
+import kolo.engine.error.GameException;
+import kolo.engine.error.ValidationException;
+import kolo.engine.view.CellView;
+import kolo.engine.view.CountryView;
+
+/** Повідомлення сервера клієнтові. */
+public sealed interface ServerMessage
+        permits ServerMessage.Welcome, ServerMessage.Error, ServerMessage.MapStart, ServerMessage.MapCells {
+
+    /**
+     * Відповідь на {@link ClientMessage.Hello}: версії збіглися, з'єднання відкрите.
+     *
+     * @param protocolVersion версія протоколу сервера
+     * @param contentHash хеш контенту сервера
+     */
+    record Welcome(int protocolVersion, String contentHash) implements ServerMessage {
+
+        public Welcome {
+            Checks.inRange("protocol_version", protocolVersion, 1, Integer.MAX_VALUE);
+            Checks.notBlank("content_hash", contentHash);
+        }
+    }
+
+    /**
+     * Помилка: клієнт показує гравцеві текст за ключем {@link ErrorCode#key()} з подробицями.
+     *
+     * <p>Подробиці — як у {@link GameException#details()}, але цілі числа завжди {@link Long}: на дроті JSON не
+     * розрізняє {@code int} і {@code long}, а повідомлення, прочитане назад, мусить дорівнювати надісланому. Нецілі
+     * числа стають рядками.
+     *
+     * @param code код помилки
+     * @param details подробиці; значення — {@link String}, {@link Long} або {@link Boolean}
+     */
+    record Error(ErrorCode code, SortedMap<String, Object> details) implements ServerMessage {
+
+        /** @throws ValidationException якщо бракує обов'язкових подробиць коду ({@link ErrorCode#requiredDetails()}) */
+        public Error {
+            Objects.requireNonNull(code, "code");
+            TreeMap<String, Object> normalized = new TreeMap<>();
+            details.forEach((key, value) -> normalized.put(Objects.requireNonNull(key, "ключ подробиць"), wire(value)));
+            for (String required : code.requiredDetails()) {
+                if (!normalized.containsKey(required)) {
+                    throw new ValidationException(
+                            ErrorCode.MISSING_DEFINITION, ErrorDetails.of("field", "details", "value", required));
+                }
+            }
+            details = Collections.unmodifiableSortedMap(normalized);
+        }
+
+        /** Помилка для клієнта з винятку гри. */
+        public static Error of(GameException exception) {
+            return new Error(exception.code(), exception.details());
+        }
+
+        private static Object wire(Object value) {
+            return switch (value) {
+                case String text -> text;
+                case Boolean flag -> flag;
+                case Long number -> number;
+                case Integer number -> number.longValue();
+                case Short number -> number.longValue();
+                case Byte number -> number.longValue();
+                case null -> "null";
+                default -> String.valueOf(value);
+            };
+        }
+    }
+
+    /**
+     * Початок карти світу: усе, крім комірок. Далі — частини {@link MapCells} по порядку, доки не прийдуть усі
+     * {@code cellCount} комірок ({@link MapAssembler}).
+     *
+     * @param seed seed світу
+     * @param width ширина карти в одиницях сітки
+     * @param height висота карти в одиницях сітки
+     * @param cellCount скільки комірок прийде частинами
+     * @param countries держави за номером
+     */
+    record MapStart(long seed, int width, int height, int cellCount, List<CountryView> countries)
+            implements ServerMessage {
+
+        public MapStart {
+            Checks.inRange("width", width, 1, Integer.MAX_VALUE);
+            Checks.inRange("height", height, 1, Integer.MAX_VALUE);
+            Checks.inRange("cell_count", cellCount, 1, Integer.MAX_VALUE);
+            countries = List.copyOf(countries);
+        }
+    }
+
+    /**
+     * Частина комірок карти.
+     *
+     * @param first номер першої комірки частини; частини йдуть підряд без пропусків
+     * @param cells комірки від {@code first}; щонайменше одна
+     */
+    record MapCells(int first, List<CellView> cells) implements ServerMessage {
+
+        public MapCells {
+            Checks.inRange("first", first, 0, Integer.MAX_VALUE);
+            cells = List.copyOf(cells);
+            Checks.inRange("cells", cells.size(), 1, Integer.MAX_VALUE);
+        }
+    }
+}
