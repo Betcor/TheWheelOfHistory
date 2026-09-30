@@ -265,3 +265,111 @@ placement:
       weight: 10
       quality: 90
       tags: [large_country]
+
+# geography — географія держави (GD §4.1, № 3): підсумок її території без колеса. Частки рахуються у відсотках
+# провінцій держави з округленням вгору.
+#   coast — рівні виходу до моря від найменшої частки прибережних провінцій (min_pct строго зростає, перший — 0):
+#     держава отримує останній рівень, чий min_pct не більший за її частку; озеро виходу до моря не дає;
+#   terrains — мітки за переважною місцевістю: якщо типи terrains (plain, hills, mountains, forest, desert, tundra,
+#     swamp) разом займають щонайменше min_pct (1..100) провінцій, держава отримує tags; правила незалежні.
+geography:
+  coast:
+    - id: landlocked
+      name: Без виходу до моря
+      description: Жодна провінція не межує з морем — торгівля й флот лише через сусідів.
+      min_pct: 0
+      tags: [landlocked]
+    - id: coastal
+      name: Прибережна держава
+      description: Має вихід до моря, але живе переважно суходолом.
+      min_pct: 1
+      tags: [coastal]
+    - id: maritime
+      name: Морська держава
+      description: Щонайменше половина провінцій виходить до моря — флот і торгівля в крові.
+      min_pct: 50
+      tags: [coastal, maritime]
+  terrains:
+    - terrains: [mountains]
+      min_pct: 20
+      tags: [mountainous]
+    - terrains: [forest]
+      min_pct: 40
+      tags: [forested]
+    - terrains: [desert]
+      min_pct: 30
+      tags: [desert_country]
+    - terrains: [tundra]
+      min_pct: 30
+      tags: [arctic]
+    - terrains: [plain]
+      min_pct: 60
+      tags: [lowland]
+
+# population — колесо населення держави (GD §4.1, колесо 4) і розподіл населення по її провінціях.
+#   levels — рівні загального населення від найменшого до найбільшого (population_k — тисячі людей, строго зростає;
+#     tier — як діє перевага: crit_fail / fail / partial / success / crit_success, не спадає); weight — відносна вага
+#     сектора (1..10000), quality — наскільки рівень добрий для держави (0..100, стріки генерації), tags — мітки;
+#   area_advantage — перевага за кожні 100 п. п. площі понад середню (0..100): карликова 40% → −0,6 × area_advantage;
+#   fertility_advantage — скільки % різниці середньої родючості держави й світу йде в перевагу (0..100);
+#   province_base, coast_bonus — вага провінції в розподілі населення: province_base (1..1000) + родючість +
+#     coast_bonus (0..1000), якщо провінція має вихід до моря.
+population:
+  area_advantage: 50
+  fertility_advantage: 100
+  province_base: 10
+  coast_bonus: 20
+  levels:
+    - id: tiny
+      name: Малолюдна держава
+      description: Близько пів мільйона людей — кожна людина на рахунку.
+      population_k: 500
+      tier: crit_fail
+      weight: 6
+      quality: 10
+      tags: [small_population]
+    - id: small
+      name: Нечисленний народ
+      description: Близько двох мільйонів людей.
+      population_k: 2000
+      tier: fail
+      weight: 14
+      quality: 25
+      tags: [small_population]
+    - id: modest
+      name: Помірне населення
+      description: Близько шести мільйонів людей.
+      population_k: 6000
+      tier: fail
+      weight: 20
+      quality: 40
+    - id: medium
+      name: Середнє населення
+      description: Близько п'ятнадцяти мільйонів людей — звичайна держава свого часу.
+      population_k: 15000
+      tier: partial
+      weight: 24
+      quality: 50
+    - id: large
+      name: Численний народ
+      description: Близько тридцяти п'яти мільйонів людей.
+      population_k: 35000
+      tier: success
+      weight: 18
+      quality: 65
+    - id: very_large
+      name: Багатолюдна держава
+      description: Близько вісімдесяти мільйонів людей — великі армії й великі ринки.
+      population_k: 80000
+      tier: success
+      weight: 12
+      quality: 80
+      tags: [large_population]
+    - id: huge
+      name: Людський океан
+      description: Близько двохсот мільйонів людей — одна з найбільших націй світу.
+      population_k: 200000
+      tier: crit_success
+      weight: 6
+      quality: 90
+      tags: [large_population]

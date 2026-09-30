@@ -816,6 +816,28 @@ class ContentPackTest {
     }
 
     @Test
+    void geographyAndPopulationTagsAreBackstoryTagSources() {
+        // maritime — мітка рівня виходу до моря, highland — правила місцевості, large_population — рівня населення.
+        BackstoryFragmentDef fleet = TestContent.fragment(
+                "fleet",
+                new TagCondition(List.of("maritime", "highland", "large_population"), List.of(), List.of()),
+                List.of());
+        BackstoryContent backstory = new BackstoryContent(Map.of(), List.of(fleet));
+        MapContent withoutTerrainTags = TestMaps.content(TestMaps.geography(List.of()));
+
+        assertThat(withMap(TestMaps.CONTENT, backstory).backstory().fragments()).hasSize(1);
+        assertThat(TestMaps.CONTENT.producedTags())
+                .contains("landlocked", "coastal", "maritime", "mountainous", "highland")
+                .contains("small_population", "large_population", "small_country");
+        assertThatThrownBy(() -> withMap(withoutTerrainTags, backstory))
+                .isInstanceOfSatisfying(ValidationException.class, e -> {
+                    assertThat(e.code()).isEqualTo(ErrorCode.UNKNOWN_REFERENCE);
+                    assertThat(e.details())
+                            .containsExactly(entry("field", "backstory.fleet.tags"), entry("value", "highland"));
+                });
+    }
+
+    @Test
     void religionAndSecularTagsAreBackstoryTagSources() {
         // secular — мітка світської держави, dogma_holy_war — мітка догмату.
         BackstoryFragmentDef crusade = TestContent.fragment(

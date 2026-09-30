@@ -314,6 +314,43 @@ final class Files {
               terrains: { plain: 5, hills: 0, mountains: -40, forest: -10, desert: -30, tundra: -20, swamp: -15 }
               moisture_pct: 30
               river: 15
+            geography:
+              coast:
+                - id: inland
+                  name: Без моря
+                  description: Жодного берега.
+                  min_pct: 0
+                  tags: [inland]
+                - id: seaside
+                  name: Морська
+                  description: Має берег.
+                  min_pct: 1
+                  tags: [seaside]
+              terrains:
+                - terrains: [hills, mountains]
+                  min_pct: 40
+                  tags: [highland]
+            population:
+              area_advantage: 25
+              fertility_advantage: 50
+              province_base: 12
+              coast_bonus: 8
+              levels:
+                - id: few
+                  name: Мало людей
+                  description: Малолюдна.
+                  population_k: 800
+                  tier: fail
+                  weight: 40
+                  quality: 25
+                  tags: [few_people]
+                - id: many
+                  name: Багато людей
+                  description: Багатолюдна.
+                  population_k: 40000
+                  tier: success
+                  weight: 60
+                  quality: 75
             placement:
               min_provinces: 4
               roughness: 30

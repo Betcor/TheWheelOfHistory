@@ -633,7 +633,9 @@ final class ContentYaml {
             Sea sea,
             Rivers rivers,
             Fertility fertility,
-            Placement placement) {
+            Placement placement,
+            Geography geography,
+            Population population) {
         MapFile {
             templates = orEmpty(templates);
         }
@@ -692,6 +694,63 @@ final class ContentYaml {
             Integer quality,
             List<String> tags) {
         AreaLevel {
+            tags = orEmpty(tags);
+        }
+    }
+
+    record Geography(List<CoastLevel> coast, List<TerrainTag> terrains) {
+        Geography {
+            coast = orEmpty(coast);
+            terrains = orEmpty(terrains);
+        }
+    }
+
+    /** @param minPct з якої частки прибережних провінцій діє рівень, % */
+    record CoastLevel(
+            String id,
+            String name,
+            String description,
+            @JsonProperty("min_pct") Integer minPct,
+            List<String> tags) {
+        CoastLevel {
+            tags = orEmpty(tags);
+        }
+    }
+
+    /** @param terrains ключі типів місцевості */
+    record TerrainTag(
+            List<String> terrains, @JsonProperty("min_pct") Integer minPct, List<String> tags) {
+        TerrainTag {
+            terrains = orEmpty(terrains);
+            tags = orEmpty(tags);
+        }
+    }
+
+    record Population(
+            @JsonProperty("area_advantage") Integer areaAdvantage,
+            @JsonProperty("fertility_advantage") Integer fertilityAdvantage,
+            @JsonProperty("province_base") Integer provinceBase,
+            @JsonProperty("coast_bonus") Integer coastBonus,
+            List<PopulationLevel> levels) {
+        Population {
+            levels = orEmpty(levels);
+        }
+    }
+
+    /**
+     * @param populationK населення в тисячах
+     * @param tier ключ рівня результату
+     */
+    record PopulationLevel(
+            String id,
+            String name,
+            String description,
+            @JsonProperty("population_k") Integer populationK,
+            String tier,
+            Integer weight,
+            Integer quality,
+            List<String> tags) {
+        PopulationLevel {
             tags = orEmpty(tags);
         }
     }

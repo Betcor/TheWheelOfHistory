@@ -115,7 +115,9 @@ class PlacementDefinitionsTest {
                 TestMaps.SEA,
                 TestMaps.RIVERS,
                 TestMaps.FERTILITY,
-                TestMaps.placement(8));
+                TestMaps.placement(8),
+                TestMaps.GEOGRAPHY,
+                TestMaps.POPULATION);
 
         assertThatThrownBy(() -> TestNames.pack(map, TestMaps.world(new CountRange(300, 400))))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {

@@ -273,7 +273,7 @@ public final class ContentPack {
         hdiMap.values().forEach(hdi -> known.addAll(hdi.tags()));
         armyMap.values().forEach(army -> known.addAll(army.tags()));
         trainingMap.values().forEach(training -> known.addAll(training.tags()));
-        known.addAll(Objects.requireNonNull(map, "map").placement().producedTags());
+        known.addAll(Objects.requireNonNull(map, "map").producedTags());
         for (BackstoryFragmentDef fragment : backstory.fragments().values()) {
             for (String tag : fragment.referencedTags()) {
                 if (!known.contains(tag)) {

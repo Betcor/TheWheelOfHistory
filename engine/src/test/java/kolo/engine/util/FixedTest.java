@@ -22,6 +22,28 @@ class FixedTest {
     }
 
     @Test
+    void distributeUsesLargestRemainders() {
+        assertThat(Fixed.distribute(10, new long[] {1, 1, 1})).containsExactly(4, 3, 3);
+        assertThat(Fixed.distribute(5, new long[] {0, 1, 1})).containsExactly(0, 3, 2);
+        assertThat(Fixed.distribute(7, new long[] {2, 5})).containsExactly(2, 5);
+        assertThat(Fixed.distribute(0, new long[] {3})).containsExactly(0);
+    }
+
+    @Property
+    void distributeGivesExactlyTotal(@ForAll long seed) {
+        long total = Math.floorMod(seed, 100_000);
+        long[] weights = {Math.floorMod(seed, 7), Math.floorMod(seed >> 8, 13) + 1, Math.floorMod(seed >> 16, 5)};
+
+        long[] shares = Fixed.distribute(total, weights);
+
+        assertThat(java.util.Arrays.stream(shares).sum()).isEqualTo(total);
+        long sum = java.util.Arrays.stream(weights).sum();
+        for (int i = 0; i < weights.length; i++) {
+            assertThat(shares[i]).isBetween(total * weights[i] / sum, total * weights[i] / sum + 1);
+        }
+    }
+
+    @Test
     void intVersionUsesLongIntermediate() {
         assertThat(Fixed.mulDiv(Integer.MAX_VALUE, 2, 2)).isEqualTo(Integer.MAX_VALUE);
     }

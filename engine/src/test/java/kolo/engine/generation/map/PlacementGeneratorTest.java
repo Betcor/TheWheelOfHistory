@@ -164,14 +164,6 @@ class PlacementGeneratorTest {
     }
 
     @Test
-    void distributeUsesLargestRemainders() {
-        assertThat(PlacementGenerator.distribute(10, new long[] {1, 1, 1})).containsExactly(4, 3, 3);
-        assertThat(PlacementGenerator.distribute(5, new long[] {0, 1, 1})).containsExactly(0, 3, 2);
-        assertThat(PlacementGenerator.distribute(7, new long[] {2, 5})).containsExactly(2, 5);
-        assertThat(PlacementGenerator.distribute(0, new long[] {3})).containsExactly(0);
-    }
-
-    @Test
     void continentWeightsFollowFreeSpace() {
         // Перша держава: вага пропорційна частці материка.
         assertThat(PlacementGenerator.continentSectors(new int[] {30, 90}, new int[2], new long[2], 2, 5))

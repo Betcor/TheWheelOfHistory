@@ -259,7 +259,7 @@ public final class PlacementGenerator {
                 for (int c = 0; c < continents; c++) {
                     weights[c] = open[c] ? demand[c] : 0;
                 }
-                long[] shares = distribute(rest, weights);
+                long[] shares = Fixed.distribute(rest, weights);
                 for (int c = 0; c < continents; c++) {
                     if (open[c]) {
                         extra[c] = shares[c];
@@ -278,7 +278,7 @@ public final class PlacementGenerator {
             for (int i = 0; i < countryContinents.length; i++) {
                 weights[i] = countryContinents[i] == c ? areas[i].sharePct() : 0;
             }
-            long[] shares = distribute(extra[c], weights);
+            long[] shares = Fixed.distribute(extra[c], weights);
             for (int i = 0; i < countryContinents.length; i++) {
                 if (countryContinents[i] == c) {
                     targets[i] = (int) (minimum + shares[i]);
@@ -286,34 +286,6 @@ public final class PlacementGenerator {
             }
         }
         return targets;
-    }
-
-    /**
-     * {@code total}, поділене пропорційно вагам: частки вниз, залишок — по одному найбільшим залишкам, при рівності —
-     * менший номер. Нульова вага нічого не отримує; сума ваг — більша за нуль.
-     */
-    static long[] distribute(long total, long[] weights) {
-        long sum = Arrays.stream(weights).sum();
-        long[] shares = new long[weights.length];
-        long[] remainders = new long[weights.length];
-        long given = 0;
-        for (int i = 0; i < weights.length; i++) {
-            long part = Math.multiplyExact(total, weights[i]);
-            shares[i] = part / sum;
-            remainders[i] = weights[i] == 0 ? -1 : part % sum;
-            given += shares[i];
-        }
-        for (long left = total - given; left > 0; left--) {
-            int best = -1;
-            for (int i = 0; i < weights.length; i++) {
-                if (remainders[i] >= 0 && (best < 0 || remainders[i] > remainders[best])) {
-                    best = i;
-                }
-            }
-            shares[best]++;
-            remainders[best] = -1;
-        }
-        return shares;
     }
 
     /** Перша розкладка материка, де кожна держава отримала рівно свою ціль, або з найменшим відхиленням. */
