@@ -10,12 +10,13 @@ import kolo.engine.error.ValidationException;
 import kolo.engine.state.PowerCorridor;
 
 /**
- * Числа балансу, що не належать жодному окремому визначенню: колеса, стріки, коридор сили, кількості генерації
+ * Числа балансу, що не належать жодному окремому визначенню: колеса, стріки, коридор і бюджет сили, кількості генерації
  * країн і релігій, розмір світу, кількість родовищ держави.
  *
  * <p>Правила гри (межі переваги, мінімум КП/КУ, ліміт жетонів долі) — не тут, а в коді: вони не налаштовуються.
  *
  * @param corridors рівно по одному визначенню на кожен {@link PowerCorridor}
+ * @param power як рахувати проміжну силу держави й зсувати колеса за межами коридору
  */
 public record BalanceDef(
         WheelBalanceDef wheel,
@@ -24,7 +25,8 @@ public record BalanceDef(
         GenerationBalanceDef generation,
         ReligionBalanceDef religion,
         WorldBalanceDef world,
-        ResourceBalanceDef resources) {
+        ResourceBalanceDef resources,
+        PowerBudgetDef power) {
 
     public BalanceDef {
         Objects.requireNonNull(wheel, "wheel");
@@ -33,6 +35,7 @@ public record BalanceDef(
         Objects.requireNonNull(religion, "religion");
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(resources, "resources");
+        Objects.requireNonNull(power, "power");
         TreeMap<PowerCorridor, PowerCorridorDef> copy = new TreeMap<>();
         corridors.forEach((key, def) -> {
             if (key != Objects.requireNonNull(def, "power_corridor").corridor()) {
@@ -57,7 +60,8 @@ public record BalanceDef(
             GenerationBalanceDef generation,
             ReligionBalanceDef religion,
             WorldBalanceDef world,
-            ResourceBalanceDef resources) {
+            ResourceBalanceDef resources,
+            PowerBudgetDef power) {
         TreeMap<PowerCorridor, PowerCorridorDef> map = new TreeMap<>();
         for (PowerCorridorDef def : corridors) {
             Objects.requireNonNull(def, "power_corridor");
@@ -71,7 +75,7 @@ public record BalanceDef(
                                 def.corridor().key()));
             }
         }
-        return new BalanceDef(wheel, streaks, map, generation, religion, world, resources);
+        return new BalanceDef(wheel, streaks, map, generation, religion, world, resources, power);
     }
 
     public PowerCorridorDef corridor(PowerCorridor corridor) {

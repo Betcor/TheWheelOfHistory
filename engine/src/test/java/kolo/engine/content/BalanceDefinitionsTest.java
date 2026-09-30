@@ -606,7 +606,8 @@ class BalanceDefinitionsTest {
                         balance.generation(),
                         balance.religion(),
                         TestMaps.BALANCE,
-                        balance.resources()))
+                        balance.resources(),
+                        TestPower.BUDGET))
                 .isInstanceOfSatisfying(ValidationException.class, e -> {
                     assertThat(e.code()).isEqualTo(ErrorCode.MISSING_DEFINITION);
                     assertThat(e.details())
@@ -623,7 +624,8 @@ class BalanceDefinitionsTest {
                         balance.generation(),
                         balance.religion(),
                         TestMaps.BALANCE,
-                        balance.resources()),
+                        balance.resources(),
+                        TestPower.BUDGET),
                 ErrorCode.DUPLICATE_ID);
     }
 
@@ -641,7 +643,8 @@ class BalanceDefinitionsTest {
                         balance.generation(),
                         balance.religion(),
                         balance.world(),
-                        balance.resources()),
+                        balance.resources(),
+                        TestPower.BUDGET),
                 ErrorCode.UNKNOWN_REFERENCE);
     }
 

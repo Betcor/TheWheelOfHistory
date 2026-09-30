@@ -47,6 +47,7 @@ import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TestMaps;
+import kolo.engine.content.TestPower;
 import kolo.engine.content.TestReligions;
 import kolo.engine.content.TestResources;
 import kolo.engine.content.TrainingLevelDef;
@@ -490,7 +491,8 @@ final class TestBackstory {
                                 0),
                         TestReligions.BALANCE,
                         TestMaps.BALANCE,
-                        TestResources.BALANCE));
+                        TestResources.BALANCE,
+                        TestPower.BUDGET));
     }
 
     /** По рівню вишколу на кожен рівень 1..5 з рівними вагами, від провалу до успіху. */

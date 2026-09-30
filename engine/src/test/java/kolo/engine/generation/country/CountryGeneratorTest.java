@@ -10,6 +10,7 @@ import java.util.TreeSet;
 import java.util.stream.IntStream;
 import kolo.engine.content.CoastLevelId;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.PowerComponent;
 import kolo.engine.content.StreakKind;
 import kolo.engine.generation.map.PlacedCountry;
 import kolo.engine.generation.map.PlacementGenerator;
@@ -19,6 +20,7 @@ import kolo.engine.modifier.Modifier;
 import kolo.engine.modifier.SourceKind;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.FateTokens;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.TechBranch;
 import kolo.engine.wheel.AppliedModifier;
 import kolo.engine.wheel.RollRecord;
@@ -28,6 +30,9 @@ import org.junit.jupiter.api.Test;
 class CountryGeneratorTest {
 
     private static final int SEEDS = 200;
+
+    /** Слабка держава: площа, населення, розвиненість, ВВП та ІЛР — якість 10. */
+    private static final ContentPack WEAK = TestChain.pack(TestChain.BAD, TestChain.NEUTRAL_QUALITY, TestChain.BAD);
 
     @Test
     void wheelsSpinInChainOrder() {
@@ -303,7 +308,8 @@ class CountryGeneratorTest {
         TreeSet<String> people = new TreeSet<>();
         // У північному стилі лише 8 чоловічих імен: трьох держав досить, щоб повтори стали ймовірними.
         for (int seed = 0; seed < 3; seed++) {
-            CountryGenerationInput input = new CountryGenerationInput(world, 0, religions, countries, people);
+            CountryGenerationInput input =
+                    new CountryGenerationInput(world, 0, religions, PowerCorridor.DEFAULT, countries, people);
             StartCountry country = CountryGenerator.generate(Rng.of(seed), NEUTRAL, input);
 
             assertThat(countries.add(country.name().name().fullName().nominative()))
@@ -325,6 +331,85 @@ class CountryGeneratorTest {
     /** Скільки постатей обрало колесо кількості: сектор {@code people_<n>}. */
     private static int counted(StartCountry country) {
         return Integer.parseInt(country.people().countRoll().resultSectorId().substring("people_".length()));
+    }
+
+    @Test
+    void neutralCountryStaysAtMedianWithoutShift() {
+        StartCountry country = generate(NEUTRAL, 5);
+
+        assertThat(country.power().steps()).extracting(PowerStep::component).containsExactly(PowerComponent.values());
+        assertThat(country.power().steps()).allSatisfy(step -> {
+            assertThat(step.strengthPct()).isEqualTo(PowerBudget.MEDIAN_PCT);
+            assertThat(step.advantage()).isZero();
+        });
+        assertThat(country.rolls())
+                .flatExtracting(RollRecord::modifiers)
+                .extracting(AppliedModifier::descriptionKey)
+                .doesNotContain(PowerBudget.DESCRIPTION_KEY);
+    }
+
+    @Test
+    void weakCountryIsShiftedUpUntilItReturnsToCorridor() {
+        // Площа, населення, розвиненість, ВВП, ІЛР — якість 10 (20% медіани), армія й ядерний статус — 50.
+        // Коридор 50..200%: 30 п. п. нижче → +15; далі сила 33% → +8, 42% → +4, 50% → у коридорі.
+        StartCountry country = generate(WEAK, 6);
+
+        assertThat(country.power().corridor()).isEqualTo(PowerCorridor.DEFAULT);
+        assertThat(country.power().npc()).isFalse();
+        assertThat(country.power().steps())
+                .containsExactly(
+                        new PowerStep(PowerComponent.AREA, 10, 20, 15),
+                        new PowerStep(PowerComponent.POPULATION, 10, 20, 15),
+                        new PowerStep(PowerComponent.DEVELOPMENT, 10, 20, 15),
+                        new PowerStep(PowerComponent.GDP, 10, 20, 15),
+                        new PowerStep(PowerComponent.HDI, 10, 20, 15),
+                        new PowerStep(PowerComponent.ARMY_SIZE, 50, 33, 8),
+                        new PowerStep(PowerComponent.ARMY_TRAINING, 50, 42, 4),
+                        new PowerStep(PowerComponent.NUCLEAR, 50, 50, 0));
+        assertShift(country.population().rolls(), 15);
+        assertShift(country.development().rolls(), 15);
+        assertShift(country.gdp().rolls(), 15);
+        assertShift(country.hdi().rolls(), 15);
+        assertShift(country.armySize().rolls(), 15);
+        assertShift(country.armyTraining().rolls(), 8);
+        assertShift(country.nuclear().rolls().subList(0, 1), 4);
+    }
+
+    @Test
+    void shiftActsOnlyOnGenerationWheels() {
+        StartCountry country = generate(WEAK, 7);
+
+        assertThat(country.modifiers())
+                .extracting(modifier -> modifier.source().kind())
+                .doesNotContain(SourceKind.POWER_BUDGET);
+        assertThat(country.regime().rolls())
+                .flatExtracting(RollRecord::modifiers)
+                .extracting(AppliedModifier::descriptionKey)
+                .doesNotContain(PowerBudget.DESCRIPTION_KEY);
+    }
+
+    @Test
+    void corridorAndNpcComeFromInput() {
+        WorldMap world = TestChain.world(WEAK);
+        int npc = world.countries() - 1;
+        CountryGenerationInput input = new CountryGenerationInput(
+                world, npc, TestChain.religions(WEAK), PowerCorridor.FULL_CHAOS, new TreeSet<>(), new TreeSet<>());
+
+        StartCountry country = CountryGenerator.generate(Rng.of(8), WEAK, input);
+
+        assertThat(TestChain.input(WEAK, 0).npc()).isFalse();
+        assertThat(input.npc()).isTrue();
+        assertThat(country.power().corridor()).isEqualTo(PowerCorridor.FULL_CHAOS);
+        assertThat(country.power().npc()).isTrue();
+    }
+
+    /** Кожне обертання має зсув коридору сили {@code value} з поясненням для свого типу колеса. */
+    private static void assertShift(List<RollRecord> rolls, int value) {
+        assertThat(rolls)
+                .isNotEmpty()
+                .allSatisfy(roll -> assertThat(roll.modifiers())
+                        .contains(new AppliedModifier(
+                                "power_corridor:" + roll.kind().id(), PowerBudget.DESCRIPTION_KEY, value)));
     }
 
     private static StartCountry generate(ContentPack pack, long seed) {

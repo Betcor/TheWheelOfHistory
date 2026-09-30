@@ -67,7 +67,7 @@ final class CountryCommand {
             throw new UsageException(
                     "error.usage.no_such_country", options.country(), map.countries(), map.countries() - 1);
         }
-        StartWorld world = WorldGenerator.generate(rng, content, map);
+        StartWorld world = WorldGenerator.generate(rng, content, map, options.corridor());
         return new Result(content, world, options.country());
     }
 

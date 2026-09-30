@@ -245,6 +245,19 @@ final class Files {
               - id: full_chaos
                 players: { min_pct: 20, max_pct: 500 }
                 npc: { min_pct: 10, max_pct: 1000 }
+            power_budget:
+              median_quality: 50
+              weights:
+                area: 2
+                population: 2
+                development: 2
+                gdp: 3
+                hdi: 1
+                army_size: 1
+                army_training: 1
+                nuclear: 1
+              advantage_pct: 50
+              max_advantage: 30
             generation:
               backstory_fragments: { min: 2, max: 4 }
               notable_people: { min: 1, max: 3 }

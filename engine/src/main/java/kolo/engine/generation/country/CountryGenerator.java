@@ -1,12 +1,14 @@
 package kolo.engine.generation.country;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeSet;
 import kolo.engine.content.AreaLevelDef;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.PowerComponent;
 import kolo.engine.content.StreakKind;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
@@ -17,7 +19,9 @@ import kolo.engine.generation.map.WorldMap;
 import kolo.engine.modifier.Modifier;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.FateTokens;
+import kolo.engine.state.TechBranch;
 import kolo.engine.wheel.RollRecord;
+import kolo.engine.wheel.WheelKind;
 
 /**
  * Ланцюжок коліс генерації держави (GD §4.1).
@@ -35,7 +39,11 @@ import kolo.engine.wheel.RollRecord;
  * нагорода діє на наступні колеса: мітки — на передісторію й людей, модифікатори — на перевагу, додаткові постаті — на
  * колесо людей. Жетони долі нагород складаються й обрізаються до {@link FateTokens#MAX}.
  *
- * <p>Модифікатори фрагментів передісторії стають модифікаторами держави. Бюджет сили (GD §4.11) — окремим кроком.
+ * <p>Бюджет сили (GD §4.11, {@link PowerBudget}): після кожного колеса площі, населення, розвиненості, ВВП, ІЛР,
+ * армії й ядерного статусу проміжна сила перераховується; якщо вона поза коридором хоста, наступні з цих коліс
+ * отримують перевагу до середини. Зсув — лише для коліс генерації, у модифікатори держави не йде.
+ *
+ * <p>Модифікатори фрагментів передісторії стають модифікаторами держави.
  */
 public final class CountryGenerator {
 
@@ -54,7 +62,7 @@ public final class CountryGenerator {
         Objects.requireNonNull(rng, "rng");
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(input, "input");
-        Chain chain = new Chain(rng, content);
+        Chain chain = new Chain(rng, content, PowerBudget.start(input.corridor(), input.npc()));
         WorldMap map = input.map();
 
         PlacedCountry territory = input.territory();
@@ -66,12 +74,19 @@ public final class CountryGenerator {
                         ErrorDetails.of(
                                 "field", "area", "value", territory.area().value())));
         chain.rated(territory.tags(), area.quality(), territory.rolls());
+        chain.power(PowerComponent.AREA, area.quality());
         StartGeography geography =
                 Geography.generate(content, territory.cells(), map.sea(), map.climate(), map.fertility());
         chain.tags.addAll(geography.tags());
         StartPopulation population = PopulationWheel.generate(
-                rng.fork("population"), content, chain.modifiers(), territory.area(), geography, map.fertility());
+                rng.fork("population"),
+                content,
+                chain.modifiers(PopulationWheel.KIND),
+                territory.area(),
+                geography,
+                map.fertility());
         chain.rated(population.tags(), population.quality(), population.rolls());
+        chain.power(PowerComponent.POPULATION, population.quality());
 
         Regime regime = RegimeWheel.generate(rng.fork("regime"), content);
         chain.neutral(regime.tags(), regime.modifiers(), regime.rolls());
@@ -79,25 +94,37 @@ public final class CountryGenerator {
                 StateReligionWheel.generate(rng.fork("religion"), content, chain.tags, input.religions());
         chain.neutral(religion.tags(), religion.modifiers(), religion.rolls());
 
-        StartDevelopment development =
-                DevelopmentWheel.generate(rng.fork("development"), content, chain.modifiers(), population);
+        StartDevelopment development = DevelopmentWheel.generate(
+                rng.fork("development"),
+                content,
+                chain.modifiers(Arrays.stream(TechBranch.values())
+                        .map(DevelopmentWheel::kind)
+                        .toArray(WheelKind[]::new)),
+                population);
         chain.rated(development.tags(), development.quality(), development.rolls());
-        StartGdp gdp =
-                GdpWheel.generate(rng.fork("gdp"), content, chain.modifiers(), development, population, geography);
+        chain.power(PowerComponent.DEVELOPMENT, development.quality());
+        StartGdp gdp = GdpWheel.generate(
+                rng.fork("gdp"), content, chain.modifiers(GdpWheel.KIND), development, population, geography);
         chain.rated(gdp.tags(), gdp.quality(), gdp.rolls());
-        StartHdi hdi = HdiWheel.generate(rng.fork("hdi"), content, chain.modifiers(), gdp);
+        chain.power(PowerComponent.GDP, gdp.quality());
+        StartHdi hdi = HdiWheel.generate(rng.fork("hdi"), content, chain.modifiers(HdiWheel.KIND), gdp);
         chain.rated(hdi.tags(), hdi.quality(), hdi.rolls());
-        StartArmySize armySize = ArmySizeWheel.generate(rng.fork("army_size"), content, chain.modifiers(), gdp);
+        chain.power(PowerComponent.HDI, hdi.quality());
+        StartArmySize armySize =
+                ArmySizeWheel.generate(rng.fork("army_size"), content, chain.modifiers(ArmySizeWheel.KIND), gdp);
         chain.rated(armySize.tags(), armySize.quality(), armySize.rolls());
-        StartArmyTraining armyTraining =
-                ArmyTrainingWheel.generate(rng.fork("army_training"), content, chain.modifiers(), gdp, development);
+        chain.power(PowerComponent.ARMY_SIZE, armySize.quality());
+        StartArmyTraining armyTraining = ArmyTrainingWheel.generate(
+                rng.fork("army_training"), content, chain.modifiers(ArmyTrainingWheel.KIND), gdp, development);
         chain.rated(armyTraining.tags(), armyTraining.quality(), armyTraining.rolls());
+        chain.power(PowerComponent.ARMY_TRAINING, armyTraining.quality());
         StartResources resources =
                 ResourceWheel.generate(rng.fork("resources"), content, map.suitability(), territory.cells());
         chain.rolls.addAll(resources.rolls());
         StartNuclear nuclear = NuclearWheel.generate(
-                rng.fork("nuclear"), content, chain.modifiers(), development, resources.resources());
+                rng.fork("nuclear"), content, chain.modifiers(NuclearWheel.KIND), development, resources.resources());
         chain.rated(nuclear.tags(), nuclear.quality(), nuclear.rolls());
+        chain.power(PowerComponent.NUCLEAR, nuclear.quality());
 
         Backstory backstory = BackstoryWheel.generate(rng.fork("backstory"), content, chain.tags, input.neighbors());
         chain.rolls.addAll(backstory.rolls());
@@ -129,6 +156,7 @@ public final class CountryGenerator {
                 nuclear,
                 backstory,
                 chain.streaks,
+                chain.power,
                 name,
                 people,
                 chain.tags,
@@ -147,15 +175,23 @@ public final class CountryGenerator {
         private final List<RollRecord> rolls = new ArrayList<>();
         private final List<StreakBonus> streaks = new ArrayList<>();
         private Streaks counter = Streaks.START;
+        private PowerBudget power;
 
-        Chain(Rng rng, ContentPack content) {
+        Chain(Rng rng, ContentPack content, PowerBudget power) {
             this.rng = rng;
             this.content = content;
+            this.power = power;
         }
 
-        /** Модифікатори, що діють на наступне колесо. */
-        List<Modifier> modifiers() {
-            return List.copyOf(modifiers);
+        /** Модифікатори, що діють на наступне колесо {@code kinds}: держави й зсув коридору сили. */
+        List<Modifier> modifiers(WheelKind... kinds) {
+            List<Modifier> result = new ArrayList<>(modifiers);
+            result.addAll(power.modifiers(List.of(kinds)));
+            return List.copyOf(result);
+        }
+
+        void power(PowerComponent component, int quality) {
+            power = power.add(content.balance(), component, quality);
         }
 
         /** Колесо, що не рахується в стріки. */

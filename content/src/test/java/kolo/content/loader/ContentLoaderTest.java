@@ -58,6 +58,8 @@ import kolo.engine.content.PlacementDef;
 import kolo.engine.content.PopulationDef;
 import kolo.engine.content.PopulationLevelDef;
 import kolo.engine.content.PopulationLevelId;
+import kolo.engine.content.PowerBudgetDef;
+import kolo.engine.content.PowerComponent;
 import kolo.engine.content.ReliefDef;
 import kolo.engine.content.ReliefLevelDef;
 import kolo.engine.content.ReligionBalanceDef;
@@ -2294,6 +2296,50 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replaceAll("(?s)  - id: full_chaos.*?max_pct: 1000 }\n", "")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "power_corridors", "cause", "missing_definition", "value", "full_chaos"));
+        assertContentError(
+                balance(Files.BALANCE.replaceAll("(?s)power_budget:.*?max_advantage: 30\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_budget", "cause", "blank_value"));
+        assertContentError(
+                balance(Files.BALANCE.replace("    hdi: 1\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_budget.weights", "cause", "missing_definition", "value", "hdi"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  advantage_pct: 50\n", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_budget", "cause", "blank_value"));
+    }
+
+    @Test
+    void loadsPowerBudget() {
+        PowerBudgetDef power =
+                ContentLoader.load(Files.valid().source()).balance().power();
+
+        assertThat(power.medianQuality()).isEqualTo(50);
+        assertThat(power.weight(PowerComponent.GDP)).isEqualTo(3);
+        assertThat(power.weight(PowerComponent.NUCLEAR)).isEqualTo(1);
+        assertThat(power.advantagePct()).isEqualTo(50);
+        assertThat(power.maxAdvantage()).isEqualTo(30);
+    }
+
+    @Test
+    void invalidPowerBudgetIsRejected() {
+        assertContentError(
+                balance(Files.BALANCE.replace("    area: 2\n", "    area: 2\n    luck: 1\n")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_budget.weights.luck", "cause", "unknown_reference", "value", "luck"));
+        assertContentError(
+                balance(Files.BALANCE.replace("    gdp: 3\n", "    gdp: 101\n")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_budget", "field", "power_budget.weights.gdp"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  median_quality: 50", "  median_quality: 100")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_budget", "field", "power_budget.median_quality"));
+        assertContentError(
+                balance(Files.BALANCE.replace("  max_advantage: 30", "  max_advantage: 0")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "power_budget", "field", "power_budget.max_advantage"));
     }
 
     @Test

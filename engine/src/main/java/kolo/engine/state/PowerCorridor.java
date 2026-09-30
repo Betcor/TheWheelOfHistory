@@ -15,6 +15,9 @@ public enum PowerCorridor {
     /** «Повний хаос»: найширший коридор. */
     FULL_CHAOS;
 
+    /** Варіант, якщо хост нічого не обрав. */
+    public static final PowerCorridor DEFAULT = CLASSIC;
+
     /** Ключ у контенті, напр. {@code full_chaos}. */
     public String key() {
         // Locale.ROOT: інакше в турецькій локалі «I» перетворюється на «ı».
