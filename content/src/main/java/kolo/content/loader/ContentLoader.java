@@ -23,6 +23,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import kolo.engine.content.ArchetypeDef;
 import kolo.engine.content.ArchetypeId;
+import kolo.engine.content.AreaLevelDef;
+import kolo.engine.content.AreaLevelId;
 import kolo.engine.content.ArmySizeDef;
 import kolo.engine.content.ArmySizeId;
 import kolo.engine.content.AspectDef;
@@ -72,6 +74,7 @@ import kolo.engine.content.NameStyleId;
 import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.PersonNameStyleDef;
+import kolo.engine.content.PlacementDef;
 import kolo.engine.content.PowerCorridorDef;
 import kolo.engine.content.ReliefDef;
 import kolo.engine.content.ReliefLevelDef;
@@ -206,8 +209,11 @@ public final class ContentLoader {
         NameContent names = names(parse(files, NAMES, ContentYaml.NamesFile.class), ideologies);
         StreakContent streaks = streaks(parse(files, STREAKS, ContentYaml.StreaksFile.class));
         ReligionContent religions = religions(parse(files, RELIGIONS, ContentYaml.ReligionsFile.class), ideologies);
+        // Карта — раніше за передісторію: рівні площі дають мітки, на які посилаються фрагменти.
+        MapContent map = map(parse(files, MAP, ContentYaml.MapFile.class));
         BackstoryContent backstory = backstory(
                 parse(files, BACKSTORY, ContentYaml.BackstoryFile.class),
+                map,
                 streaks,
                 religions,
                 ideologies,
@@ -218,8 +224,8 @@ public final class ContentLoader {
                 army,
                 training);
         checkPersonKindTags(
-                kinds, knownTags(backstory, streaks, religions, ideologies, levels, nuclear, gdp, hdi, army, training));
-        MapContent map = map(parse(files, MAP, ContentYaml.MapFile.class));
+                kinds,
+                knownTags(backstory, map, streaks, religions, ideologies, levels, nuclear, gdp, hdi, army, training));
         BalanceDef balance = balance(parse(files, BALANCE, ContentYaml.BalanceFile.class));
 
         // Повтори, пропуски й порожні колекції вже відловлено по файлах, з місцем помилки; тут — лише збирання.
@@ -801,11 +807,12 @@ public final class ContentLoader {
     }
 
     /**
-     * @param streaks уже завантажені колеса стріків, шаблон релігій, ідеології, рівні розвиненості, ядерні статуси,
-     *     рівні ВВП, ІЛР, розміру й вишколу армії: їхні мітки — джерела міток в умовах фрагментів
+     * @param map уже завантажені карта (рівні площі), колеса стріків, шаблон релігій, ідеології, рівні розвиненості,
+     *     ядерні статуси, рівні ВВП, ІЛР, розміру й вишколу армії: їхні мітки — джерела міток в умовах фрагментів
      */
     private static BackstoryContent backstory(
             ContentYaml.BackstoryFile yaml,
+            MapContent map,
             StreakContent streaks,
             ReligionContent religions,
             List<IdeologyDef> ideologies,
@@ -827,7 +834,7 @@ public final class ContentLoader {
 
         // Мітки в умовах мають джерело; перевіряється тут, щоб помилка вказувала на фрагмент.
         TreeSet<String> known =
-                knownTags(content, streaks, religions, ideologies, levels, nuclear, gdp, hdi, army, training);
+                knownTags(content, map, streaks, religions, ideologies, levels, nuclear, gdp, hdi, army, training);
         for (int i = 0; i < fragments.size(); i++) {
             for (String tag : fragments.get(i).referencedTags()) {
                 if (!known.contains(tag)) {
@@ -839,11 +846,12 @@ public final class ContentLoader {
     }
 
     /**
-     * Мітки, які може мати держава після генерації: з ладу, релігії, рівнів коліс генерації, фрагментів передісторії,
-     * коліс стріків і словника міток коліс генерації.
+     * Мітки, які може мати держава після генерації: з ладу, релігії, рівнів коліс генерації (зокрема площі),
+     * фрагментів передісторії, коліс стріків і словника міток коліс генерації.
      */
     private static TreeSet<String> knownTags(
             BackstoryContent backstory,
+            MapContent map,
             StreakContent streaks,
             ReligionContent religions,
             List<IdeologyDef> ideologies,
@@ -863,6 +871,7 @@ public final class ContentLoader {
         hdi.forEach(level -> known.addAll(level.tags()));
         army.forEach(size -> known.addAll(size.tags()));
         training.forEach(level -> known.addAll(level.tags()));
+        known.addAll(map.placement().producedTags());
         return known;
     }
 
@@ -1326,7 +1335,53 @@ public final class ContentLoader {
         SeaDef sea = at(MAP, "sea", () -> sea(yaml.sea()));
         RiverDef rivers = at(MAP, "rivers", () -> rivers(yaml.rivers()));
         FertilityDef fertility = fertility(yaml.fertility());
-        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate, sea, rivers, fertility));
+        PlacementDef placement = placement(yaml.placement());
+        return at(
+                MAP,
+                "",
+                () -> new MapContent(templates, grid, continents, relief, climate, sea, rivers, fertility, placement));
+    }
+
+    private static PlacementDef placement(ContentYaml.Placement placement) {
+        at(MAP, "placement", () -> {
+            if (placement == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "placement"));
+            }
+            return placement;
+        });
+        TreeSet<AreaLevelId> ids = new TreeSet<>();
+        List<AreaLevelDef> areas =
+                list(MAP, "placement.areas", nonEmpty(MAP, "placement.areas", placement.areas()), (location, area) -> {
+                    AreaLevelId id = at(MAP, location, () -> unique(ids, new AreaLevelId(area.id())));
+                    return at(
+                            MAP,
+                            location,
+                            () -> new AreaLevelDef(
+                                    id,
+                                    area.name(),
+                                    area.description(),
+                                    required("share_pct", area.sharePct()),
+                                    required("weight", area.weight()),
+                                    required("quality", area.quality()),
+                                    area.tags()));
+                });
+        // Порядок перевіряється тут, щоб помилка вказувала на рівень, що стоїть не на своєму місці.
+        for (int i = 1; i < areas.size(); i++) {
+            AreaLevelDef previous = areas.get(i - 1);
+            AreaLevelDef next = areas.get(i);
+            at(MAP, "placement.areas[" + i + "]", () -> {
+                AreaLevelDef.checkFollows(previous, next);
+                return next;
+            });
+        }
+        return at(
+                MAP,
+                "placement",
+                () -> new PlacementDef(
+                        areas,
+                        required("min_provinces", placement.minProvinces()),
+                        required("roughness", placement.roughness()),
+                        required("noise_cells", placement.noiseCells())));
     }
 
     private static ClimateDef climate(ContentYaml.Climate climate) {

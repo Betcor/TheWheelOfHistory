@@ -632,7 +632,8 @@ final class ContentYaml {
             Climate climate,
             Sea sea,
             Rivers rivers,
-            Fertility fertility) {
+            Fertility fertility,
+            Placement placement) {
         MapFile {
             templates = orEmpty(templates);
         }
@@ -668,6 +669,30 @@ final class ContentYaml {
         Fertility {
             climates = climates == null ? Map.of() : climates;
             terrains = terrains == null ? Map.of() : terrains;
+        }
+    }
+
+    record Placement(
+            @JsonProperty("min_provinces") Integer minProvinces,
+            Integer roughness,
+            @JsonProperty("noise_cells") Integer noiseCells,
+            List<AreaLevel> areas) {
+        Placement {
+            areas = orEmpty(areas);
+        }
+    }
+
+    /** @param sharePct площа у відсотках середньої держави */
+    record AreaLevel(
+            String id,
+            String name,
+            String description,
+            @JsonProperty("share_pct") Integer sharePct,
+            Integer weight,
+            Integer quality,
+            List<String> tags) {
+        AreaLevel {
+            tags = orEmpty(tags);
         }
     }
 

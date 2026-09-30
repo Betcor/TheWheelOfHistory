@@ -314,6 +314,24 @@ final class Files {
               terrains: { plain: 5, hills: 0, mountains: -40, forest: -10, desert: -30, tundra: -20, swamp: -15 }
               moisture_pct: 30
               river: 15
+            placement:
+              min_provinces: 4
+              roughness: 30
+              noise_cells: 5
+              areas:
+                - id: small
+                  name: Мала держава
+                  description: Менша за сусідів.
+                  share_pct: 60
+                  weight: 30
+                  quality: 30
+                  tags: [tiny_land]
+                - id: large
+                  name: Велика держава
+                  description: Більша за сусідів.
+                  share_pct: 150
+                  weight: 20
+                  quality: 70
             relief:
               ridges: { min: 1, max: 3 }
               ridge_min_provinces: 40

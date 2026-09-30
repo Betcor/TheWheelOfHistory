@@ -11,8 +11,8 @@ import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 
 /**
- * Контент карти (GD §3.3–3.5): шаблони, сітка комірок, материки, рельєф, клімат, море, річки й родючість; родовища додадуться з
- * генератором карти.
+ * Контент карти (GD §3.3–3.6): шаблони, сітка комірок, материки, рельєф, клімат, море, річки, родючість і розміщення
+ * держав. Придатність до родовищ — у ресурсах ({@link ResourceDef#deposits()}).
  */
 public final class MapContent {
 
@@ -25,6 +25,7 @@ public final class MapContent {
     private final SeaDef sea;
     private final RiverDef rivers;
     private final FertilityDef fertility;
+    private final PlacementDef placement;
 
     /**
      * @param templates шаблони в порядку контенту (порядок секторів колеса шаблону)
@@ -35,6 +36,7 @@ public final class MapContent {
      * @param sea числа генерації моря й морських зон
      * @param rivers числа генерації річок
      * @param fertility таблиця родючості провінцій
+     * @param placement рівні площі й числа розміщення держав
      * @throws ValidationException якщо шаблонів немає або id повторюється
      */
     public MapContent(
@@ -45,7 +47,8 @@ public final class MapContent {
             ClimateDef climate,
             SeaDef sea,
             RiverDef rivers,
-            FertilityDef fertility) {
+            FertilityDef fertility,
+            PlacementDef placement) {
         if (templates.isEmpty()) {
             throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", "map_templates"));
         }
@@ -66,6 +69,7 @@ public final class MapContent {
         this.sea = Objects.requireNonNull(sea, "sea");
         this.rivers = Objects.requireNonNull(rivers, "rivers");
         this.fertility = Objects.requireNonNull(fertility, "fertility");
+        this.placement = Objects.requireNonNull(placement, "placement");
     }
 
     /** Шаблони в порядку контенту — порядок секторів колеса шаблону. */
@@ -103,5 +107,9 @@ public final class MapContent {
 
     public FertilityDef fertility() {
         return fertility;
+    }
+
+    public PlacementDef placement() {
+        return placement;
     }
 }
