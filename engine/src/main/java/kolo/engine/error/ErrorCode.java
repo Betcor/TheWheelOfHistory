@@ -94,6 +94,14 @@ public enum ErrorCode {
      */
     CONTENT_MALFORMED(ContentException.class),
     SAVE_FILE_ERROR(SaveFileException.class),
+    /**
+     * Снапшот світу пошкоджений: не валідний JSON, не та структура, значення поза межами, порушено інваріант, не
+     * канонічний запис або снапшот стану не від цієї карти. Подробиці: {@code part} ({@code map} чи {@code state}),
+     * {@code location} (шлях усередині снапшота), {@code problem} (опис для розробника, не для гравця) або {@code
+     * cause} (код первинної помилки) з її подробицями.
+     */
+    SAVE_MALFORMED(SaveFileException.class),
+    /** Файл світу створено новішою версією гри. Подробиці: {@code version}, {@code supported}. */
     SAVE_VERSION_TOO_NEW(SaveVersionException.class),
     INVARIANT_VIOLATION(InvariantViolationException.class);
 
