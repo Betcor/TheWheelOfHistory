@@ -546,7 +546,8 @@ final class ContentYaml {
             Generation generation,
             Religion religion,
             World world,
-            Resources resources) {
+            Resources resources,
+            @JsonProperty("power_budget") PowerBudget powerBudget) {
         BalanceFile {
             powerCorridors = orEmpty(powerCorridors);
         }
@@ -628,6 +629,17 @@ final class ContentYaml {
     record ResourceCount(@JsonProperty("max_provinces") Integer maxProvinces, Integer min, Integer max) {}
 
     record Count(Integer min, Integer max) {}
+
+    /** @param weights ключ складника → вага */
+    record PowerBudget(
+            @JsonProperty("median_quality") Integer medianQuality,
+            Map<String, Integer> weights,
+            @JsonProperty("advantage_pct") Integer advantagePct,
+            @JsonProperty("max_advantage") Integer maxAdvantage) {
+        PowerBudget {
+            weights = weights == null ? Map.of() : weights;
+        }
+    }
 
     /** @param npcExtra ключ частки NPC ({@code few}, {@code normal}, {@code many}) → діапазон колеса */
     record World(

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.WorldLimits;
 
 /**
@@ -13,17 +14,26 @@ import kolo.engine.state.WorldLimits;
  * @param seed seed світу: з нього — карта, релігії світу й усі держави
  * @param players скільки гравців у світі, {@value WorldLimits#MIN_PLAYERS}..{@value WorldLimits#MAX_PLAYERS}
  * @param npcShare частка NPC-держав, яку задав би хост
+ * @param corridor коридор бюджету сили, який задав би хост
  * @param country номер держави, чию картку друкувати; чи є така в світі, видно лише після генерації карти
  * @param rolls чи друкувати всі обертання коліс
  * @param content каталог з YAML-файлами контенту; порожньо — вбудований контент
  */
-record CountryOptions(long seed, int players, NpcShare npcShare, int country, boolean rolls, Optional<Path> content) {
+record CountryOptions(
+        long seed,
+        int players,
+        NpcShare npcShare,
+        PowerCorridor corridor,
+        int country,
+        boolean rolls,
+        Optional<Path> content) {
 
     static final int DEFAULT_PLAYERS = 1;
     static final NpcShare DEFAULT_NPC_SHARE = NpcShare.NORMAL;
 
     CountryOptions {
         Objects.requireNonNull(npcShare, "npcShare");
+        Objects.requireNonNull(corridor, "corridor");
         Objects.requireNonNull(content, "content");
     }
 
@@ -36,6 +46,7 @@ record CountryOptions(long seed, int players, NpcShare npcShare, int country, bo
         Long seed = null;
         Integer players = null;
         NpcShare npcShare = null;
+        PowerCorridor corridor = null;
         Integer country = null;
         boolean rolls = false;
         Path content = null;
@@ -54,6 +65,10 @@ record CountryOptions(long seed, int players, NpcShare npcShare, int country, bo
                 case "--npc" -> {
                     once(option, npcShare);
                     npcShare = npcShare(value(args, ++i, option));
+                }
+                case "--corridor" -> {
+                    once(option, corridor);
+                    corridor = corridor(value(args, ++i, option));
                 }
                 case "--country" -> {
                     once(option, country);
@@ -79,6 +94,7 @@ record CountryOptions(long seed, int players, NpcShare npcShare, int country, bo
                 seed,
                 players == null ? DEFAULT_PLAYERS : players,
                 npcShare == null ? DEFAULT_NPC_SHARE : npcShare,
+                corridor == null ? PowerCorridor.DEFAULT : corridor,
                 country == null ? 0 : country,
                 rolls,
                 Optional.ofNullable(content));
@@ -91,6 +107,15 @@ record CountryOptions(long seed, int players, NpcShare npcShare, int country, bo
             }
         }
         throw new UsageException("error.usage.unknown_npc_share", value);
+    }
+
+    private static PowerCorridor corridor(String value) {
+        for (PowerCorridor corridor : PowerCorridor.values()) {
+            if (corridor.key().equals(value)) {
+                return corridor;
+            }
+        }
+        throw new UsageException("error.usage.unknown_corridor", value);
     }
 
     private static void once(String option, Object current) {

@@ -51,6 +51,7 @@ import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TestMaps;
+import kolo.engine.content.TestPower;
 import kolo.engine.content.TestReligions;
 import kolo.engine.content.TestResources;
 import kolo.engine.content.TrainingLevelDef;
@@ -325,7 +326,8 @@ public final class TestNames {
                         0),
                 religionBalance,
                 world,
-                resourceBalance);
+                resourceBalance,
+                TestPower.BUDGET);
     }
 
     private static BackstoryContent backstory() {

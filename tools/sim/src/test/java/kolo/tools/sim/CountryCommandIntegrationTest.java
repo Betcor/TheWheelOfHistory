@@ -19,6 +19,7 @@ import kolo.engine.generation.world.StartWorld;
 import kolo.engine.generation.world.WorldGenerator;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.CountryId;
+import kolo.engine.state.PowerCorridor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -62,6 +63,26 @@ class CountryCommandIntegrationTest {
         assertThat(card(options(7)))
                 .anySatisfy(line -> assertThat(line)
                         .contains(expected.country(0).name().name().fullName().nominative()));
+    }
+
+    @Test
+    void corridorReachesEveryCountryAndTheCard() {
+        CountryOptions options = options(7, "--corridor", "equal_chances");
+        CountryCommand.Result result = CountryCommand.generate(PACK, options);
+
+        assertThat(result.countries())
+                .allSatisfy(country -> assertThat(country.power().corridor()).isEqualTo(PowerCorridor.EQUAL_CHANCES));
+        assertThat(result.world())
+                .isEqualTo(WorldGenerator.generate(
+                        Rng.of(7),
+                        PACK,
+                        WorldSizeInput.of(CountryOptions.DEFAULT_PLAYERS, CountryOptions.DEFAULT_NPC_SHARE),
+                        PowerCorridor.EQUAL_CHANCES));
+        assertThat(CountryCommand.render(result, options))
+                .anySatisfy(line -> assertThat(line)
+                        .startsWith("Сила: " + result.country().power().strengthPct() + "% медіани")
+                        .contains("рівні шанси")
+                        .contains("75–133%"));
     }
 
     @Test

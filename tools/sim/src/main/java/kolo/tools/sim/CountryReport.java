@@ -9,7 +9,9 @@ import java.util.Optional;
 import java.util.SortedSet;
 import java.util.stream.Collectors;
 import kolo.engine.content.ContentPack;
+import kolo.engine.content.MedianRange;
 import kolo.engine.generation.country.BackstoryEntry;
+import kolo.engine.generation.country.PowerBudget;
 import kolo.engine.generation.country.StartCountry;
 import kolo.engine.generation.country.StartDevelopment;
 import kolo.engine.generation.country.StartGeography;
@@ -117,6 +119,7 @@ final class CountryReport {
         nuclear();
         add("country.fate_tokens", country.fateTokens());
         streaks();
+        power();
         backstory();
         people();
         lines.add("");
@@ -310,6 +313,27 @@ final class CountryReport {
                 "country.neighbor",
                 number,
                 countries.get(number).name().name().shortName().nominative());
+    }
+
+    private void power() {
+        PowerBudget power = country.power();
+        MedianRange range = power.range(content.balance());
+        add(
+                "country.power",
+                power.strengthPct(),
+                text("corridor." + power.corridor().key()),
+                text(power.npc() ? "country.power_npc" : "country.power_player"),
+                range.minPct(),
+                range.maxPct());
+        String steps = power.steps().stream()
+                .map(step -> text(
+                        "country.power_step",
+                        step.component().key(),
+                        step.quality(),
+                        step.strengthPct(),
+                        signed(step.advantage())))
+                .collect(Collectors.joining("; "));
+        add("country.power_steps", steps);
     }
 
     private void rolls() {

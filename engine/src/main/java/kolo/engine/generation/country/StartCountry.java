@@ -22,6 +22,7 @@ import kolo.engine.wheel.RollRecord;
  * @param religion державна релігія або світська держава (колесо 6а)
  * @param resources родовища (13)
  * @param streaks нагороди стріків у порядку спрацювання; кожен вид — щонайбільше раз
+ * @param power бюджет сили (GD §4.11): сила після кожного складника й зсуви коридору
  * @param people відомі люди разом із додатковими постатями нагород стріків
  * @param tags усі мітки держави: площі, географії, населення, ладу, релігії, рівнів коліс, стріків і передісторії
  * @param modifiers модифікатори держави в порядку набуття: лад, релігія, стріки, передісторія
@@ -44,6 +45,7 @@ public record StartCountry(
         StartNuclear nuclear,
         Backstory backstory,
         List<StreakBonus> streaks,
+        PowerBudget power,
         StartName name,
         StartPeople people,
         SortedSet<String> tags,
@@ -69,6 +71,7 @@ public record StartCountry(
         Objects.requireNonNull(nuclear, "nuclear");
         Objects.requireNonNull(backstory, "backstory");
         streaks = List.copyOf(streaks);
+        Objects.requireNonNull(power, "power");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(people, "people");
         tags = Collections.unmodifiableSortedSet(new TreeSet<>(tags));

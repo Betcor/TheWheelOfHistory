@@ -24,6 +24,7 @@ import kolo.engine.modifier.Modifier;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.FateTokens;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.WorldLimits;
 import org.junit.jupiter.api.Test;
 
@@ -57,8 +58,8 @@ class BundledCountryGeneratorIntegrationTest {
                 TreeSet<String> countryNames = new TreeSet<>();
                 TreeSet<String> personNames = new TreeSet<>();
                 for (int n = 0; n < map.countries(); n++) {
-                    CountryGenerationInput input =
-                            new CountryGenerationInput(map, n, religions, countryNames, personNames);
+                    CountryGenerationInput input = new CountryGenerationInput(
+                            map, n, religions, PowerCorridor.DEFAULT, countryNames, personNames);
                     StartCountry country =
                             CountryGenerator.generate(worldRng.fork("run:" + run + ":country:" + n), PACK, input);
 

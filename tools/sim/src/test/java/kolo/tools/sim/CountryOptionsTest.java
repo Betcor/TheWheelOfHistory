@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Path;
 import java.util.List;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.WorldLimits;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,7 @@ class CountryOptionsTest {
         assertThat(options.seed()).isEqualTo(42);
         assertThat(options.players()).isEqualTo(CountryOptions.DEFAULT_PLAYERS);
         assertThat(options.npcShare()).isEqualTo(NpcShare.NORMAL);
+        assertThat(options.corridor()).isEqualTo(PowerCorridor.CLASSIC);
         assertThat(options.country()).isZero();
         assertThat(options.rolls()).isFalse();
         assertThat(options.content()).isEmpty();
@@ -26,11 +28,24 @@ class CountryOptionsTest {
     @Test
     void readsEveryOptionInAnyOrder() {
         CountryOptions options = CountryOptions.parse(List.of(
-                "--rolls", "--npc", "many", "--content", "mods/x", "--country", "3", "--players", "4", "--seed", "-7"));
+                "--rolls",
+                "--npc",
+                "many",
+                "--content",
+                "mods/x",
+                "--corridor",
+                "full_chaos",
+                "--country",
+                "3",
+                "--players",
+                "4",
+                "--seed",
+                "-7"));
 
         assertThat(options.seed()).isEqualTo(-7);
         assertThat(options.players()).isEqualTo(4);
         assertThat(options.npcShare()).isEqualTo(NpcShare.MANY);
+        assertThat(options.corridor()).isEqualTo(PowerCorridor.FULL_CHAOS);
         assertThat(options.country()).isEqualTo(3);
         assertThat(options.rolls()).isTrue();
         assertThat(options.content()).contains(Path.of("mods/x"));
@@ -68,6 +83,8 @@ class CountryOptionsTest {
         assertUsage(List.of("--seed", "1", "--country", "40"), "error.usage.out_of_range");
         assertUsage(List.of("--seed", "1", "--npc", "lots"), "error.usage.unknown_npc_share");
         assertUsage(List.of("--seed", "1", "--npc", "NORMAL"), "error.usage.unknown_npc_share");
+        assertUsage(List.of("--seed", "1", "--corridor", "chaos"), "error.usage.unknown_corridor");
+        assertUsage(List.of("--seed", "1", "--corridor", "CLASSIC"), "error.usage.unknown_corridor");
     }
 
     @Test
@@ -83,6 +100,9 @@ class CountryOptionsTest {
         assertUsage(List.of("--seed", "1", "--seed", "2"), "error.usage.duplicate_option");
         assertUsage(List.of("--seed", "1", "--rolls", "--rolls"), "error.usage.duplicate_option");
         assertUsage(List.of("--seed", "1", "--npc", "few", "--npc", "many"), "error.usage.duplicate_option");
+        assertUsage(
+                List.of("--seed", "1", "--corridor", "classic", "--corridor", "classic"),
+                "error.usage.duplicate_option");
         assertUsage(List.of("--seed", "1", "--country", "1", "--country", "2"), "error.usage.duplicate_option");
         assertUsage(List.of("--seed", "1", "--players", "1", "--players", "2"), "error.usage.duplicate_option");
         assertUsage(List.of("--seed", "1", "--countries", "20"), "error.usage.unknown_option");

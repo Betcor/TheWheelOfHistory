@@ -82,6 +82,8 @@ import kolo.engine.content.PlacementDef;
 import kolo.engine.content.PopulationDef;
 import kolo.engine.content.PopulationLevelDef;
 import kolo.engine.content.PopulationLevelId;
+import kolo.engine.content.PowerBudgetDef;
+import kolo.engine.content.PowerComponent;
 import kolo.engine.content.PowerCorridorDef;
 import kolo.engine.content.ReliefDef;
 import kolo.engine.content.ReliefLevelDef;
@@ -1334,7 +1336,35 @@ public final class ContentLoader {
                 });
         ResourceBalanceDef resources = at(BALANCE, "resources", () -> new ResourceBalanceDef(resourceCount));
 
-        return at(BALANCE, "", () -> BalanceDef.of(wheel, streaks, corridors, generation, religion, world, resources));
+        ContentYaml.PowerBudget powerYaml = section("power_budget", yaml.powerBudget());
+        TreeMap<PowerComponent, Integer> powerWeights = new TreeMap<>();
+        powerYaml.weights().forEach((key, weight) -> {
+            String location = "power_budget.weights." + key;
+            PowerComponent component = at(
+                    BALANCE,
+                    location,
+                    () -> ContentKeys.parse("power_component", PowerComponent.values(), PowerComponent::key, key));
+            powerWeights.put(component, at(BALANCE, location, () -> required(location, weight)));
+        });
+        complete(
+                BALANCE,
+                "power_budget.weights",
+                new TreeSet<>(powerWeights.keySet()),
+                List.of(PowerComponent.values()),
+                PowerComponent::key);
+        PowerBudgetDef power = at(
+                BALANCE,
+                "power_budget",
+                () -> new PowerBudgetDef(
+                        required("power_budget.median_quality", powerYaml.medianQuality()),
+                        powerWeights,
+                        required("power_budget.advantage_pct", powerYaml.advantagePct()),
+                        required("power_budget.max_advantage", powerYaml.maxAdvantage())));
+
+        return at(
+                BALANCE,
+                "",
+                () -> BalanceDef.of(wheel, streaks, corridors, generation, religion, world, resources, power));
     }
 
     private static MapContent map(ContentYaml.MapFile yaml) {

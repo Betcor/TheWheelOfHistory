@@ -22,6 +22,7 @@ import kolo.engine.generation.religion.StartReligions;
 import kolo.engine.generation.religion.WorldReligionsWheel;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.PowerCorridor;
 import org.junit.jupiter.api.Test;
 
 class WorldGeneratorTest {
@@ -44,7 +45,8 @@ class WorldGeneratorTest {
             StartCountry country = CountryGenerator.generate(
                     rng.fork(WorldGenerator.COUNTRY_STREAM + n),
                     PACK,
-                    new CountryGenerationInput(map, n, religions.religions(), countryNames, personNames));
+                    new CountryGenerationInput(
+                            map, n, religions.religions(), PowerCorridor.DEFAULT, countryNames, personNames));
             countryNames.add(country.name().name().fullName().nominative());
             country.people()
                     .people()

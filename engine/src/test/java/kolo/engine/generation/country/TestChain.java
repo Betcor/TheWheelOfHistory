@@ -45,6 +45,7 @@ import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
 import kolo.engine.content.TestMaps;
+import kolo.engine.content.TestPower;
 import kolo.engine.content.TestReligions;
 import kolo.engine.content.TestResources;
 import kolo.engine.content.TrainingLevelDef;
@@ -287,7 +288,8 @@ final class TestChain {
                                 GDP_PER_STEP),
                         TestReligions.BALANCE,
                         TestMaps.BALANCE,
-                        TestResources.BALANCE));
+                        TestResources.BALANCE,
+                        TestPower.BUDGET));
     }
 
     /** {@link TestMaps#CONTENT} з рівнями площі й населення якості {@code quality}. */

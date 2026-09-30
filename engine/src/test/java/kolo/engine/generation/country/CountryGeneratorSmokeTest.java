@@ -2,6 +2,7 @@ package kolo.engine.generation.country;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import kolo.engine.content.PowerComponent;
 import kolo.engine.rng.Rng;
 import org.junit.jupiter.api.Test;
 
@@ -18,5 +19,6 @@ class CountryGeneratorSmokeTest {
         assertThat(country.people().people()).isNotEmpty();
         assertThat(country.tags()).containsAll(country.regime().tags());
         assertThat(country.rolls()).isNotEmpty();
+        assertThat(country.power().steps()).hasSize(PowerComponent.values().length);
     }
 }
