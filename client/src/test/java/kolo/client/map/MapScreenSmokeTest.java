@@ -1,0 +1,150 @@
+package kolo.client.map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import javafx.application.Platform;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.WritableImage;
+import javafx.scene.layout.BorderPane;
+import kolo.client.TestWorlds;
+import kolo.client.app.Navigator;
+import kolo.client.i18n.Texts;
+import kolo.client.screen.MainMenuScreen;
+import kolo.client.screen.MapScreen;
+import kolo.client.screen.NewWorldScreen;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Смок із JavaFX: екрани будуються, карта малює кадри растром і векторно. Вікно не показується — сцена рендериться в
+ * знімок. Потрібен дисплей (у CI — Xvfb); без нього тест пропускається.
+ */
+class MapScreenSmokeTest {
+
+    private static final int WIDTH = 1280;
+    private static final int HEIGHT = 800;
+    private static final long TIMEOUT_SECONDS = 20;
+
+    private static final Navigator NAVIGATOR = new Navigator() {
+        @Override
+        public void showMainMenu() {}
+
+        @Override
+        public void showNewWorld() {}
+
+        @Override
+        public void showMap(MapLayers layers) {}
+
+        @Override
+        public void exit() {}
+    };
+
+    @BeforeAll
+    static void startToolkit() throws InterruptedException {
+        CountDownLatch started = new CountDownLatch(1);
+        try {
+            Platform.startup(started::countDown);
+        } catch (IllegalStateException alreadyStarted) {
+            started.countDown();
+        } catch (UnsupportedOperationException | UnsatisfiedLinkError noDisplay) {
+            Assumptions.abort("JavaFX без дисплея: " + noDisplay.getMessage());
+        }
+        assertThat(started.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
+        Platform.setImplicitExit(false);
+    }
+
+    @Test
+    void screensBuild() throws Exception {
+        Texts texts = Texts.ukrainian();
+        onFx(() -> {
+            new Scene(MainMenuScreen.create(NAVIGATOR, texts), WIDTH, HEIGHT);
+            new Scene(NewWorldScreen.create(NAVIGATOR, texts, TestWorlds.SERVER, Runnable::run), WIDTH, HEIGHT);
+            return null;
+        });
+    }
+
+    @Test
+    void mapDrawsRasterAndVectorFrames() throws Exception {
+        MapLayers layers = MapLayers.build(TestWorlds.DEFAULT);
+        Texts texts = Texts.ukrainian();
+        // Растеризація режиму — одразу в потоці виклику: плитки з'являються наступним runLater.
+        Parent screen = onFx(() -> MapScreen.create(NAVIGATOR, texts, layers, Runnable::run));
+        Scene scene = onFx(() -> {
+            Scene result = new Scene(screen, WIDTH, HEIGHT);
+            screen.applyCss();
+            screen.layout();
+            return result;
+        });
+        MapCanvas canvas = onFx(() -> (MapCanvas) ((BorderPane) screen).getCenter());
+
+        waitUntil(() -> onFxQuietly(() -> canvas.rasterReady() && canvas.frames() > 0));
+        int rasterFrames = onFx(canvas::frames);
+        WritableImage raster = onFx(() -> scene.snapshot(null));
+        assertThat(colors(raster)).contains(MapPalette.SEA).hasSizeGreaterThan(10);
+
+        onFx(() -> {
+            MapCamera camera = canvas.camera();
+            camera.zoom(camera.maxScale() / camera.scale(), canvas.getWidth() / 2, canvas.getHeight() / 2);
+            canvas.fit();
+            camera.zoom(camera.maxScale() / camera.scale(), canvas.getWidth() / 2, canvas.getHeight() / 2);
+            canvas.setMode(MapMode.TERRAIN);
+            return null;
+        });
+        assertThat(onFx(() -> canvas.camera().scale())).isGreaterThanOrEqualTo(layers.vectorScale());
+        waitUntil(() -> onFxQuietly(() -> canvas.frames() > rasterFrames));
+        WritableImage vector = onFx(() -> scene.snapshot(null));
+        assertThat(colors(vector)).hasSizeGreaterThan(3);
+        onFx(() -> {
+            canvas.dispose();
+            return null;
+        });
+    }
+
+    private static Set<Integer> colors(WritableImage image) {
+        PixelReader reader = image.getPixelReader();
+        Set<Integer> colors = new HashSet<>();
+        for (int y = 0; y < (int) image.getHeight(); y += 5) {
+            for (int x = 0; x < (int) image.getWidth(); x += 5) {
+                colors.add(reader.getArgb(x, y));
+            }
+        }
+        return colors;
+    }
+
+    private static <T> T onFx(Supplier<T> action) throws Exception {
+        CompletableFuture<T> result = new CompletableFuture<>();
+        Platform.runLater(() -> {
+            try {
+                result.complete(action.get());
+            } catch (RuntimeException | Error e) {
+                result.completeExceptionally(e);
+            }
+        });
+        return result.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private static boolean onFxQuietly(Supplier<Boolean> condition) {
+        try {
+            return onFx(condition);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void waitUntil(Supplier<Boolean> condition) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+        while (!condition.get()) {
+            assertThat(System.nanoTime()).as("timeout").isLessThan(deadline);
+            Thread.sleep(20);
+        }
+    }
+}
