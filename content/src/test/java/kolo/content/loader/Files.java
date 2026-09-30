@@ -298,6 +298,11 @@ final class Files {
             rivers:
               min_flow: 400
               min_cells: 2
+            fertility:
+              climates: { polar: 0, boreal: 20, temperate: 60, arid: 10, tropical: 40 }
+              terrains: { plain: 5, hills: 0, mountains: -40, forest: -10, desert: -30, tundra: -20, swamp: -15 }
+              moisture_pct: 30
+              river: 15
             relief:
               ridges: { min: 1, max: 3 }
               ridge_min_provinces: 40

@@ -173,6 +173,18 @@ rivers:
   min_flow: 200
   min_cells: 3
 
+# fertility — родючість провінції (GD §3.5), 0..100, без коліс: основа поясу (climates) + поправка типу місцевості
+# (terrains) + волога × moisture_pct / 100 (вниз) + river, якщо провінцією тече річка; сума обрізається до 0..100.
+#   climates — основа на кожен пояс (0..100);
+#   terrains — поправка на кожен тип місцевості (−100..100): рельєф або покрив, якщо він є (див. climate.covers);
+#   moisture_pct — скільки відсотків вологи провінції додається (0..100): вологіші землі родючіші в межах поясу;
+#   river — бонус провінції з річкою (0..100): заплава й вода для зрошення, навіть у пустелі.
+fertility:
+  climates: { polar: 5, boreal: 25, temperate: 50, arid: 20, tropical: 45 }
+  terrains: { plain: 10, hills: 0, mountains: -30, forest: -10, desert: -25, tundra: -10, swamp: -25 }
+  moisture_pct: 25
+  river: 20
+
 templates:
   - id: continents
     name: Континенти

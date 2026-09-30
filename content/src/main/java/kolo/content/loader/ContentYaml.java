@@ -607,7 +607,8 @@ final class ContentYaml {
             Relief relief,
             Climate climate,
             Sea sea,
-            Rivers rivers) {
+            Rivers rivers,
+            Fertility fertility) {
         MapFile {
             templates = orEmpty(templates);
         }
@@ -630,6 +631,21 @@ final class ContentYaml {
     record Rivers(
             @JsonProperty("min_flow") Integer minFlow,
             @JsonProperty("min_cells") Integer minCells) {}
+
+    /**
+     * @param climates ключ поясу → основа
+     * @param terrains ключ типу місцевості → поправка
+     */
+    record Fertility(
+            Map<String, Integer> climates,
+            Map<String, Integer> terrains,
+            @JsonProperty("moisture_pct") Integer moisturePct,
+            Integer river) {
+        Fertility {
+            climates = climates == null ? Map.of() : climates;
+            terrains = terrains == null ? Map.of() : terrains;
+        }
+    }
 
     record Relief(
             Count ridges,

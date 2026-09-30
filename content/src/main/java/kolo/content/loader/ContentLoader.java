@@ -46,6 +46,7 @@ import kolo.engine.content.DogmaDef;
 import kolo.engine.content.DogmaId;
 import kolo.engine.content.FaithFormDef;
 import kolo.engine.content.FaithFormId;
+import kolo.engine.content.FertilityDef;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
@@ -120,6 +121,7 @@ import kolo.engine.state.PowerCorridor;
 import kolo.engine.state.Relief;
 import kolo.engine.state.Sex;
 import kolo.engine.state.TechBranch;
+import kolo.engine.state.Terrain;
 import kolo.engine.state.Training;
 import kolo.engine.wheel.OutcomeTier;
 import kolo.engine.wheel.WheelKind;
@@ -1283,7 +1285,8 @@ public final class ContentLoader {
         ClimateDef climate = climate(yaml.climate());
         SeaDef sea = at(MAP, "sea", () -> sea(yaml.sea()));
         RiverDef rivers = at(MAP, "rivers", () -> rivers(yaml.rivers()));
-        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate, sea, rivers));
+        FertilityDef fertility = fertility(yaml.fertility());
+        return at(MAP, "", () -> new MapContent(templates, grid, continents, relief, climate, sea, rivers, fertility));
     }
 
     private static ClimateDef climate(ContentYaml.Climate climate) {
@@ -1435,6 +1438,38 @@ public final class ContentLoader {
             throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "rivers"));
         }
         return new RiverDef(required("min_flow", rivers.minFlow()), required("min_cells", rivers.minCells()));
+    }
+
+    private static FertilityDef fertility(ContentYaml.Fertility fertility) {
+        at(MAP, "fertility", () -> {
+            if (fertility == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "fertility"));
+            }
+            return fertility;
+        });
+        TreeMap<Climate, Integer> climates = new TreeMap<>();
+        fertility.climates().forEach((key, value) -> {
+            String location = "fertility.climates." + key;
+            climates.put(
+                    at(MAP, location, () -> climateKey("climate", key)), at(MAP, location, () -> required(key, value)));
+        });
+        complete(MAP, "fertility.climates", new TreeSet<>(climates.keySet()), List.of(Climate.values()), Climate::key);
+        TreeMap<Terrain, Integer> terrains = new TreeMap<>();
+        fertility.terrains().forEach((key, value) -> {
+            String location = "fertility.terrains." + key;
+            terrains.put(
+                    at(MAP, location, () -> ContentKeys.parse("terrain", Terrain.values(), Terrain::key, key)),
+                    at(MAP, location, () -> required(key, value)));
+        });
+        complete(MAP, "fertility.terrains", new TreeSet<>(terrains.keySet()), List.of(Terrain.values()), Terrain::key);
+        return at(
+                MAP,
+                "fertility",
+                () -> new FertilityDef(
+                        climates,
+                        terrains,
+                        required("moisture_pct", fertility.moisturePct()),
+                        required("river", fertility.river())));
     }
 
     private static ContinentsDef continents(ContentYaml.Continents continents) {

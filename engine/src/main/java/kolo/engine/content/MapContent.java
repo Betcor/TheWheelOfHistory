@@ -11,7 +11,7 @@ import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 
 /**
- * Контент карти (GD §3.3–3.5): шаблони, сітка комірок, материки, рельєф, клімат, море й річки; родовища додадуться з
+ * Контент карти (GD §3.3–3.5): шаблони, сітка комірок, материки, рельєф, клімат, море, річки й родючість; родовища додадуться з
  * генератором карти.
  */
 public final class MapContent {
@@ -24,6 +24,7 @@ public final class MapContent {
     private final ClimateDef climate;
     private final SeaDef sea;
     private final RiverDef rivers;
+    private final FertilityDef fertility;
 
     /**
      * @param templates шаблони в порядку контенту (порядок секторів колеса шаблону)
@@ -33,6 +34,7 @@ public final class MapContent {
      * @param climate числа генерації клімату, пояси й покриви
      * @param sea числа генерації моря й морських зон
      * @param rivers числа генерації річок
+     * @param fertility таблиця родючості провінцій
      * @throws ValidationException якщо шаблонів немає або id повторюється
      */
     public MapContent(
@@ -42,7 +44,8 @@ public final class MapContent {
             ReliefDef relief,
             ClimateDef climate,
             SeaDef sea,
-            RiverDef rivers) {
+            RiverDef rivers,
+            FertilityDef fertility) {
         if (templates.isEmpty()) {
             throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", "map_templates"));
         }
@@ -62,6 +65,7 @@ public final class MapContent {
         this.climate = Objects.requireNonNull(climate, "climate");
         this.sea = Objects.requireNonNull(sea, "sea");
         this.rivers = Objects.requireNonNull(rivers, "rivers");
+        this.fertility = Objects.requireNonNull(fertility, "fertility");
     }
 
     /** Шаблони в порядку контенту — порядок секторів колеса шаблону. */
@@ -95,5 +99,9 @@ public final class MapContent {
 
     public RiverDef rivers() {
         return rivers;
+    }
+
+    public FertilityDef fertility() {
+        return fertility;
     }
 }

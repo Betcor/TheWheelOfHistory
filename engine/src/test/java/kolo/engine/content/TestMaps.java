@@ -7,6 +7,7 @@ import kolo.engine.state.Climate;
 import kolo.engine.state.Cover;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.Relief;
+import kolo.engine.state.Terrain;
 
 /**
  * Мінімальний валідний контент карти для тестових пакетів: шаблони «Пангея» (1 материк, коефіцієнт 100, суходолу 50%)
@@ -48,8 +49,14 @@ public final class TestMaps {
     /** Річка — від стоку 300 (басейн щонайменше з кількох вологих комірок) і від двох комірок у системі. */
     public static final RiverDef RIVERS = new RiverDef(300, 2);
 
+    /**
+     * Родючість: основа полярний 0 / бореальний 20 / помірний 60 / посушливий 10 / тропічний 40; рівнина +10, пагорби 0,
+     * гори −40, ліс −10, пустеля −30, тундра −20, болото −20; +20% вологи; річка +20.
+     */
+    public static final FertilityDef FERTILITY = fertility(20);
+
     public static final MapContent CONTENT =
-            new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS);
+            new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY);
 
     /** NPC: мало 0–1, звичайно 2–4, багато 10–20; 60–100 провінцій на державу з кроком 20; 5–15% нічийних; 100–3000. */
     public static final WorldBalanceDef BALANCE = world(new CountRange(100, 3000));
@@ -76,27 +83,51 @@ public final class TestMaps {
 
     /** Контент {@link #CONTENT} з іншими шаблонами й числами материків. */
     public static MapContent content(List<MapTemplateDef> templates, ContinentsDef continents) {
-        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE, SEA, RIVERS);
+        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY);
     }
 
     /** Контент {@link #CONTENT} з іншим рельєфом. */
     public static MapContent content(ReliefDef relief) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE, SEA, RIVERS);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE, SEA, RIVERS, FERTILITY);
     }
 
     /** Контент {@link #CONTENT} з іншим кліматом. */
     public static MapContent content(ClimateDef climate) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate, SEA, RIVERS);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate, SEA, RIVERS, FERTILITY);
     }
 
     /** Контент {@link #CONTENT} з іншими числами моря. */
     public static MapContent content(SeaDef sea) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, sea, RIVERS);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, sea, RIVERS, FERTILITY);
     }
 
     /** Контент {@link #CONTENT} з іншими числами річок. */
     public static MapContent content(RiverDef rivers) {
-        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, rivers);
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, rivers, FERTILITY);
+    }
+
+    /** Контент {@link #CONTENT} з іншою родючістю. */
+    public static MapContent content(FertilityDef fertility) {
+        return new MapContent(List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, fertility);
+    }
+
+    /** Родючість {@link #FERTILITY} з іншим бонусом річки. */
+    public static FertilityDef fertility(int river) {
+        TreeMap<Climate, Integer> climates = new TreeMap<>();
+        climates.put(Climate.POLAR, 0);
+        climates.put(Climate.BOREAL, 20);
+        climates.put(Climate.TEMPERATE, 60);
+        climates.put(Climate.ARID, 10);
+        climates.put(Climate.TROPICAL, 40);
+        TreeMap<Terrain, Integer> terrains = new TreeMap<>();
+        terrains.put(Terrain.PLAIN, 10);
+        terrains.put(Terrain.HILLS, 0);
+        terrains.put(Terrain.MOUNTAINS, -40);
+        terrains.put(Terrain.FOREST, -10);
+        terrains.put(Terrain.DESERT, -30);
+        terrains.put(Terrain.TUNDRA, -20);
+        terrains.put(Terrain.SWAMP, -20);
+        return new FertilityDef(climates, terrains, 20, river);
     }
 
     /** Клімат {@link #CLIMATE} з іншими кліматами світу. */
