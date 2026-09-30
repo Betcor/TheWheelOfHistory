@@ -8,8 +8,10 @@ import java.util.TreeMap;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.generation.name.TestNames;
+import kolo.engine.state.Climate;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.Relief;
+import kolo.engine.state.Terrain;
 import kolo.engine.state.WorldLimits;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
@@ -113,6 +115,62 @@ class MapDefinitionsTest {
         assertThat(new RiverDef(ClimateDef.MAX_VALUE + 1, 1)).isEqualTo(new RiverDef(101, 1));
         assertThat(new RiverDef(RiverDef.MAX_MIN_FLOW, RiverDef.MAX_MIN_CELLS).minFlow())
                 .isEqualTo(RiverDef.MAX_MIN_FLOW);
+    }
+
+    @Test
+    void fertilitySumsTableMoistureAndRiver() {
+        FertilityDef fertility = TestMaps.FERTILITY;
+
+        // Помірна рівнина: 60 + 10 + 55 × 20% (вниз — 11) = 81; з річкою 101 → обрізано до 100.
+        assertThat(fertility.fertility(Climate.TEMPERATE, Terrain.PLAIN, 55, false))
+                .isEqualTo(81);
+        assertThat(fertility.fertility(Climate.TEMPERATE, Terrain.PLAIN, 55, true))
+                .isEqualTo(FertilityDef.MAX_VALUE);
+        // Пустеля: 10 − 30 + 2 = −18 → 0; річка лише піднімає до 2.
+        assertThat(fertility.fertility(Climate.ARID, Terrain.DESERT, 10, false)).isZero();
+        assertThat(fertility.fertility(Climate.ARID, Terrain.DESERT, 10, true)).isEqualTo(2);
+        assertThat(fertility.fertility(Climate.BOREAL, Terrain.FOREST, 0, false))
+                .isEqualTo(10);
+        assertThat(fertility.fertility(Climate.BOREAL, Terrain.FOREST, 100, false))
+                .isEqualTo(30);
+        assertFails(
+                () -> fertility.fertility(Climate.BOREAL, Terrain.FOREST, 101, false), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> fertility.fertility(Climate.BOREAL, Terrain.FOREST, -1, false), ErrorCode.VALUE_OUT_OF_RANGE);
+    }
+
+    @Test
+    void fertilityRejectsIncompleteTablesAndValuesOutsideLimits() {
+        FertilityDef base = TestMaps.FERTILITY;
+        TreeMap<Climate, Integer> climates = new TreeMap<>(base.climates());
+        TreeMap<Terrain, Integer> terrains = new TreeMap<>(base.terrains());
+
+        assertThat(new FertilityDef(climates, terrains, 0, 0).river()).isZero();
+        assertThat(new FertilityDef(climates, terrains, 100, FertilityDef.MAX_VALUE).moisturePct())
+                .isEqualTo(100);
+        assertFails(() -> new FertilityDef(climates, terrains, -1, 0), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new FertilityDef(climates, terrains, 101, 0), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(() -> new FertilityDef(climates, terrains, 20, -1), ErrorCode.VALUE_OUT_OF_RANGE);
+        assertFails(
+                () -> new FertilityDef(climates, terrains, 20, FertilityDef.MAX_VALUE + 1),
+                ErrorCode.VALUE_OUT_OF_RANGE);
+
+        TreeMap<Climate, Integer> missingClimate = new TreeMap<>(climates);
+        missingClimate.remove(Climate.ARID);
+        assertFails(() -> new FertilityDef(missingClimate, terrains, 20, 20), ErrorCode.MISSING_DEFINITION);
+        TreeMap<Terrain, Integer> missingTerrain = new TreeMap<>(terrains);
+        missingTerrain.remove(Terrain.SWAMP);
+        assertFails(() -> new FertilityDef(climates, missingTerrain, 20, 20), ErrorCode.MISSING_DEFINITION);
+
+        TreeMap<Climate, Integer> negativeBase = new TreeMap<>(climates);
+        negativeBase.put(Climate.POLAR, -1);
+        assertFails(() -> new FertilityDef(negativeBase, terrains, 20, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        TreeMap<Terrain, Integer> penalties = new TreeMap<>(terrains);
+        penalties.put(Terrain.DESERT, -FertilityDef.MAX_VALUE);
+        assertThat(new FertilityDef(climates, penalties, 20, 20).terrains()).containsEntry(Terrain.DESERT, -100);
+        penalties.put(Terrain.DESERT, -FertilityDef.MAX_VALUE - 1);
+        assertFails(() -> new FertilityDef(climates, penalties, 20, 20), ErrorCode.VALUE_OUT_OF_RANGE);
+        penalties.put(Terrain.DESERT, FertilityDef.MAX_VALUE + 1);
+        assertFails(() -> new FertilityDef(climates, penalties, 20, 20), ErrorCode.VALUE_OUT_OF_RANGE);
     }
 
     @Test
@@ -230,6 +288,7 @@ class MapDefinitionsTest {
         assertThat(content.climate()).isEqualTo(TestMaps.CLIMATE);
         assertThat(content.sea()).isEqualTo(TestMaps.SEA);
         assertThat(content.rivers()).isEqualTo(TestMaps.RIVERS);
+        assertThat(content.fertility()).isEqualTo(TestMaps.FERTILITY);
     }
 
     @Test
@@ -242,7 +301,8 @@ class MapDefinitionsTest {
                         TestMaps.RELIEF,
                         TestMaps.CLIMATE,
                         TestMaps.SEA,
-                        TestMaps.RIVERS),
+                        TestMaps.RIVERS,
+                        TestMaps.FERTILITY),
                 ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
@@ -252,7 +312,8 @@ class MapDefinitionsTest {
                         TestMaps.RELIEF,
                         TestMaps.CLIMATE,
                         TestMaps.SEA,
-                        TestMaps.RIVERS),
+                        TestMaps.RIVERS,
+                        TestMaps.FERTILITY),
                 ErrorCode.DUPLICATE_ID);
     }
 

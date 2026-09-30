@@ -30,6 +30,7 @@ import kolo.engine.content.DogmaDef;
 import kolo.engine.content.DogmaId;
 import kolo.engine.content.FaithFormDef;
 import kolo.engine.content.FaithFormId;
+import kolo.engine.content.FertilityDef;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.HdiLevelDef;
@@ -86,6 +87,7 @@ import kolo.engine.state.Relief;
 import kolo.engine.state.Sex;
 import kolo.engine.state.Stat;
 import kolo.engine.state.TechBranch;
+import kolo.engine.state.Terrain;
 import kolo.engine.wheel.OutcomeTier;
 import kolo.engine.wheel.WheelKind;
 import org.junit.jupiter.api.Test;
@@ -1330,6 +1332,21 @@ class ContentLoaderTest {
         assertThat(pack.map().continents()).isEqualTo(new ContinentsDef(new CountRange(1, 4), 20, 50, 6));
         assertThat(pack.map().sea()).isEqualTo(new SeaDef(8, 30));
         assertThat(pack.map().rivers()).isEqualTo(new RiverDef(400, 2));
+        FertilityDef fertility = pack.map().fertility();
+        assertThat(fertility.climates())
+                .containsExactly(
+                        Map.entry(Climate.POLAR, 0),
+                        Map.entry(Climate.BOREAL, 20),
+                        Map.entry(Climate.TEMPERATE, 60),
+                        Map.entry(Climate.ARID, 10),
+                        Map.entry(Climate.TROPICAL, 40));
+        assertThat(fertility.terrains())
+                .containsEntry(Terrain.PLAIN, 5)
+                .containsEntry(Terrain.MOUNTAINS, -40)
+                .containsEntry(Terrain.SWAMP, -15)
+                .hasSize(Terrain.values().length);
+        assertThat(fertility.moisturePct()).isEqualTo(30);
+        assertThat(fertility.river()).isEqualTo(15);
         ReliefDef relief = pack.map().relief();
         assertThat(relief.ridges()).isEqualTo(new CountRange(1, 3));
         assertThat(List.of(
@@ -1451,6 +1468,48 @@ class ContentLoaderTest {
         assertMapError(
                 Files.MAP.replace("min_cells: 2", "min_cells: 0"),
                 Map.of("location", "rivers", "cause", "value_out_of_range", "field", "rivers.min_cells"));
+    }
+
+    @Test
+    void invalidFertilityIsReportedAtItsPosition() {
+        String fertility = Files.MAP.substring(
+                Files.MAP.indexOf("fertility:\n"), Files.MAP.indexOf("  river: 15\n") + "  river: 15\n".length());
+        assertMapError(
+                Files.MAP.replace(fertility, ""),
+                Map.of("location", "fertility", "cause", "blank_value", "field", "fertility"));
+        assertMapError(
+                Files.MAP.replace("  moisture_pct: 30\n", ""),
+                Map.of("location", "fertility", "cause", "blank_value", "field", "moisture_pct"));
+        assertMapError(
+                Files.MAP.replace("  river: 15\n", ""),
+                Map.of("location", "fertility", "cause", "blank_value", "field", "river"));
+        assertMapError(
+                Files.MAP.replace("moisture_pct: 30", "moisture_pct: 101"),
+                Map.of("location", "fertility", "cause", "value_out_of_range", "field", "fertility.moisture_pct"));
+        assertMapError(
+                Files.MAP.replace("tropical: 40 }", "tropical: 40, arctic: 5 }"),
+                Map.of("location", "fertility.climates.arctic", "cause", "unknown_reference", "value", "arctic"));
+        assertMapError(
+                Files.MAP.replace("polar: 0, boreal: 20", "boreal: 20"),
+                Map.of("location", "fertility.climates", "cause", "missing_definition", "value", "polar"));
+        assertMapError(
+                Files.MAP.replace("polar: 0, boreal: 20", "polar: , boreal: 20"),
+                Map.of("location", "fertility.climates.polar", "cause", "blank_value", "field", "polar"));
+        assertMapError(
+                Files.MAP.replace("swamp: -15 }", "swamp: -15, jungle: 5 }"),
+                Map.of("location", "fertility.terrains.jungle", "cause", "unknown_reference", "value", "jungle"));
+        assertMapError(
+                Files.MAP.replace(", swamp: -15 }", " }"),
+                Map.of("location", "fertility.terrains", "cause", "missing_definition", "value", "swamp"));
+        assertMapError(
+                Files.MAP.replace("mountains: -40", "mountains: -101"),
+                Map.of(
+                        "location",
+                        "fertility",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "fertility.terrains.mountains"));
     }
 
     @Test
