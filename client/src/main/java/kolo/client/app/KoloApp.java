@@ -1,29 +1,80 @@
 package kolo.client.app;
 
 import atlantafx.base.theme.PrimerLight;
-import java.util.Locale;
-import java.util.ResourceBundle;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import kolo.client.i18n.Texts;
+import kolo.client.map.MapLayers;
+import kolo.client.screen.MainMenuScreen;
+import kolo.client.screen.MapScreen;
+import kolo.client.screen.NewWorldScreen;
+import kolo.server.EmbeddedServer;
 
-/** JavaFX-застосунок клієнта. Поки що — порожнє вікно з темою AtlantaFX. */
-public final class KoloApp extends Application {
+/**
+ * JavaFX-застосунок клієнта: головне меню → параметри нового світу → карта.
+ *
+ * <p>Важка робота (генерація світу, растеризація карти) — в одному фоновому потоці, UI змінюється лише в потоці JavaFX.
+ */
+public final class KoloApp extends Application implements Navigator {
     private static final double INITIAL_WIDTH = 1280;
     private static final double INITIAL_HEIGHT = 800;
+
+    private final Texts texts = Texts.ukrainian();
+    private final EmbeddedServer server = EmbeddedServer.withBundledContent();
+    private final ExecutorService background = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "kolo-background");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final StackPane root = new StackPane();
+    private Stage stage;
 
     public static void main(String[] args) {
         launch(KoloApp.class, args);
     }
 
     @Override
-    public void start(Stage stage) {
+    public void start(Stage primaryStage) {
+        stage = primaryStage;
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
-        ResourceBundle messages = ResourceBundle.getBundle("i18n.messages", Locale.of("uk"));
-
-        stage.setTitle(messages.getString("app.title"));
-        stage.setScene(new Scene(new StackPane(), INITIAL_WIDTH, INITIAL_HEIGHT));
+        stage.setTitle(texts.text("app.title"));
+        stage.setScene(new Scene(root, INITIAL_WIDTH, INITIAL_HEIGHT));
+        showMainMenu();
         stage.show();
+    }
+
+    @Override
+    public void stop() {
+        background.shutdownNow();
+    }
+
+    @Override
+    public void showMainMenu() {
+        show(MainMenuScreen.create(this, texts));
+    }
+
+    @Override
+    public void showNewWorld() {
+        show(NewWorldScreen.create(this, texts, server, background));
+    }
+
+    @Override
+    public void showMap(MapLayers layers) {
+        show(MapScreen.create(this, texts, layers, background));
+    }
+
+    @Override
+    public void exit() {
+        Platform.exit();
+    }
+
+    private void show(Parent screen) {
+        root.getChildren().setAll(screen);
     }
 }

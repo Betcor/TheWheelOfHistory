@@ -20,6 +20,11 @@ application {
     mainClass = "kolo.client.app.KoloApp"
 }
 
+tasks.withType<Test>().configureEach {
+    // Смок-тест карти запускає JavaFX: без прапорця JDK попереджає про нативні бібліотеки glass.
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+}
+
 tasks.named<JavaExec>("run") {
     jvmArgs("--enable-native-access=javafx.graphics")
     // Плагін org.openjfx.javafxplugin 0.1.0 звертається до project під час виконання run.
