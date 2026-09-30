@@ -84,6 +84,9 @@ religion:
   # Скільки аспектів у божества й догматів у релігії — рівноймовірно від min до max (1..6).
   aspects: { min: 2, max: 3 }
   dogmas: { min: 2, max: 4 }
+  # Колесо святого центру: провінції держав цієї віри й нічийні. Вага = (base + родючість ×
+  # fertility_pct / 100 + river, якщо є річка), у нічийної — ще × unclaimed_pct / 100; щонайменше 1.
+  holy_center: { base: 10, fertility_pct: 100, river: 30, unclaimed_pct: 20 }
 
 # Розмір світу (GD §3.2–3.3).
 world:

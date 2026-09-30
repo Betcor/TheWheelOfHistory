@@ -17,8 +17,10 @@ import kolo.engine.generation.country.StartName;
 import kolo.engine.generation.country.StartPerson;
 import kolo.engine.generation.country.StreakBonus;
 import kolo.engine.generation.map.PlacedCountry;
+import kolo.engine.generation.map.PlacementMap;
 import kolo.engine.generation.map.WorldMap;
 import kolo.engine.generation.map.WorldSize;
+import kolo.engine.generation.religion.StartHolyCenters;
 import kolo.engine.generation.religion.StartReligion;
 import kolo.engine.generation.religion.StartReligions;
 import kolo.engine.modifier.Modifier;
@@ -47,6 +49,7 @@ final class CountryReport {
     private final ContentPack content;
     private final WorldMap map;
     private final StartReligions religions;
+    private final StartHolyCenters holyCenters;
     private final List<StartCountry> countries;
     private final int number;
     private final StartCountry country;
@@ -56,6 +59,7 @@ final class CountryReport {
         this.content = result.content();
         this.map = result.map();
         this.religions = result.religions();
+        this.holyCenters = result.world().holyCenters();
         this.countries = result.countries();
         this.number = result.number();
         this.country = result.country();
@@ -165,12 +169,7 @@ final class CountryReport {
             add("country.neighbors", text("country.none"));
             return;
         }
-        String names = neighbors.stream()
-                .map(neighbor -> text(
-                        "country.neighbor",
-                        neighbor,
-                        countries.get(neighbor).name().name().shortName().nominative()))
-                .collect(Collectors.joining(", "));
+        String names = neighbors.stream().map(this::countryName).collect(Collectors.joining(", "));
         add("country.neighbors", names);
     }
 
@@ -290,6 +289,8 @@ final class CountryReport {
         add("country.world_religions");
         for (int i = 0; i < religions.religions().size(); i++) {
             StartReligion religion = religions.religions().get(i);
+            int cell = holyCenters.cell(i);
+            int owner = map.placement().country(cell);
             add(
                     "country.world_religion",
                     i,
@@ -297,8 +298,18 @@ final class CountryReport {
                     content.religions()
                             .archetype(religion.archetype())
                             .orElseThrow()
-                            .name());
+                            .name(),
+                    cell,
+                    owner == PlacementMap.NONE ? text("country.unclaimed") : countryName(owner));
         }
+    }
+
+    /** Коротка назва держави з номером: «Велмар (3)». */
+    private String countryName(int number) {
+        return text(
+                "country.neighbor",
+                number,
+                countries.get(number).name().name().shortName().nominative());
     }
 
     private void rolls() {

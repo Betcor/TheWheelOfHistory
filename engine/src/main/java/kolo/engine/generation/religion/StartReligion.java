@@ -20,8 +20,8 @@ import kolo.engine.state.Sex;
 import kolo.engine.wheel.RollRecord;
 
 /**
- * Релігія світу на старті (GD §25.1) — результат {@link ReligionWheel}. Id, святий центр і держави цієї віри
- * з'являться разом зі світом і картою.
+ * Релігія світу на старті (GD §25.1) — результат {@link ReligionWheel}. Святий центр — {@link HolyCenterWheel}, id
+ * релігії з'явиться разом зі світом.
  *
  * @param aspects аспекти божества в порядку вибору, без повторів, {@code 0..}{@value ReligionBalanceDef#MAX_PARTS}
  *     (менше за баланс, якщо доступних забракло)

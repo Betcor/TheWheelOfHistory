@@ -23,9 +23,12 @@ public final class TestReligions {
     /** До 20 держав (і більше) — 4–5 релігій. */
     public static final ReligionCountDef MANY_COUNTRIES = new ReligionCountDef(20, new CountRange(4, 5));
 
-    /** 2–3 аспекти, 1–2 догмати. */
-    public static final ReligionBalanceDef BALANCE =
-            new ReligionBalanceDef(List.of(FEW_COUNTRIES, MANY_COUNTRIES), new CountRange(2, 3), new CountRange(1, 2));
+    /** Основа 10, уся родючість, річка +30, нічийна земля — 20%. */
+    public static final HolyCenterDef HOLY_CENTER = new HolyCenterDef(10, 100, 30, 20);
+
+    /** 2–3 аспекти, 1–2 догмати, святий центр — {@link #HOLY_CENTER}. */
+    public static final ReligionBalanceDef BALANCE = new ReligionBalanceDef(
+            List.of(FEW_COUNTRIES, MANY_COUNTRIES), new CountRange(2, 3), new CountRange(1, 2), HOLY_CENTER);
 
     /**
      * Кожна релігія — вага 100, світська держава — 100 без добавок і умов: тестові ідеології не мають міток, а
