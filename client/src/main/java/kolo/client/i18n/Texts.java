@@ -1,8 +1,10 @@
 package kolo.client.i18n;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.ResourceBundle;
+import kolo.engine.error.ErrorCode;
 
 /**
  * Тексти інтерфейсу з {@code i18n/messages_uk.properties}.
@@ -31,6 +33,19 @@ public final class Texts {
         String result = bundle.getString(Objects.requireNonNull(key, "key"));
         for (int i = 0; i < args.length; i++) {
             result = result.replace("{" + i + "}", String.valueOf(args[i]));
+        }
+        return result;
+    }
+
+    /**
+     * Текст помилки для гравця за кодом; {@code {назва}} замінюється подробицею з тією назвою. Тексти помилок
+     * підставляють лише обов'язкові подробиці коду ({@link ErrorCode#requiredDetails()}), тож заміна повна; решта
+     * подробиць — для розробника.
+     */
+    public String error(ErrorCode code, Map<String, ?> details) {
+        String result = text(code.key());
+        for (Map.Entry<String, ?> detail : details.entrySet()) {
+            result = result.replace("{" + detail.getKey() + "}", String.valueOf(detail.getValue()));
         }
         return result;
     }

@@ -3,6 +3,7 @@ package kolo.engine.error;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,7 +24,10 @@ class ErrorCodeTest {
     @ParameterizedTest
     @EnumSource(ErrorCode.class)
     void everyCodeCanBeThrownByItsException(ErrorCode code) {
-        GameException e = Errors.create(code, ErrorDetails.of("id", "cty_1"));
+        TreeMap<String, Object> details = new TreeMap<>(ErrorDetails.of("id", "cty_1"));
+        code.requiredDetails().forEach(key -> details.put(key, 1));
+
+        GameException e = Errors.create(code, details);
 
         assertThat(e).isExactlyInstanceOf(code.exceptionType());
         assertThat(e.code()).isEqualTo(code);
@@ -66,5 +70,14 @@ class ErrorCodeTest {
 
     private static void assertParent(Class<?> type, Class<?> parent) {
         assertThat(type.getSuperclass()).as(type.getSimpleName()).isEqualTo(parent);
+    }
+
+    @Test
+    void requiredDetailsAreSnakeCase() {
+        for (ErrorCode code : ErrorCode.values()) {
+            assertThat(code.requiredDetails()).allSatisfy(key -> assertThat(key).matches("[a-z][a-z0-9_]*"));
+        }
+        assertThat(ErrorCode.VERSION_MISMATCH.requiredDetails()).containsExactly("client", "part", "server");
+        assertThat(ErrorCode.VALUE_OUT_OF_RANGE.requiredDetails()).isEmpty();
     }
 }

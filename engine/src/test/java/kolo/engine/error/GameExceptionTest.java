@@ -50,7 +50,8 @@ class GameExceptionTest {
     void leafExceptionsCarryTheirFixedCode() {
         assertThat(new InsufficientFundsException(ErrorDetails.of()).code()).isEqualTo(ErrorCode.INSUFFICIENT_FUNDS);
         assertThat(new InvalidOrderException(ErrorDetails.of()).code()).isEqualTo(ErrorCode.INVALID_ORDER);
-        assertThat(new SaveVersionException(ErrorDetails.of()).code()).isEqualTo(ErrorCode.SAVE_VERSION_TOO_NEW);
+        assertThat(new SaveVersionException(ErrorDetails.of("version", 2, "supported", 1)).code())
+                .isEqualTo(ErrorCode.SAVE_VERSION_TOO_NEW);
     }
 
     @Test
@@ -62,6 +63,16 @@ class GameExceptionTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ValidationException(null, ErrorDetails.of()))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void requiresMandatoryDetailsOfItsCode() {
+        assertThatThrownBy(() -> new VersionMismatchException(ErrorDetails.of("part", "protocol", "client", 1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("server");
+        assertThat(new VersionMismatchException(ErrorDetails.of("part", "protocol", "client", 1, "server", 2))
+                        .details())
+                .containsKeys("part", "client", "server");
     }
 
     @Test

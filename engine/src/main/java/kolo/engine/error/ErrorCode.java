@@ -1,6 +1,10 @@
 package kolo.engine.error;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
  * Код помилки. Клієнт показує гравцеві текст за ключем {@link #key()}, підставляючи подробиці з {@link
@@ -77,8 +81,17 @@ public enum ErrorCode {
     UNAUTHORIZED(UnauthorizedException.class),
     FORBIDDEN(ForbiddenException.class),
     CONFLICT(ConflictException.class),
+    /**
+     * Повідомлення протоколу пошкоджене або прийшло не в тому порядку. Подробиці: {@code location} (шлях усередині
+     * повідомлення, {@code cells[3].site}) і {@code problem} (опис для розробника, не для гравця) або {@code cause}
+     * (код первинної помилки) з її подробицями.
+     */
     PROTOCOL_ERROR(ProtocolException.class),
-    VERSION_MISMATCH(VersionMismatchException.class),
+    /**
+     * Клієнт і сервер говорять різними версіями протоколу або мають різний контент. Подробиці: {@code part} ({@code
+     * protocol} чи {@code content}), {@code client}, {@code server} — версії або хеші контенту.
+     */
+    VERSION_MISMATCH(VersionMismatchException.class, "part", "client", "server"),
     /**
      * Значення в контенті невалідне. Подробиці: {@code file}, {@code location} (шлях усередині файлу), {@code cause}
      * (код первинної помилки) і подробиці первинної помилки ({@code field}, {@code value}…).
@@ -111,15 +124,17 @@ public enum ErrorCode {
      * Файл світу створено новішою версією гри. Подробиці: {@code version}, {@code supported}; для схеми файлу — ще
      * {@code part} = {@code file}.
      */
-    SAVE_VERSION_TOO_NEW(SaveVersionException.class),
+    SAVE_VERSION_TOO_NEW(SaveVersionException.class, "version", "supported"),
     INVARIANT_VIOLATION(InvariantViolationException.class);
 
     private static final String KEY_PREFIX = "error.";
 
     private final Class<? extends GameException> exceptionType;
+    private final SortedSet<String> requiredDetails;
 
-    ErrorCode(Class<? extends GameException> exceptionType) {
+    ErrorCode(Class<? extends GameException> exceptionType, String... requiredDetails) {
         this.exceptionType = exceptionType;
+        this.requiredDetails = Collections.unmodifiableSortedSet(new TreeSet<>(List.of(requiredDetails)));
     }
 
     /**
@@ -128,6 +143,14 @@ public enum ErrorCode {
      */
     public Class<? extends GameException> exceptionType() {
         return exceptionType;
+    }
+
+    /**
+     * Подробиці, які має кожен виняток з цим кодом ({@link GameException} перевіряє це при створенні). Лише їх текст
+     * помилки для гравця може підставляти як {@code {назва}}: решта подробиць буває не завжди.
+     */
+    public SortedSet<String> requiredDetails() {
+        return requiredDetails;
     }
 
     /** Ключ i18n, напр. {@code error.insufficient_funds}. */
