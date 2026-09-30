@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import kolo.engine.state.CellKind;
 import kolo.engine.state.Climate;
 import kolo.engine.state.Terrain;
-import kolo.engine.view.CellKind;
 import kolo.engine.view.CellView;
 import org.junit.jupiter.api.Test;
 

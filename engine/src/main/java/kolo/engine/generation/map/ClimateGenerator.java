@@ -16,6 +16,7 @@ import kolo.engine.error.Checks;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.Climate;
 import kolo.engine.state.Cover;
+import kolo.engine.state.GridPoint;
 import kolo.engine.state.Relief;
 import kolo.engine.state.Terrain;
 import kolo.engine.wheel.Advantage;

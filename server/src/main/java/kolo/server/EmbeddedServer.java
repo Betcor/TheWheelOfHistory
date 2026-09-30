@@ -6,8 +6,10 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.generation.map.WorldSizeInput;
 import kolo.engine.generation.world.StartWorld;
 import kolo.engine.generation.world.WorldGenerator;
+import kolo.engine.generation.world.WorldStates;
 import kolo.engine.rng.Rng;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.WorldState;
 import kolo.engine.view.MapView;
 import kolo.engine.view.MapViews;
 
@@ -47,8 +49,10 @@ public final class EmbeddedServer {
      */
     public MapView newWorld(long seed, int players, NpcShare npcShare) {
         WorldSizeInput input = WorldSizeInput.of(players, npcShare);
-        StartWorld world = WorldGenerator.generate(Rng.of(seed), content(), input);
-        return MapViews.of(seed, world);
+        ContentPack pack = content();
+        StartWorld world = WorldGenerator.generate(Rng.of(seed), pack, input);
+        WorldState state = WorldStates.of(seed, pack, world);
+        return MapViews.of(state);
     }
 
     private synchronized ContentPack content() {

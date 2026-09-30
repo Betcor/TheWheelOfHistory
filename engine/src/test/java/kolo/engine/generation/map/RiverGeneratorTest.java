@@ -16,6 +16,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.generation.name.TestNames;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.GridPoint;
 import kolo.engine.state.Relief;
 import org.junit.jupiter.api.Test;
 

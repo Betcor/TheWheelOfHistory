@@ -12,6 +12,7 @@ import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.InvariantViolationException;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.GridPoint;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.triangulate.DelaunayTriangulationBuilder;
 import org.locationtech.jts.triangulate.quadedge.QuadEdge;

@@ -11,6 +11,7 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.content.SeaDef;
 import kolo.engine.error.Checks;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.GridPoint;
 
 /**
  * Море й озера (GD §3.5): ділить воду карти на водойми, а моря — на морські зони.

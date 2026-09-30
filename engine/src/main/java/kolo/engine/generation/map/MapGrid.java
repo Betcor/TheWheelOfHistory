@@ -2,6 +2,7 @@ package kolo.engine.generation.map;
 
 import java.util.List;
 import kolo.engine.error.Checks;
+import kolo.engine.state.GridPoint;
 
 /**
  * Сітка комірок Вороного, що вкриває прямокутник карти {@code [0, width] × [0, height]} без щілин і накладань.

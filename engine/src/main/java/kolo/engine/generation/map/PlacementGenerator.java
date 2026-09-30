@@ -14,6 +14,7 @@ import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.InvariantViolationException;
 import kolo.engine.error.ValidationException;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.GridPoint;
 import kolo.engine.util.Fixed;
 import kolo.engine.wheel.Advantage;
 import kolo.engine.wheel.OutcomeTier;

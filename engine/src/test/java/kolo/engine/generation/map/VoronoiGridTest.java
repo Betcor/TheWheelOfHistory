@@ -9,6 +9,7 @@ import kolo.engine.content.TestMaps;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ValidationException;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.GridPoint;
 import org.junit.jupiter.api.Test;
 
 class VoronoiGridTest {

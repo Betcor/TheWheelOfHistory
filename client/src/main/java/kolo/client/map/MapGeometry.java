@@ -1,7 +1,7 @@
 package kolo.client.map;
 
 import java.util.List;
-import kolo.engine.generation.map.GridPoint;
+import kolo.engine.state.GridPoint;
 import kolo.engine.view.CellView;
 import kolo.engine.view.MapView;
 

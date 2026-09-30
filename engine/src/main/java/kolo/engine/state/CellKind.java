@@ -1,4 +1,4 @@
-package kolo.engine.view;
+package kolo.engine.state;
 
 /** Що лежить у комірці карти. */
 public enum CellKind {
