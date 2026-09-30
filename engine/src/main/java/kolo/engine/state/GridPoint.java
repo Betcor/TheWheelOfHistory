@@ -1,4 +1,4 @@
-package kolo.engine.generation.map;
+package kolo.engine.state;
 
 import java.util.Comparator;
 

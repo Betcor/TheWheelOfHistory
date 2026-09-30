@@ -9,8 +9,13 @@ import kolo.engine.generation.map.WorldSizeInput;
 import kolo.engine.generation.name.TestNames;
 import kolo.engine.generation.world.StartWorld;
 import kolo.engine.generation.world.WorldGenerator;
+import kolo.engine.generation.world.WorldStates;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.CellKind;
+import kolo.engine.state.CountryId;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.Province;
+import kolo.engine.state.WorldState;
 import org.junit.jupiter.api.Test;
 
 class MapViewsTest {
@@ -18,7 +23,8 @@ class MapViewsTest {
     private static final long SEED = 1970;
     private static final StartWorld WORLD =
             WorldGenerator.generate(Rng.of(SEED), TestNames.PACK, WorldSizeInput.of(1, NpcShare.FEW));
-    private static final MapView VIEW = MapViews.of(SEED, WORLD);
+    private static final WorldState STATE = WorldStates.of(SEED, TestNames.PACK, WORLD);
+    private static final MapView VIEW = MapViews.of(STATE);
 
     @Test
     void geometryIsGrid() {
@@ -75,6 +81,27 @@ class MapViewsTest {
     @Test
     void sameWorldSameView() {
         StartWorld again = WorldGenerator.generate(Rng.of(SEED), TestNames.PACK, WorldSizeInput.of(1, NpcShare.FEW));
-        assertThat(MapViews.of(SEED, again)).isEqualTo(VIEW);
+        assertThat(MapViews.of(WorldStates.of(SEED, TestNames.PACK, again))).isEqualTo(VIEW);
+    }
+
+    @Test
+    void viewFollowsStateNotGeneration() {
+        WorldState changed = STATE.deepCopy();
+        Province province = changed.provinces().values().stream()
+                .filter(candidate -> candidate.owner().isPresent())
+                .findFirst()
+                .orElseThrow();
+        CountryId other = changed.countries().keySet().stream()
+                .filter(id -> !province.owner().orElseThrow().equals(id))
+                .findFirst()
+                .orElseThrow();
+        province.setOwner(other);
+
+        MapView view = MapViews.of(changed);
+
+        int cell = Math.toIntExact(province.id().number());
+        assertThat(view.cells().get(cell).country()).isEqualTo(OptionalInt.of(Math.toIntExact(other.number())));
+        assertThat(VIEW.cells().get(cell).country())
+                .isNotEqualTo(view.cells().get(cell).country());
     }
 }

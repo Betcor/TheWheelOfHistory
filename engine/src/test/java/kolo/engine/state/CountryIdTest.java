@@ -24,7 +24,7 @@ class CountryIdTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "cty_", "cty_-1", "cty_1a", "prv_1", "CTY_1", " cty_1"})
+    @ValueSource(strings = {"", "cty_", "cty_-1", "cty_1a", "prv_1", "CTY_1", " cty_1", "cty_01"})
     void rejectsMalformedIds(String value) {
         assertValidation(() -> new CountryId(value), ErrorCode.INVALID_KEY_FORMAT);
     }

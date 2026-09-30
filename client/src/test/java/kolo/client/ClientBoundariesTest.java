@@ -24,12 +24,12 @@ class ClientBoundariesTest {
             .dependOnClassesThat(resideInAPackage("kolo.server..").and(not(simpleName("EmbeddedServer"))))
             .allowEmptyShould(true);
 
-    // Світ генерує сервер; клієнт лише показує його представлення (GridPoint — точка геометрії в представленні карти).
+    // Світ генерує сервер; клієнт лише показує його представлення (точки геометрії — з kolo.engine.state).
     @ArchTest
     static final ArchRule clientDoesNotGenerateWorld = noClasses()
             .that()
             .resideInAPackage("kolo.client..")
             .should()
-            .dependOnClassesThat(resideInAPackage("kolo.engine.generation..").and(not(simpleName("GridPoint"))))
+            .dependOnClassesThat(resideInAPackage("kolo.engine.generation.."))
             .allowEmptyShould(true);
 }

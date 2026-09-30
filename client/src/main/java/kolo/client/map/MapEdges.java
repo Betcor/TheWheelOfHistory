@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import kolo.engine.generation.map.GridPoint;
+import kolo.engine.state.GridPoint;
 import kolo.engine.view.CellView;
 import kolo.engine.view.MapView;
 

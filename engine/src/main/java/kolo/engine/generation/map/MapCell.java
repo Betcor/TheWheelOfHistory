@@ -6,6 +6,7 @@ import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
+import kolo.engine.state.GridPoint;
 
 /**
  * Комірка діаграми Вороного — майбутня провінція або частина моря.

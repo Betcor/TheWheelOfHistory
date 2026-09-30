@@ -3,7 +3,7 @@ package kolo.client.screen;
 import java.util.ArrayList;
 import java.util.List;
 import kolo.client.i18n.Texts;
-import kolo.engine.view.CellKind;
+import kolo.engine.state.CellKind;
 import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 import kolo.engine.view.MapView;

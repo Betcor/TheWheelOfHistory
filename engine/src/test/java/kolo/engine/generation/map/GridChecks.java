@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.List;
+import kolo.engine.state.GridPoint;
 
 /** Перевірки цілісності сітки, спільні для тестів рушія й інтеграційних тестів на вбудованому контенті. */
 public final class GridChecks {

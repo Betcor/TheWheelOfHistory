@@ -12,6 +12,7 @@ import kolo.engine.content.CountRange;
 import kolo.engine.content.ReliefDef;
 import kolo.engine.error.Checks;
 import kolo.engine.rng.Rng;
+import kolo.engine.state.GridPoint;
 import kolo.engine.state.Relief;
 import kolo.engine.wheel.Advantage;
 import kolo.engine.wheel.OutcomeTier;
