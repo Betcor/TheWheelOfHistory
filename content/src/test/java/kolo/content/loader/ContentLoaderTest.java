@@ -24,6 +24,8 @@ import kolo.engine.content.ClimateDef;
 import kolo.engine.content.ClimateMoistureDef;
 import kolo.engine.content.ClimateTemperatureDef;
 import kolo.engine.content.ClimateZoneDef;
+import kolo.engine.content.CoastLevelDef;
+import kolo.engine.content.CoastLevelId;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
@@ -40,6 +42,7 @@ import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
 import kolo.engine.content.IdeologyId;
+import kolo.engine.content.MapContent;
 import kolo.engine.content.MapGridDef;
 import kolo.engine.content.MapTemplateDef;
 import kolo.engine.content.MapTemplateId;
@@ -51,6 +54,9 @@ import kolo.engine.content.NameStyleDef;
 import kolo.engine.content.NameStyleId;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.PlacementDef;
+import kolo.engine.content.PopulationDef;
+import kolo.engine.content.PopulationLevelDef;
+import kolo.engine.content.PopulationLevelId;
 import kolo.engine.content.ReliefDef;
 import kolo.engine.content.ReliefLevelDef;
 import kolo.engine.content.ReligionBalanceDef;
@@ -70,6 +76,7 @@ import kolo.engine.content.StreakWheelDef;
 import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
+import kolo.engine.content.TerrainTagDef;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -1699,6 +1706,125 @@ class ContentLoaderTest {
                         .source(),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "tiny_land"));
+    }
+
+    @Test
+    void loadsGeographyAndPopulation() {
+        MapContent map = ContentLoader.load(Files.valid().source()).map();
+
+        assertThat(map.geography().coast())
+                .extracting(CoastLevelDef::id, CoastLevelDef::name, CoastLevelDef::minPct, CoastLevelDef::tags)
+                .containsExactly(
+                        tuple(new CoastLevelId("inland"), "Без моря", 0, List.of("inland")),
+                        tuple(new CoastLevelId("seaside"), "Морська", 1, List.of("seaside")));
+        assertThat(map.geography().terrains())
+                .extracting(TerrainTagDef::terrains, TerrainTagDef::minPct, TerrainTagDef::tags)
+                .containsExactly(tuple(List.of(Terrain.HILLS, Terrain.MOUNTAINS), 40, List.of("highland")));
+        PopulationDef population = map.population();
+        assertThat(population.levels())
+                .extracting(
+                        PopulationLevelDef::id,
+                        PopulationLevelDef::populationK,
+                        PopulationLevelDef::tier,
+                        PopulationLevelDef::weight,
+                        PopulationLevelDef::quality,
+                        PopulationLevelDef::tags)
+                .containsExactly(
+                        tuple(new PopulationLevelId("few"), 800, OutcomeTier.FAIL, 40, 25, List.of("few_people")),
+                        tuple(new PopulationLevelId("many"), 40_000, OutcomeTier.SUCCESS, 60, 75, List.of()));
+        assertThat(List.of(
+                        population.areaAdvantage(),
+                        population.fertilityAdvantage(),
+                        population.provinceBase(),
+                        population.coastBonus()))
+                .containsExactly(25, 50, 12, 8);
+    }
+
+    @Test
+    void invalidGeographyIsReportedAtItsPosition() {
+        String geography = Files.MAP.substring(Files.MAP.indexOf("geography:\n"), Files.MAP.indexOf("population:\n"));
+        assertMapError(
+                Files.MAP.replace(geography, ""),
+                Map.of("location", "geography", "cause", "blank_value", "field", "geography"));
+        assertMapError(
+                Files.MAP.replace("      min_pct: 1\n", ""),
+                Map.of("location", "geography.coast[1]", "cause", "blank_value", "field", "min_pct"));
+        assertMapError(
+                Files.MAP.replace("min_pct: 1\n", "min_pct: 0\n"),
+                Map.of(
+                        "location",
+                        "geography.coast[1]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "coast_level.seaside.min_pct"));
+        assertMapError(
+                Files.MAP.replace("id: seaside", "id: inland"),
+                Map.of("location", "geography.coast[1]", "cause", "duplicate_id", "value", "inland"));
+        assertMapError(
+                Files.MAP.replace("terrains: [hills, mountains]", "terrains: [hills, lava]"),
+                Map.of("location", "geography.terrains[0].terrains[1]", "cause", "unknown_reference", "value", "lava"));
+        assertMapError(
+                Files.MAP.replace("min_pct: 40", "min_pct: 0"),
+                Map.of(
+                        "location",
+                        "geography.terrains[0]",
+                        "cause",
+                        "value_out_of_range",
+                        "field",
+                        "terrain_tag.min_pct"));
+        assertMapError(
+                Files.MAP.replace("tags: [highland]", "tags: []"),
+                Map.of("location", "geography.terrains[0]", "cause", "empty_collection", "field", "terrain_tag.tags"));
+    }
+
+    @Test
+    void invalidPopulationIsReportedAtItsPosition() {
+        String population = Files.MAP.substring(Files.MAP.indexOf("population:\n"), Files.MAP.indexOf("placement:\n"));
+        assertMapError(
+                Files.MAP.replace(population, ""),
+                Map.of("location", "population", "cause", "blank_value", "field", "population"));
+        assertMapError(
+                Files.MAP.replace("  coast_bonus: 8\n", ""),
+                Map.of("location", "population", "cause", "blank_value", "field", "coast_bonus"));
+        assertMapError(
+                Files.MAP.replace("area_advantage: 25", "area_advantage: 101"),
+                Map.of("location", "population", "cause", "value_out_of_range", "field", "population.area_advantage"));
+        assertMapError(
+                Files.MAP.replace("population_k: 40000", "population_k: 800"),
+                Map.of(
+                        "location",
+                        "population.levels[1]",
+                        "cause",
+                        "out_of_order",
+                        "field",
+                        "population_level.many.population_k"));
+        assertMapError(
+                Files.MAP.replace("tier: success", "tier: triumph"),
+                Map.of("location", "population.levels[1]", "cause", "unknown_reference", "value", "triumph"));
+        assertMapError(
+                Files.MAP.replace("id: many", "id: few"),
+                Map.of("location", "population.levels[1]", "cause", "duplicate_id", "value", "few"));
+    }
+
+    @Test
+    void geographyAndPopulationTagsAreSourcesForBackstoryConditions() {
+        String backstory =
+                Files.BACKSTORY.replace("requires: [lost_war]", "requires: [lost_war, highland, seaside, few_people]");
+
+        assertThat(ContentLoader.load(Files.valid()
+                                .with(ContentLoader.BACKSTORY, backstory)
+                                .source())
+                        .backstory()
+                        .fragments())
+                .hasSize(2);
+        assertContentError(
+                Files.valid()
+                        .with(ContentLoader.BACKSTORY, backstory)
+                        .with(ContentLoader.MAP, Files.MAP.replace("tags: [few_people]", "tags: []"))
+                        .source(),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "fragments[1]", "cause", "unknown_reference", "value", "few_people"));
     }
 
     @Test

@@ -304,7 +304,9 @@ class MapDefinitionsTest {
                         TestMaps.SEA,
                         TestMaps.RIVERS,
                         TestMaps.FERTILITY,
-                        TestMaps.PLACEMENT),
+                        TestMaps.PLACEMENT,
+                        TestMaps.GEOGRAPHY,
+                        TestMaps.POPULATION),
                 ErrorCode.EMPTY_COLLECTION);
         assertFails(
                 () -> new MapContent(
@@ -316,7 +318,9 @@ class MapDefinitionsTest {
                         TestMaps.SEA,
                         TestMaps.RIVERS,
                         TestMaps.FERTILITY,
-                        TestMaps.PLACEMENT),
+                        TestMaps.PLACEMENT,
+                        TestMaps.GEOGRAPHY,
+                        TestMaps.POPULATION),
                 ErrorCode.DUPLICATE_ID);
     }
 

@@ -38,6 +38,8 @@ import kolo.engine.content.ClimateDef;
 import kolo.engine.content.ClimateMoistureDef;
 import kolo.engine.content.ClimateTemperatureDef;
 import kolo.engine.content.ClimateZoneDef;
+import kolo.engine.content.CoastLevelDef;
+import kolo.engine.content.CoastLevelId;
 import kolo.engine.content.ContentPack;
 import kolo.engine.content.ContinentsDef;
 import kolo.engine.content.CountRange;
@@ -54,6 +56,7 @@ import kolo.engine.content.FertilityDef;
 import kolo.engine.content.GdpLevelDef;
 import kolo.engine.content.GdpLevelId;
 import kolo.engine.content.GenerationBalanceDef;
+import kolo.engine.content.GeographyDef;
 import kolo.engine.content.HdiLevelDef;
 import kolo.engine.content.HdiLevelId;
 import kolo.engine.content.IdeologyDef;
@@ -75,6 +78,9 @@ import kolo.engine.content.NuclearStatusDef;
 import kolo.engine.content.PersonKindDef;
 import kolo.engine.content.PersonNameStyleDef;
 import kolo.engine.content.PlacementDef;
+import kolo.engine.content.PopulationDef;
+import kolo.engine.content.PopulationLevelDef;
+import kolo.engine.content.PopulationLevelId;
 import kolo.engine.content.PowerCorridorDef;
 import kolo.engine.content.ReliefDef;
 import kolo.engine.content.ReliefLevelDef;
@@ -105,6 +111,7 @@ import kolo.engine.content.SubIdeologyId;
 import kolo.engine.content.SurnameFinalDef;
 import kolo.engine.content.TagCondition;
 import kolo.engine.content.TechBranchDef;
+import kolo.engine.content.TerrainTagDef;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
@@ -871,7 +878,7 @@ public final class ContentLoader {
         hdi.forEach(level -> known.addAll(level.tags()));
         army.forEach(size -> known.addAll(size.tags()));
         training.forEach(level -> known.addAll(level.tags()));
-        known.addAll(map.placement().producedTags());
+        known.addAll(map.producedTags());
         return known;
     }
 
@@ -1336,10 +1343,111 @@ public final class ContentLoader {
         RiverDef rivers = at(MAP, "rivers", () -> rivers(yaml.rivers()));
         FertilityDef fertility = fertility(yaml.fertility());
         PlacementDef placement = placement(yaml.placement());
+        GeographyDef geography = geography(yaml.geography());
+        PopulationDef population = population(yaml.population());
         return at(
                 MAP,
                 "",
-                () -> new MapContent(templates, grid, continents, relief, climate, sea, rivers, fertility, placement));
+                () -> new MapContent(
+                        templates,
+                        grid,
+                        continents,
+                        relief,
+                        climate,
+                        sea,
+                        rivers,
+                        fertility,
+                        placement,
+                        geography,
+                        population));
+    }
+
+    private static GeographyDef geography(ContentYaml.Geography geography) {
+        at(MAP, "geography", () -> {
+            if (geography == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "geography"));
+            }
+            return geography;
+        });
+        TreeSet<CoastLevelId> ids = new TreeSet<>();
+        List<CoastLevelDef> coast =
+                list(MAP, "geography.coast", nonEmpty(MAP, "geography.coast", geography.coast()), (location, level) -> {
+                    CoastLevelId id = at(MAP, location, () -> unique(ids, new CoastLevelId(level.id())));
+                    return at(
+                            MAP,
+                            location,
+                            () -> new CoastLevelDef(
+                                    id,
+                                    level.name(),
+                                    level.description(),
+                                    required("min_pct", level.minPct()),
+                                    level.tags()));
+                });
+        // Порядок перевіряється тут, щоб помилка вказувала на рівень, що стоїть не на своєму місці.
+        for (int i = 1; i < coast.size(); i++) {
+            CoastLevelDef previous = coast.get(i - 1);
+            CoastLevelDef next = coast.get(i);
+            at(MAP, "geography.coast[" + i + "]", () -> {
+                CoastLevelDef.checkFollows(previous, next);
+                return next;
+            });
+        }
+        List<TerrainTagDef> terrains = list(MAP, "geography.terrains", geography.terrains(), (location, rule) -> {
+            List<Terrain> kinds = list(
+                    MAP,
+                    location + ".terrains",
+                    rule.terrains(),
+                    (where, key) ->
+                            at(MAP, where, () -> ContentKeys.parse("terrain", Terrain.values(), Terrain::key, key)));
+            return at(MAP, location, () -> new TerrainTagDef(kinds, required("min_pct", rule.minPct()), rule.tags()));
+        });
+        return at(MAP, "geography", () -> new GeographyDef(coast, terrains));
+    }
+
+    private static PopulationDef population(ContentYaml.Population population) {
+        at(MAP, "population", () -> {
+            if (population == null) {
+                throw new ValidationException(ErrorCode.BLANK_VALUE, ErrorDetails.of("field", "population"));
+            }
+            return population;
+        });
+        TreeSet<PopulationLevelId> ids = new TreeSet<>();
+        List<PopulationLevelDef> levels = list(
+                MAP,
+                "population.levels",
+                nonEmpty(MAP, "population.levels", population.levels()),
+                (location, level) -> {
+                    PopulationLevelId id = at(MAP, location, () -> unique(ids, new PopulationLevelId(level.id())));
+                    return at(
+                            MAP,
+                            location,
+                            () -> new PopulationLevelDef(
+                                    id,
+                                    level.name(),
+                                    level.description(),
+                                    required("population_k", level.populationK()),
+                                    ContentKeys.parse("tier", OutcomeTier.values(), OutcomeTier::key, level.tier()),
+                                    required("weight", level.weight()),
+                                    required("quality", level.quality()),
+                                    level.tags()));
+                });
+        for (int i = 1; i < levels.size(); i++) {
+            PopulationLevelDef previous = levels.get(i - 1);
+            PopulationLevelDef next = levels.get(i);
+            at(MAP, "population.levels[" + i + "]", () -> {
+                PopulationLevelDef.checkFollows(previous, next);
+                return next;
+            });
+        }
+        return at(
+                MAP,
+                "population",
+                () -> new PopulationDef(
+                        levels,
+                        required("area_advantage", population.areaAdvantage()),
+                        required("fertility_advantage", population.fertilityAdvantage()),
+                        required("province_base", population.provinceBase()),
+                        required("coast_bonus", population.coastBonus())));
     }
 
     private static PlacementDef placement(ContentYaml.Placement placement) {

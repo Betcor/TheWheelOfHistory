@@ -1,5 +1,6 @@
 package kolo.engine.content;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.TreeMap;
@@ -8,6 +9,7 @@ import kolo.engine.state.Cover;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.Relief;
 import kolo.engine.state.Terrain;
+import kolo.engine.wheel.OutcomeTier;
 
 /**
  * Мінімальний валідний контент карти для тестових пакетів: шаблони «Пангея» (1 материк, коефіцієнт 100, суходолу 50%)
@@ -58,8 +60,34 @@ public final class TestMaps {
     /** Три рівні площі: половина, середня, подвійна; мінімум — 2 провінції. */
     public static final PlacementDef PLACEMENT = placement(2);
 
+    /**
+     * Берег: без виходу до моря (0%, {@code landlocked}), прибережна (з 1%, {@code coastal}), морська (з 50%, {@code
+     * coastal} і {@code maritime}); місцевість: гори ≥ 20% — {@code mountainous}, пагорби й гори разом ≥ 50% — {@code
+     * highland}.
+     */
+    public static final GeographyDef GEOGRAPHY = geography(List.of(
+            new TerrainTagDef(List.of(Terrain.MOUNTAINS), 20, List.of("mountainous")),
+            new TerrainTagDef(List.of(Terrain.HILLS, Terrain.MOUNTAINS), 50, List.of("highland"))));
+
+    /**
+     * Населення: п'ять рівнів 100 / 1000 / 5000 / 20 000 / 100 000 тисяч з вагами 1000 / 2000 / 4000 / 2000 / 1000 (сума
+     * 10 000) і рівнями результату від КП до КУ, мітки {@code small_population} (два нижчі) і {@code large_population}
+     * (два верхні); площа +20 за 100 п. п., родючість 100%; вага провінції 10 + родючість + 20 на березі.
+     */
+    public static final PopulationDef POPULATION = population(20, 100, 10, 20);
+
     public static final MapContent CONTENT = new MapContent(
-            List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY, PLACEMENT);
+            List.of(PANGAEA, ARCHIPELAGO),
+            GRID,
+            CONTINENTS,
+            RELIEF,
+            CLIMATE,
+            SEA,
+            RIVERS,
+            FERTILITY,
+            PLACEMENT,
+            GEOGRAPHY,
+            POPULATION);
 
     /** NPC: мало 0–1, звичайно 2–4, багато 10–20; 60–100 провінцій на державу з кроком 20; 5–15% нічийних; 100–3000. */
     public static final WorldBalanceDef BALANCE = world(new CountRange(100, 3000));
@@ -86,42 +114,171 @@ public final class TestMaps {
 
     /** Контент {@link #CONTENT} з іншими шаблонами й числами материків. */
     public static MapContent content(List<MapTemplateDef> templates, ContinentsDef continents) {
-        return new MapContent(templates, GRID, continents, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY, PLACEMENT);
+        return new MapContent(
+                templates, GRID, continents, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY, PLACEMENT, GEOGRAPHY, POPULATION);
     }
 
     /** Контент {@link #CONTENT} з іншим рельєфом. */
     public static MapContent content(ReliefDef relief) {
         return new MapContent(
-                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, relief, CLIMATE, SEA, RIVERS, FERTILITY, PLACEMENT);
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                relief,
+                CLIMATE,
+                SEA,
+                RIVERS,
+                FERTILITY,
+                PLACEMENT,
+                GEOGRAPHY,
+                POPULATION);
     }
 
     /** Контент {@link #CONTENT} з іншим кліматом. */
     public static MapContent content(ClimateDef climate) {
         return new MapContent(
-                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, climate, SEA, RIVERS, FERTILITY, PLACEMENT);
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                RELIEF,
+                climate,
+                SEA,
+                RIVERS,
+                FERTILITY,
+                PLACEMENT,
+                GEOGRAPHY,
+                POPULATION);
     }
 
     /** Контент {@link #CONTENT} з іншими числами моря. */
     public static MapContent content(SeaDef sea) {
         return new MapContent(
-                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, sea, RIVERS, FERTILITY, PLACEMENT);
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                RELIEF,
+                CLIMATE,
+                sea,
+                RIVERS,
+                FERTILITY,
+                PLACEMENT,
+                GEOGRAPHY,
+                POPULATION);
     }
 
     /** Контент {@link #CONTENT} з іншими числами річок. */
     public static MapContent content(RiverDef rivers) {
         return new MapContent(
-                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, rivers, FERTILITY, PLACEMENT);
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                RELIEF,
+                CLIMATE,
+                SEA,
+                rivers,
+                FERTILITY,
+                PLACEMENT,
+                GEOGRAPHY,
+                POPULATION);
     }
 
     /** Контент {@link #CONTENT} з іншою родючістю. */
     public static MapContent content(FertilityDef fertility) {
         return new MapContent(
-                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, fertility, PLACEMENT);
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                RELIEF,
+                CLIMATE,
+                SEA,
+                RIVERS,
+                fertility,
+                PLACEMENT,
+                GEOGRAPHY,
+                POPULATION);
     }
 
     public static MapContent content(PlacementDef placement) {
         return new MapContent(
-                List.of(PANGAEA, ARCHIPELAGO), GRID, CONTINENTS, RELIEF, CLIMATE, SEA, RIVERS, FERTILITY, placement);
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                RELIEF,
+                CLIMATE,
+                SEA,
+                RIVERS,
+                FERTILITY,
+                placement,
+                GEOGRAPHY,
+                POPULATION);
+    }
+
+    /** Контент {@link #CONTENT} з іншою географією. */
+    public static MapContent content(GeographyDef geography) {
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                RELIEF,
+                CLIMATE,
+                SEA,
+                RIVERS,
+                FERTILITY,
+                PLACEMENT,
+                geography,
+                POPULATION);
+    }
+
+    /** Контент {@link #CONTENT} з іншим колесом населення. */
+    public static MapContent content(PopulationDef population) {
+        return new MapContent(
+                List.of(PANGAEA, ARCHIPELAGO),
+                GRID,
+                CONTINENTS,
+                RELIEF,
+                CLIMATE,
+                SEA,
+                RIVERS,
+                FERTILITY,
+                PLACEMENT,
+                GEOGRAPHY,
+                population);
+    }
+
+    /** Географія {@link #GEOGRAPHY} з іншими правилами місцевості. */
+    public static GeographyDef geography(List<TerrainTagDef> terrains) {
+        return new GeographyDef(
+                List.of(
+                        coast("landlocked", 0, List.of("landlocked")),
+                        coast("coastal", 1, List.of("coastal")),
+                        coast("maritime", 50, List.of("coastal", "maritime"))),
+                terrains);
+    }
+
+    public static CoastLevelDef coast(String id, int minPct, List<String> tags) {
+        return new CoastLevelDef(new CoastLevelId(id), "Берег " + id, "Опис берега " + id, minPct, tags);
+    }
+
+    /** Населення {@link #POPULATION} з іншими числами переваги й розподілу. */
+    public static PopulationDef population(
+            int areaAdvantage, int fertilityAdvantage, int provinceBase, int coastBonus) {
+        int[] thousands = {100, 1_000, 5_000, 20_000, 100_000};
+        int[] weights = {1_000, 2_000, 4_000, 2_000, 1_000};
+        String[] ids = {"tiny", "small", "medium", "large", "huge"};
+        List<PopulationLevelDef> levels = new ArrayList<>();
+        for (int i = 0; i < ids.length; i++) {
+            List<String> tags = i < 2 ? List.of("small_population") : i > 2 ? List.of("large_population") : List.of();
+            levels.add(new PopulationLevelDef(
+                    new PopulationLevelId(ids[i]),
+                    "Населення " + ids[i],
+                    "Опис населення " + ids[i],
+                    thousands[i],
+                    OutcomeTier.values()[i],
+                    weights[i],
+                    10 + 20 * i,
+                    tags));
+        }
+        return new PopulationDef(levels, areaAdvantage, fertilityAdvantage, provinceBase, coastBonus);
     }
 
     /** Розміщення {@link #PLACEMENT} з іншим мінімумом провінцій держави. */

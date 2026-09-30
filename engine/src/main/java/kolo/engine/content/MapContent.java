@@ -6,13 +6,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ValidationException;
 
 /**
- * Контент карти (GD §3.3–3.6): шаблони, сітка комірок, материки, рельєф, клімат, море, річки, родючість і розміщення
- * держав. Придатність до родовищ — у ресурсах ({@link ResourceDef#deposits()}).
+ * Контент карти (GD §3.3–3.6): шаблони, сітка комірок, материки, рельєф, клімат, море, річки, родючість, розміщення
+ * держав і те, що держава бере з території, — географія й населення (колеса 1–4 GD §4.1). Придатність до родовищ — у
+ * ресурсах ({@link ResourceDef#deposits()}).
  */
 public final class MapContent {
 
@@ -26,6 +28,8 @@ public final class MapContent {
     private final RiverDef rivers;
     private final FertilityDef fertility;
     private final PlacementDef placement;
+    private final GeographyDef geography;
+    private final PopulationDef population;
 
     /**
      * @param templates шаблони в порядку контенту (порядок секторів колеса шаблону)
@@ -37,6 +41,8 @@ public final class MapContent {
      * @param rivers числа генерації річок
      * @param fertility таблиця родючості провінцій
      * @param placement рівні площі й числа розміщення держав
+     * @param geography рівні виходу до моря й мітки переважної місцевості держави
+     * @param population рівні колеса населення й розподіл населення по провінціях
      * @throws ValidationException якщо шаблонів немає або id повторюється
      */
     public MapContent(
@@ -48,7 +54,9 @@ public final class MapContent {
             SeaDef sea,
             RiverDef rivers,
             FertilityDef fertility,
-            PlacementDef placement) {
+            PlacementDef placement,
+            GeographyDef geography,
+            PopulationDef population) {
         if (templates.isEmpty()) {
             throw new ValidationException(ErrorCode.EMPTY_COLLECTION, ErrorDetails.of("field", "map_templates"));
         }
@@ -70,6 +78,8 @@ public final class MapContent {
         this.rivers = Objects.requireNonNull(rivers, "rivers");
         this.fertility = Objects.requireNonNull(fertility, "fertility");
         this.placement = Objects.requireNonNull(placement, "placement");
+        this.geography = Objects.requireNonNull(geography, "geography");
+        this.population = Objects.requireNonNull(population, "population");
     }
 
     /** Шаблони в порядку контенту — порядок секторів колеса шаблону. */
@@ -111,5 +121,21 @@ public final class MapContent {
 
     public PlacementDef placement() {
         return placement;
+    }
+
+    public GeographyDef geography() {
+        return geography;
+    }
+
+    public PopulationDef population() {
+        return population;
+    }
+
+    /** Мітки, які держава може отримати з карти: рівні площі, географія й рівні населення. */
+    public TreeSet<String> producedTags() {
+        TreeSet<String> tags = placement.producedTags();
+        tags.addAll(geography.producedTags());
+        tags.addAll(population.producedTags());
+        return tags;
     }
 }

@@ -33,4 +33,38 @@ public final class Fixed {
     public static int applyBp(int value, int bp) {
         return mulDiv(value, bp, BP_SCALE);
     }
+
+    /**
+     * {@code total}, поділене пропорційно вагам: частки вниз, залишок — по одному найбільшим залишкам, при рівності —
+     * менший номер. Нульова вага нічого не отримує.
+     *
+     * @param total невід'ємне
+     * @param weights невід'ємні, сума більша за нуль
+     */
+    public static long[] distribute(long total, long[] weights) {
+        long sum = 0;
+        for (long weight : weights) {
+            sum = Math.addExact(sum, weight);
+        }
+        long[] shares = new long[weights.length];
+        long[] remainders = new long[weights.length];
+        long given = 0;
+        for (int i = 0; i < weights.length; i++) {
+            long part = Math.multiplyExact(total, weights[i]);
+            shares[i] = part / sum;
+            remainders[i] = weights[i] == 0 ? -1 : part % sum;
+            given += shares[i];
+        }
+        for (long left = total - given; left > 0; left--) {
+            int best = -1;
+            for (int i = 0; i < weights.length; i++) {
+                if (remainders[i] >= 0 && (best < 0 || remainders[i] > remainders[best])) {
+                    best = i;
+                }
+            }
+            shares[best]++;
+            remainders[best] = -1;
+        }
+        return shares;
+    }
 }
