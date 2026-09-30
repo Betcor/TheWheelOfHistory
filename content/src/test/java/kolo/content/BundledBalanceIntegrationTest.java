@@ -22,16 +22,16 @@ class BundledBalanceIntegrationTest {
 
     @Test
     void streaksMatchDesign() {
-        // GD §4.10: дуже добрий — якість ≥ 85, дуже поганий — ≤ 15, стрік — 3 поспіль.
-        assertThat(BALANCE.streaks().veryGoodQuality()).isEqualTo(85);
-        assertThat(BALANCE.streaks().veryBadQuality()).isEqualTo(15);
+        // GD §4.10: дуже добрий — якість ≥ 70, дуже поганий — ≤ 30, стрік — 3 поспіль.
+        assertThat(BALANCE.streaks().veryGoodQuality()).isEqualTo(70);
+        assertThat(BALANCE.streaks().veryBadQuality()).isEqualTo(30);
         assertThat(BALANCE.streaks().length()).isEqualTo(3);
     }
 
     @Test
     void corridorsMatchDesign() {
-        // GD §4.11: «класика» — від 0,5× до 2× медіани; для NPC коридор ширший.
-        assertThat(BALANCE.corridor(PowerCorridor.CLASSIC).players()).isEqualTo(new MedianRange(50, 200));
+        // GD §4.11: «класика» — від 0,75× до 1,33× медіани (під шкалу сили, §24.1); для NPC коридор ширший.
+        assertThat(BALANCE.corridor(PowerCorridor.CLASSIC).players()).isEqualTo(new MedianRange(75, 133));
         for (PowerCorridorDef corridor : BALANCE.corridors().values()) {
             assertThat(corridor.npc().contains(corridor.players())).isTrue();
             assertThat(corridor.npc()).as(corridor.corridor().key()).isNotEqualTo(corridor.players());

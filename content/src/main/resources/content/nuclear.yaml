@@ -9,12 +9,14 @@
 # розвиненість енергетики й науки (generation.nuclear_energy_advantage у balance.yaml).
 # Арсенал неможливий без ресурсу з міткою nuclear_fuel (resources.yaml) або з енергетикою й наукою
 # на рівні −2 і нижче. Кількість боєголовок арсеналу — generation.warheads у balance.yaml.
+# Арсенал можливий лише в ~20% держав (уран і енергетика), тому його вага вища за частку арсеналів:
+# 72/13/15 дають ~3,6% арсеналів і ~15% програм.
 # quality — наскільки статус добрий для держави (0..100), для стріків генерації (GD §4.10).
 
 statuses:
   - id: none
     name: Без ядерної зброї
-    weight: 80
+    weight: 72
     quality: 50
   - id: program
     name: Ядерна програма
@@ -23,6 +25,6 @@ statuses:
     tags: [nuclear_program]
   - id: arsenal
     name: Ядерний арсенал
-    weight: 7
+    weight: 15
     quality: 90
     tags: [nuclear_power]

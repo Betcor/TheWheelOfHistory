@@ -48,10 +48,10 @@ class BundledNuclearWheelIntegrationTest {
 
     @Test
     void weightsMatchDesign() {
-        // GD §4.6: немає ≈ 80%, програма ≈ 13%, арсенал ≈ 7%.
-        assertThat(PACK.nuclearStatus(NuclearStatus.NONE).weight()).isEqualTo(80);
+        // GD §4.6: ваги 72/13/15 — арсенал можливий лише за урану й енергетики, тож його вага вища за частку.
+        assertThat(PACK.nuclearStatus(NuclearStatus.NONE).weight()).isEqualTo(72);
         assertThat(PACK.nuclearStatus(NuclearStatus.PROGRAM).weight()).isEqualTo(13);
-        assertThat(PACK.nuclearStatus(NuclearStatus.ARSENAL).weight()).isEqualTo(7);
+        assertThat(PACK.nuclearStatus(NuclearStatus.ARSENAL).weight()).isEqualTo(15);
     }
 
     @Test

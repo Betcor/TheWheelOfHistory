@@ -40,7 +40,7 @@ resources:
     name: Уран
     tags: [energy, strategic, nuclear_fuel]
     deposits:
-      terrains: { mountains: 20, hills: 15, desert: 15, tundra: 10 }
+      terrains: { mountains: 40, hills: 30, desert: 30, tundra: 20 }
   - id: copper
     name: Мідь
     tags: [metal]
