@@ -10,6 +10,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.GameException;
 import kolo.engine.error.ValidationException;
+import kolo.engine.state.NpcShare;
 import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 
@@ -17,6 +18,10 @@ import kolo.engine.view.CountryView;
 public sealed interface ServerMessage
         permits ServerMessage.Welcome,
                 ServerMessage.Error,
+                ServerMessage.Lobbies,
+                ServerMessage.Joined,
+                ServerMessage.Lobby,
+                ServerMessage.Players,
                 ServerMessage.MapStart,
                 ServerMessage.MapCells,
                 ServerMessage.Phase {
@@ -77,6 +82,71 @@ public sealed interface ServerMessage
                 case null -> "null";
                 default -> String.valueOf(value);
             };
+        }
+    }
+
+    /**
+     * Відкриті лобі сервера — відповідь на {@link ClientMessage.ListLobbies}.
+     *
+     * @param lobbies лобі за номером сесії
+     */
+    record Lobbies(List<LobbyInfo> lobbies) implements ServerMessage {
+
+        public Lobbies {
+            lobbies = List.copyOf(lobbies);
+        }
+    }
+
+    /**
+     * Клієнт увійшов у сесію гравцем — відповідь на {@link ClientMessage.CreateLobby}, {@link ClientMessage.JoinLobby}
+     * і {@link ClientMessage.Rejoin}. Токен — лише цьому клієнтові: з ним гравець повертається до своєї держави; сервер
+     * зберігає лише його хеш.
+     *
+     * @param session номер сесії
+     * @param player номер гравця в сесії
+     * @param token токен гравця
+     */
+    record Joined(long session, int player, String token) implements ServerMessage {
+
+        public Joined {
+            Checks.inRange("session", session, 1, Long.MAX_VALUE);
+            Checks.inRange("player", player, 1, Integer.MAX_VALUE);
+            Checks.notBlank("token", token);
+            Checks.inRange("token", token.length(), 1, ClientMessage.MAX_TOKEN_LENGTH);
+        }
+    }
+
+    /**
+     * Стан лобі — усім у лобі після кожної зміни (приєднався, пішов, змінився хост).
+     *
+     * @param session номер сесії
+     * @param seed seed світу
+     * @param npcShare частка NPC-держав
+     * @param players гравці в порядку приєднання; хост — рівно один
+     */
+    record Lobby(long session, long seed, NpcShare npcShare, List<PlayerInfo> players) implements ServerMessage {
+
+        public Lobby {
+            Checks.inRange("session", session, 1, Long.MAX_VALUE);
+            Objects.requireNonNull(npcShare, "npcShare");
+            players = List.copyOf(players);
+            Checks.inRange("players", players.size(), 1, Integer.MAX_VALUE);
+            Checks.inRange(
+                    "hosts", (int) players.stream().filter(PlayerInfo::host).count(), 1, 1);
+        }
+    }
+
+    /**
+     * Гравці гри, що йде, — усім гравцям на зв'язку після кожної зміни (від'єднався, повернувся, натиснув «Готово»)
+     * і на початку кожного року.
+     *
+     * @param players гравці за номером
+     */
+    record Players(List<PlayerInfo> players) implements ServerMessage {
+
+        public Players {
+            players = List.copyOf(players);
+            Checks.inRange("players", players.size(), 1, Integer.MAX_VALUE);
         }
     }
 

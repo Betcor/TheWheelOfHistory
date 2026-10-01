@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.netty.channel.local.LocalAddress;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import kolo.engine.state.NpcShare;
 import kolo.protocol.message.ClientMessage;
+import kolo.protocol.message.ServerMessage;
 import kolo.server.persistence.WorldDirectory;
 import kolo.server.persistence.WorldStore;
 import org.junit.jupiter.api.Test;
@@ -27,9 +30,7 @@ class EmbeddedServerTest {
             assertThat(server.contentHash()).isEqualTo(TestServers.CONTENT.hash());
 
             try (TestClient client = TestClient.welcomed(server.address(), server.contentHash())) {
-                client.send(new ClientMessage.CreateWorld(42, 2, NpcShare.NORMAL));
-
-                assertThat(client.world()).isEqualTo(TestServers.map(42, 2, NpcShare.NORMAL));
+                assertThat(client.solo(42, NpcShare.NORMAL)).isEqualTo(TestServers.map(42, 1, NpcShare.NORMAL));
             }
         }
         assertThat(worlds.resolve("world-42" + WorldStore.EXTENSION)).exists();
@@ -39,11 +40,26 @@ class EmbeddedServerTest {
     void defaultWorldsAreInTheGameHome() throws Exception {
         try (EmbeddedServer server = EmbeddedServer.startWithBundledContent();
                 TestClient client = TestClient.welcomed(server.address(), server.contentHash())) {
-            client.send(new ClientMessage.CreateWorld(-77, 1, NpcShare.FEW));
-            client.world();
+            client.solo(-77, NpcShare.FEW);
         }
         assertThat(WorldDirectory.defaultLocation().resolve("world--77" + WorldStore.EXTENSION))
                 .exists();
+    }
+
+    @Test
+    void lanGameIsReachableOverTcp() throws Exception {
+        try (EmbeddedServer server = EmbeddedServer.startWithBundledContent(worlds)) {
+            InetSocketAddress lan = server.openLan(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+            try (TestClient host = TestClient.welcomed(server.address(), server.contentHash());
+                    TestClient guest = TestClient.welcomed(lan, server.contentHash())) {
+                long session = host.createLobby("Оля", 43, NpcShare.FEW).session();
+
+                guest.send(new ClientMessage.JoinLobby(session, "Ігор"));
+
+                assertThat(guest.next(ServerMessage.Joined.class).session()).isEqualTo(session);
+                assertThat(guest.next(ServerMessage.Lobby.class).players()).hasSize(2);
+            }
+        }
     }
 
     @Test

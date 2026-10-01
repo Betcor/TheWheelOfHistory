@@ -34,7 +34,8 @@ class ProtocolPipelineTest {
     void clientMessagesReachServer() {
         List<ClientMessage> sent = List.of(
                 new ClientMessage.Hello(Protocol.VERSION, TestMessages.HASH),
-                new ClientMessage.CreateWorld(3, 2, NpcShare.NORMAL));
+                new ClientMessage.CreateLobby("Оля", 3, NpcShare.NORMAL),
+                new ClientMessage.StartGame());
 
         for (ClientMessage message : sent) {
             client.writeOutbound(message);

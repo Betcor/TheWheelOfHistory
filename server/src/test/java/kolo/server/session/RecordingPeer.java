@@ -39,12 +39,29 @@ final class RecordingPeer implements Peer {
         return message;
     }
 
-    ServerMessage.Error error() throws InterruptedException {
+    /** Наступне повідомлення — цього типу. */
+    <T extends ServerMessage> T next(Class<T> type) throws InterruptedException {
         ServerMessage message = next();
-        if (!(message instanceof ServerMessage.Error error)) {
-            throw new AssertionError("очікувалася помилка, а прийшло " + message);
+        if (!type.isInstance(message)) {
+            throw new AssertionError("очікувалося " + type.getSimpleName() + ", а прийшло " + message);
         }
-        return error;
+        return type.cast(message);
+    }
+
+    ServerMessage.Error error() throws InterruptedException {
+        return next(ServerMessage.Error.class);
+    }
+
+    ServerMessage.Joined joined() throws InterruptedException {
+        return next(ServerMessage.Joined.class);
+    }
+
+    ServerMessage.Lobby lobby() throws InterruptedException {
+        return next(ServerMessage.Lobby.class);
+    }
+
+    ServerMessage.Players players() throws InterruptedException {
+        return next(ServerMessage.Players.class);
     }
 
     /** Збирає карту з наступних повідомлень. */
@@ -65,8 +82,9 @@ final class RecordingPeer implements Peer {
         }
     }
 
-    /** Фази першого року до прийому наказів. */
+    /** Початок року: список гравців і фази до прийому наказів. */
     void expectOrders(int turn) throws InterruptedException {
+        players();
         expectPhase(turn, YearPhase.START_OF_YEAR);
         expectPhase(turn, YearPhase.ORDERS);
     }

@@ -25,7 +25,7 @@ import kolo.engine.error.SaveVersionException;
 final class Migrator {
 
     /** Скрипти в порядку версій; новий скрипт — лише в кінець, старі не змінюються. */
-    private static final List<String> BUNDLED_SCRIPTS = List.of("0001_world.sql");
+    private static final List<String> BUNDLED_SCRIPTS = List.of("0001_world.sql", "0002_players.sql");
 
     private static final String CREATE_TABLE = "CREATE TABLE IF NOT EXISTS schema_migrations ("
             + "version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)";
@@ -44,8 +44,13 @@ final class Migrator {
 
     /** Мігратор зі скриптами гри. */
     static Migrator bundled() {
+        return bundled(BUNDLED_SCRIPTS.size());
+    }
+
+    /** Мігратор з першими {@code version} скриптами гри — файл старішої версії гри (для тестів міграцій). */
+    static Migrator bundled(int version) {
         List<Migration> migrations = new ArrayList<>();
-        for (String script : BUNDLED_SCRIPTS) {
+        for (String script : BUNDLED_SCRIPTS.subList(0, version)) {
             migrations.add(Migration.of(script, resource(script)));
         }
         return new Migrator(migrations);

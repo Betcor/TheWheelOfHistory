@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.entry;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.OptionalInt;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ProtocolException;
@@ -13,7 +14,9 @@ import kolo.engine.state.NpcShare;
 import kolo.engine.view.MapView;
 import kolo.protocol.TestMessages;
 import kolo.protocol.message.ClientMessage;
+import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.MapChunks;
+import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -30,9 +33,52 @@ class MessageJsonTest {
     }
 
     @Test
-    void createWorldFormatIsFixed() {
-        assertThat(json(MessageJson.write(new ClientMessage.CreateWorld(-5, 3, NpcShare.MANY))))
-                .isEqualTo("{\"type\":\"create_world\",\"seed\":-5,\"players\":3,\"npc_share\":\"many\"}");
+    void createLobbyFormatIsFixed() {
+        assertThat(json(MessageJson.write(new ClientMessage.CreateLobby("Оля", -5, NpcShare.MANY))))
+                .isEqualTo("{\"type\":\"create_lobby\",\"nickname\":\"Оля\",\"seed\":-5,\"npc_share\":\"many\"}");
+    }
+
+    @Test
+    void lobbyRequestsFormatIsFixed() {
+        assertThat(json(MessageJson.write(new ClientMessage.ListLobbies()))).isEqualTo("{\"type\":\"list_lobbies\"}");
+        assertThat(json(MessageJson.write(new ClientMessage.JoinLobby(4, "Ігор"))))
+                .isEqualTo("{\"type\":\"join_lobby\",\"session\":4,\"nickname\":\"Ігор\"}");
+        assertThat(json(MessageJson.write(new ClientMessage.StartGame()))).isEqualTo("{\"type\":\"start_game\"}");
+        assertThat(json(MessageJson.write(new ClientMessage.Rejoin(4, 2, "ab12"))))
+                .isEqualTo("{\"type\":\"rejoin\",\"session\":4,\"player\":2,\"token\":\"ab12\"}");
+        assertThat(json(MessageJson.write(new ClientMessage.Leave()))).isEqualTo("{\"type\":\"leave\"}");
+    }
+
+    @Test
+    void lobbyFormatIsFixed() {
+        ServerMessage.Lobby lobby = new ServerMessage.Lobby(
+                3,
+                9,
+                NpcShare.FEW,
+                List.of(
+                        new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty()),
+                        new PlayerInfo(4, "Ігор", false, true, false, OptionalInt.empty())));
+
+        assertThat(json(MessageJson.write(lobby)))
+                .isEqualTo("{\"type\":\"lobby\",\"session\":3,\"seed\":9,\"npc_share\":\"few\",\"players\":["
+                        + "{\"number\":1,\"nickname\":\"Оля\",\"host\":true,\"connected\":true,\"ready\":false,"
+                        + "\"country\":null},"
+                        + "{\"number\":4,\"nickname\":\"Ігор\",\"host\":false,\"connected\":true,\"ready\":false,"
+                        + "\"country\":null}]}");
+    }
+
+    @Test
+    void playersJoinedAndLobbiesFormatIsFixed() {
+        assertThat(json(MessageJson.write(new ServerMessage.Players(
+                        List.of(new PlayerInfo(2, "Оля", false, false, true, OptionalInt.of(1)))))))
+                .isEqualTo("{\"type\":\"players\",\"players\":[{\"number\":2,\"nickname\":\"Оля\",\"host\":false,"
+                        + "\"connected\":false,\"ready\":true,\"country\":1}]}");
+        assertThat(json(MessageJson.write(new ServerMessage.Joined(3, 2, "ab12"))))
+                .isEqualTo("{\"type\":\"joined\",\"session\":3,\"player\":2,\"token\":\"ab12\"}");
+        assertThat(json(MessageJson.write(
+                        new ServerMessage.Lobbies(List.of(new LobbyInfo(3, "Оля", 2, NpcShare.NORMAL))))))
+                .isEqualTo("{\"type\":\"lobbies\",\"lobbies\":[{\"session\":3,\"host\":\"Оля\",\"players\":2,"
+                        + "\"npc_share\":\"normal\"}]}");
     }
 
     @Test
@@ -73,7 +119,12 @@ class MessageJsonTest {
     void clientMessagesRoundTrip() {
         for (ClientMessage message : List.of(
                 new ClientMessage.Hello(7, TestMessages.HASH),
-                new ClientMessage.CreateWorld(Long.MIN_VALUE, 16, NpcShare.FEW),
+                new ClientMessage.ListLobbies(),
+                new ClientMessage.CreateLobby("Гравець 1", Long.MIN_VALUE, NpcShare.FEW),
+                new ClientMessage.JoinLobby(Long.MAX_VALUE, "x"),
+                new ClientMessage.StartGame(),
+                new ClientMessage.Rejoin(1, Integer.MAX_VALUE, TestMessages.HASH),
+                new ClientMessage.Leave(),
                 new ClientMessage.Ready(0),
                 new ClientMessage.Ready(Integer.MAX_VALUE))) {
             assertThat(MessageJson.readClient(MessageJson.write(message))).isEqualTo(message);
@@ -85,6 +136,9 @@ class MessageJsonTest {
         MapView map = TestMessages.map(Long.MAX_VALUE, 9);
         List<ServerMessage> messages = new java.util.ArrayList<>(MapChunks.split(map, 4));
         messages.add(new ServerMessage.Welcome(1, TestMessages.HASH));
+        messages.add(new ServerMessage.Lobbies(List.of()));
+        messages.add(new ServerMessage.Joined(1, 1, TestMessages.HASH));
+        messages.add(new ServerMessage.Players(List.of(new PlayerInfo(1, "a", true, true, true, OptionalInt.of(0)))));
         for (YearPhase phase : YearPhase.values()) {
             messages.add(new ServerMessage.Phase(phase.ordinal() * 100, phase));
         }
@@ -151,7 +205,7 @@ class MessageJsonTest {
                 "expected_int");
         assertProblem(
                 () -> MessageJson.readClient(
-                        bytes("{\"type\":\"create_world\",\"seed\":1,\"players\":1,\"npc_share\":\"lots\"}")),
+                        bytes("{\"type\":\"create_lobby\",\"nickname\":\"a\",\"seed\":1,\"npc_share\":\"lots\"}")),
                 "npc_share",
                 "unknown_value");
         assertProblem(
@@ -159,6 +213,36 @@ class MessageJsonTest {
                 "phase",
                 "unknown_value");
         assertProblem(() -> MessageJson.readClient(bytes("{\"type\":\"ready\"}")), "turn", "missing_field");
+    }
+
+    @Test
+    void messagesWithoutFieldsRejectExtraFields() {
+        assertProblem(
+                () -> MessageJson.readClient(bytes("{\"type\":\"start_game\",\"now\":true}")), "now", "unknown_field");
+    }
+
+    @Test
+    void invalidNicknamesAreRejected() {
+        assertThat(catchProtocol(() -> MessageJson.readClient(
+                                bytes("{\"type\":\"join_lobby\",\"session\":1,\"nickname\":\" Оля\"}")))
+                        .details())
+                .containsEntry("cause", "invalid_name_format")
+                .containsEntry("field", "nickname");
+        assertThat(catchProtocol(() -> MessageJson.readClient(bytes(
+                                "{\"type\":\"join_lobby\",\"session\":1,\"nickname\":\"" + "я".repeat(25) + "\"}")))
+                        .details())
+                .containsEntry("cause", "value_out_of_range");
+    }
+
+    @Test
+    void lobbyWithoutExactlyOneHostIsRejected() {
+        String json = "{\"type\":\"lobby\",\"session\":3,\"seed\":9,\"npc_share\":\"few\",\"players\":["
+                + "{\"number\":1,\"nickname\":\"Оля\",\"host\":false,\"connected\":true,\"ready\":false,"
+                + "\"country\":null}]}";
+
+        assertThat(catchProtocol(() -> MessageJson.readServer(bytes(json))).details())
+                .containsEntry("cause", "value_out_of_range")
+                .containsEntry("field", "hosts");
     }
 
     @Test

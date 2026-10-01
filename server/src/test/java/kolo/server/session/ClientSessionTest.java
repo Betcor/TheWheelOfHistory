@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -14,6 +15,7 @@ import kolo.engine.state.NpcShare;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
+import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.ServerMessage;
 import kolo.server.TestServers;
 import kolo.server.persistence.WorldDirectory;
@@ -77,7 +79,7 @@ class ClientSessionTest {
 
     @Test
     void requestBeforeHelloClosesTheConnection() throws Exception {
-        session.handle(new ClientMessage.CreateWorld(1, 1, NpcShare.FEW));
+        session.handle(new ClientMessage.CreateLobby("Оля", 1, NpcShare.FEW));
 
         ServerMessage.Error error = peer.error();
         assertThat(error.code()).isEqualTo(ErrorCode.PROTOCOL_ERROR);
@@ -97,27 +99,66 @@ class ClientSessionTest {
     }
 
     @Test
-    void createWorldSendsTheMapAndOpensTheFirstYear() throws Exception {
+    void createdLobbyIsListedAndStartsTheGame() throws Exception {
         welcome();
 
-        session.handle(new ClientMessage.CreateWorld(42, 2, NpcShare.NORMAL));
+        session.handle(new ClientMessage.CreateLobby("Оля", 42, NpcShare.NORMAL));
 
-        assertThat(peer.map()).isEqualTo(TestServers.map(42, 2, NpcShare.NORMAL));
+        ServerMessage.Joined joined = peer.joined();
+        assertThat(peer.lobby().session()).isEqualTo(joined.session());
+        session.handle(new ClientMessage.ListLobbies());
+        assertThat(peer.next())
+                .isEqualTo(
+                        new ServerMessage.Lobbies(List.of(new LobbyInfo(joined.session(), "Оля", 1, NpcShare.NORMAL))));
+
+        session.handle(new ClientMessage.StartGame());
+
+        assertThat(peer.map()).isEqualTo(TestServers.map(42, 1, NpcShare.NORMAL));
         peer.expectOrders(0);
         assertThat(session.session()).isPresent();
         assertThat(peer.closed()).isFalse();
+        // Почату гру вже не видно у списку лобі.
+        session.handle(new ClientMessage.ListLobbies());
+        assertThat(peer.next()).isEqualTo(new ServerMessage.Lobbies(List.of()));
     }
 
     @Test
-    void readyIsForwardedToTheSession() throws Exception {
+    void anotherClientJoinsTheLobbyAndPlays() throws Exception {
         welcome();
-        session.handle(new ClientMessage.CreateWorld(3, 1, NpcShare.FEW));
+        session.handle(new ClientMessage.CreateLobby("Оля", 3, NpcShare.FEW));
+        long id = peer.joined().session();
+        peer.lobby();
+        RecordingPeer otherPeer = new RecordingPeer();
+        ClientSession other = welcomed(otherPeer);
+
+        other.handle(new ClientMessage.JoinLobby(id, "Ігор"));
+
+        assertThat(otherPeer.joined().player()).isEqualTo(2);
+        assertThat(otherPeer.lobby().players()).hasSize(2);
+        assertThat(peer.lobby().players()).hasSize(2);
+        session.handle(new ClientMessage.StartGame());
         peer.map();
         peer.expectOrders(0);
-
+        otherPeer.map();
+        otherPeer.expectOrders(0);
         session.handle(new ClientMessage.Ready(0));
-
+        peer.players();
+        other.handle(new ClientMessage.Ready(0));
+        otherPeer.players();
+        otherPeer.expectYear(0);
         peer.expectYear(0);
+    }
+
+    @Test
+    void joiningAnUnknownSessionIsNotFound() throws Exception {
+        welcome();
+
+        session.handle(new ClientMessage.JoinLobby(99, "Оля"));
+
+        ServerMessage.Error error = peer.error();
+        assertThat(error.code()).isEqualTo(ErrorCode.NOT_FOUND);
+        assertThat(error.details()).containsEntry("what", "session").containsEntry("id", 99L);
+        assertThat(peer.closed()).isFalse();
     }
 
     @Test
@@ -133,31 +174,24 @@ class ClientSessionTest {
     }
 
     @Test
-    void invalidWorldIsAnErrorButTheConnectionStaysOpen() throws Exception {
+    void startWithoutSessionIsForbidden() throws Exception {
         welcome();
 
-        session.handle(new ClientMessage.CreateWorld(1, 0, NpcShare.FEW));
+        session.handle(new ClientMessage.StartGame());
 
-        ServerMessage.Error error = peer.error();
-        assertThat(error.code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE);
-        assertThat(error.details()).containsEntry("field", "players");
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.FORBIDDEN);
         assertThat(peer.closed()).isFalse();
-        // Після помилки запиту той самий клієнт може спробувати знову.
-        session.handle(new ClientMessage.CreateWorld(1, 1, NpcShare.FEW));
-        assertThat(peer.next()).isInstanceOf(ServerMessage.MapStart.class);
     }
 
     @Test
-    void newWorldLeavesThePreviousSession() throws Exception {
+    void newLobbyLeavesThePreviousSession() throws Exception {
         welcome();
-        session.handle(new ClientMessage.CreateWorld(1, 1, NpcShare.FEW));
-        peer.map();
-        peer.expectOrders(0);
+        soloGame(1);
         SessionActor first = session.session().orElseThrow();
 
-        session.handle(new ClientMessage.CreateWorld(2, 1, NpcShare.FEW));
-        peer.map();
-        peer.expectOrders(0);
+        session.handle(new ClientMessage.CreateLobby("Оля", 2, NpcShare.FEW));
+        peer.joined();
+        peer.lobby();
 
         assertThat(first.awaitClosed(30, TimeUnit.SECONDS)).isTrue();
         assertThat(first.state()).isEqualTo(SessionState.CLOSED);
@@ -165,11 +199,59 @@ class ClientSessionTest {
     }
 
     @Test
-    void disconnectLeavesTheSession() throws Exception {
+    void leftSessionIsSilent() throws Exception {
         welcome();
-        session.handle(new ClientMessage.CreateWorld(1, 1, NpcShare.FEW));
+        session.handle(new ClientMessage.CreateLobby("Оля", 3, NpcShare.FEW));
+        long id = peer.joined().session();
+        peer.lobby();
+        RecordingPeer otherPeer = new RecordingPeer();
+        ClientSession other = welcomed(otherPeer);
+        other.handle(new ClientMessage.JoinLobby(id, "Ігор"));
+        otherPeer.joined();
+        otherPeer.lobby();
+        peer.lobby();
+
+        other.handle(new ClientMessage.Leave());
+
+        // Хост бачить вихід, а той, хто вийшов, — уже нічого з цієї сесії.
+        assertThat(peer.lobby().players()).hasSize(1);
+        session.handle(new ClientMessage.StartGame());
+        peer.map();
+        assertThat(otherPeer.quiet()).isTrue();
+        assertThat(other.session()).isEmpty();
+    }
+
+    @Test
+    void disconnectedPlayerRejoinsWithTheToken() throws Exception {
+        welcome();
+        session.handle(new ClientMessage.CreateLobby("Оля", 3, NpcShare.FEW));
+        long id = peer.joined().session();
+        peer.lobby();
+        RecordingPeer otherPeer = new RecordingPeer();
+        ClientSession other = welcomed(otherPeer);
+        other.handle(new ClientMessage.JoinLobby(id, "Ігор"));
+        ServerMessage.Joined joined = otherPeer.joined();
+        otherPeer.lobby();
+        peer.lobby();
+        session.handle(new ClientMessage.StartGame());
         peer.map();
         peer.expectOrders(0);
+        other.disconnected();
+        peer.players();
+        RecordingPeer backPeer = new RecordingPeer();
+        ClientSession back = welcomed(backPeer);
+
+        back.handle(new ClientMessage.Rejoin(id, joined.player(), joined.token()));
+
+        assertThat(backPeer.joined()).isEqualTo(joined);
+        assertThat(backPeer.map()).isEqualTo(TestServers.map(3, 2, NpcShare.FEW));
+        assertThat(back.session()).isPresent();
+    }
+
+    @Test
+    void disconnectLeavesTheSession() throws Exception {
+        welcome();
+        soloGame(1);
         SessionActor actor = session.session().orElseThrow();
 
         session.disconnected();
@@ -206,5 +288,22 @@ class ClientSessionTest {
     private void welcome() throws InterruptedException {
         session.handle(Handshake.hello(HASH));
         assertThat(peer.next()).isInstanceOf(ServerMessage.Welcome.class);
+    }
+
+    private ClientSession welcomed(RecordingPeer other) throws InterruptedException {
+        ClientSession client = new ClientSession(() -> TestServers.CONTENT, sessions, other);
+        client.handle(Handshake.hello(HASH));
+        assertThat(other.next()).isInstanceOf(ServerMessage.Welcome.class);
+        return client;
+    }
+
+    /** Лобі хоста й одразу гра; чекає наказів року 0. */
+    private void soloGame(long seed) throws InterruptedException {
+        session.handle(new ClientMessage.CreateLobby("Оля", seed, NpcShare.FEW));
+        peer.joined();
+        peer.lobby();
+        session.handle(new ClientMessage.StartGame());
+        peer.map();
+        peer.expectOrders(0);
     }
 }

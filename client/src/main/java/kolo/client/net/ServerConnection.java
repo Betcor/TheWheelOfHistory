@@ -14,6 +14,7 @@ import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import java.net.SocketAddress;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -21,22 +22,27 @@ import kolo.engine.state.NpcShare;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
+import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.ServerMessage;
 
 /**
  * З'єднання клієнта з сервером — вбудованим ({@code LocalAddress}) чи віддаленим (TCP): той самий протокол і ті самі
  * повідомлення. Має власний event loop (один потік-демон), не спільний із сервером.
  *
- * <p>Методи повертають {@link CompletableFuture}: UI не чекає мережі у своєму потоці. Помилки запиту —
+ * <p>Запити з відповіддю повертають {@link CompletableFuture}: UI не чекає мережі у своєму потоці. Помилки запиту —
  * {@link ServerErrorException} (сервер відповів помилкою), {@link kolo.engine.error.GameException} (пошкоджене
- * повідомлення, інша версія), {@link ConnectionClosedException} (розрив).
+ * повідомлення, інша версія), {@link ConnectionClosedException} (розрив). Решта — події сесії для {@link
+ * SessionListener}: початок гри, гравці, фази року, помилки без запиту.
  */
 public final class ServerConnection implements AutoCloseable {
 
+    private final SocketAddress address;
     private final Channel channel;
     private final EventLoopGroup group;
     private final ConnectionHandler handler;
 
-    private ServerConnection(Channel channel, EventLoopGroup group, ConnectionHandler handler) {
+    private ServerConnection(SocketAddress address, Channel channel, EventLoopGroup group, ConnectionHandler handler) {
+        this.address = address;
         this.channel = channel;
         this.group = group;
         this.handler = handler;
@@ -47,13 +53,15 @@ public final class ServerConnection implements AutoCloseable {
      *
      * @param address адреса вбудованого ({@code LocalAddress}) чи віддаленого (TCP) сервера
      * @param contentHash хеш контенту клієнта
+     * @param listener події сесії цього з'єднання
      * @return з'єднання після привітання сервера; з різними версіями чи контентом — помилка
      */
-    public static CompletableFuture<ServerConnection> connect(SocketAddress address, String contentHash) {
+    public static CompletableFuture<ServerConnection> connect(
+            SocketAddress address, String contentHash, SessionListener listener) {
         boolean local = address instanceof LocalAddress;
         IoHandlerFactory io = local ? LocalIoHandler.newFactory() : NioIoHandler.newFactory();
         EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, new DefaultThreadFactory("kolo-client", true), io);
-        ConnectionHandler handler = new ConnectionHandler(contentHash);
+        ConnectionHandler handler = new ConnectionHandler(contentHash, listener);
         CompletableFuture<ServerConnection> result = new CompletableFuture<>();
         ChannelFuture connecting = new Bootstrap()
                 .group(group)
@@ -72,7 +80,7 @@ public final class ServerConnection implements AutoCloseable {
                 result.completeExceptionally(new ConnectionClosedException("не вдалося з'єднатися", future.cause()));
                 return;
             }
-            ServerConnection connection = new ServerConnection(connecting.channel(), group, handler);
+            ServerConnection connection = new ServerConnection(address, connecting.channel(), group, handler);
             handler.welcomed().whenComplete((ok, error) -> {
                 if (error == null) {
                     result.complete(connection);
@@ -86,35 +94,71 @@ public final class ServerConnection implements AutoCloseable {
         return result;
     }
 
-    /**
-     * Просить сервер створити світ, отримує його карту частинами й чекає прийому наказів першого року.
-     *
-     * @return карта й поточний рік; поки запит не завершено, новий завершується {@link IllegalStateException}
-     */
-    public CompletableFuture<GameStart> createWorld(long seed, int players, NpcShare npcShare) {
-        ClientMessage.CreateWorld request = new ClientMessage.CreateWorld(seed, players, npcShare);
-        CompletableFuture<GameStart> result = new CompletableFuture<>();
-        execute(result, () -> handler.createWorld(channel, request, result));
-        return result;
+    /** Адреса сервера, з яким з'єднано. */
+    public SocketAddress address() {
+        return address;
+    }
+
+    /** Відкриті лобі сервера. */
+    public CompletableFuture<List<LobbyInfo>> lobbies() {
+        return request(new ClientMessage.ListLobbies(), ServerMessage.Lobbies.class)
+                .thenApply(ServerMessage.Lobbies::lobbies);
     }
 
     /**
-     * «Готово» для року {@code turn}: чекає, доки сервер розв'яже рік і почне прийом наказів наступного.
+     * Створює лобі з цим клієнтом-хостом; стан лобі прийде слухачеві.
      *
-     * @return новий поточний рік
+     * @return номер сесії, номер гравця й токен для повернення
      */
-    public CompletableFuture<Integer> endYear(int turn) {
-        ClientMessage.Ready request = new ClientMessage.Ready(turn);
-        CompletableFuture<Integer> result = new CompletableFuture<>();
-        execute(result, () -> handler.endYear(channel, request, result));
-        return result;
+    public CompletableFuture<ServerMessage.Joined> createLobby(String nickname, long seed, NpcShare npcShare) {
+        return request(new ClientMessage.CreateLobby(nickname, seed, npcShare), ServerMessage.Joined.class);
     }
 
-    private void execute(CompletableFuture<?> result, Runnable task) {
+    /** Приєднується до лобі; стан лобі прийде слухачеві. */
+    public CompletableFuture<ServerMessage.Joined> joinLobby(long session, String nickname) {
+        return request(new ClientMessage.JoinLobby(session, nickname), ServerMessage.Joined.class);
+    }
+
+    /**
+     * Повертається до своєї держави з токеном, отриманим раніше; карту й поточну фазу отримає слухач ({@link
+     * SessionListener#gameStarted}).
+     */
+    public CompletableFuture<ServerMessage.Joined> rejoin(ServerMessage.Joined credentials) {
+        return request(
+                new ClientMessage.Rejoin(credentials.session(), credentials.player(), credentials.token()),
+                ServerMessage.Joined.class);
+    }
+
+    /** Хост починає гру; карту отримають слухачі всіх гравців, помилку — слухач цього з'єднання. */
+    public void startGame() {
+        send(new ClientMessage.StartGame());
+    }
+
+    /** «Готово» для року {@code turn}; новий рік прийде слухачеві фазами. */
+    public void ready(int turn) {
+        send(new ClientMessage.Ready(turn));
+    }
+
+    /** Полишає сесію. */
+    public void leave() {
+        send(new ClientMessage.Leave());
+    }
+
+    private <T extends ServerMessage> CompletableFuture<T> request(ClientMessage request, Class<T> reply) {
+        CompletableFuture<T> result = new CompletableFuture<>();
         try {
-            channel.eventLoop().execute(task);
+            channel.eventLoop().execute(() -> handler.request(channel, request, reply, result));
         } catch (RejectedExecutionException e) {
             result.completeExceptionally(new ConnectionClosedException("з'єднання закрито", e));
+        }
+        return result;
+    }
+
+    private void send(ClientMessage message) {
+        try {
+            channel.eventLoop().execute(() -> handler.send(channel, message));
+        } catch (RejectedExecutionException e) {
+            // З'єднання закрито: слухач уже отримав розрив.
         }
     }
 

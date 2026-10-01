@@ -3,12 +3,15 @@ package kolo.server.session;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import kolo.engine.content.ContentPack;
 import kolo.engine.state.WorldState;
+import kolo.protocol.message.LobbyInfo;
+import kolo.server.auth.PlayerTokens;
 import kolo.server.persistence.WorldDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +23,7 @@ public final class Sessions {
 
     private final WorldDirectory worlds;
     private final Function<ContentPack, UnaryOperator<WorldState>> years;
+    private final PlayerTokens tokens = new PlayerTokens();
     private final TreeMap<Long, SessionActor> open = new TreeMap<>();
     private long nextId = 1;
     private boolean closed;
@@ -48,9 +52,23 @@ public final class Sessions {
             throw new IllegalStateException("сесії закрито");
         }
         long id = nextId++;
-        SessionActor session = new SessionActor(id, content, worlds, years.apply(content), this::closed);
+        SessionActor session = new SessionActor(id, content, worlds, tokens, years.apply(content), this::closed);
         open.put(id, session);
         return session;
+    }
+
+    /** Відкрита сесія з цим номером. */
+    public synchronized Optional<SessionActor> find(long id) {
+        return Optional.ofNullable(open.get(id));
+    }
+
+    /** Лобі, до яких ще можна приєднатися, за номером сесії. */
+    public List<LobbyInfo> lobbies() {
+        List<LobbyInfo> lobbies = new ArrayList<>();
+        for (SessionActor session : active()) {
+            session.lobby().ifPresent(lobbies::add);
+        }
+        return lobbies;
     }
 
     /** Відкриті сесії за номером. */

@@ -1,5 +1,6 @@
 package kolo.client.net;
 
+import static kolo.client.TestWorlds.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -9,8 +10,11 @@ import java.util.concurrent.CompletableFuture;
 import kolo.client.TestWorlds;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
-import kolo.engine.view.MapView;
 import kolo.protocol.message.Handshake;
+import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.PlayerInfo;
+import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 import kolo.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -18,7 +22,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Клієнт ↔ вбудований сервер через {@code LocalChannel}: рукостискання, світ, роки, помилки сервера й розрив. */
+/**
+ * Клієнт ↔ вбудований сервер через {@code LocalChannel}: рукостискання, лобі, приєднання, старт, роки, повернення,
+ * помилки сервера й розрив.
+ */
 @Timeout(60)
 class ServerConnectionTest {
 
@@ -38,107 +45,165 @@ class ServerConnectionTest {
     }
 
     @Test
-    void sameSeedSameMap() {
-        try (ServerConnection connection = connect()) {
-            MapView first = EmbeddedGame.await(connection.createWorld(42, 2, NpcShare.NORMAL))
-                    .map();
-            MapView second = EmbeddedGame.await(connection.createWorld(42, 2, NpcShare.NORMAL))
-                    .map();
+    void soloGameStartsAndYearsFollow() throws Exception {
+        RecordingListener events = new RecordingListener();
+        try (ServerConnection connection = connect(events)) {
+            ServerMessage.Joined joined = await(connection.createLobby("Оля", 5, NpcShare.FEW));
+            ServerMessage.Lobby lobby =
+                    events.next(RecordingListener.Lobby.class).lobby();
+            assertThat(lobby.session()).isEqualTo(joined.session());
+            assertThat(lobby.players()).extracting(PlayerInfo::nickname).containsExactly("Оля");
 
-            assertThat(second).isEqualTo(first);
-            assertThat(first.seed()).isEqualTo(42);
-            assertThat(first.countries().stream().filter(country -> country.player()))
+            connection.startGame();
+
+            GameStart start = TestWorlds.started(events);
+            assertThat(start.turn()).isZero();
+            assertThat(start.map().seed()).isEqualTo(5);
+            events.awaitOrders(0);
+            connection.ready(0);
+            events.awaitOrders(1);
+            connection.ready(1);
+            events.awaitOrders(2);
+
+            connection.ready(0);
+            assertThat(events.next(RecordingListener.Error.class).error().code())
+                    .isEqualTo(ErrorCode.PHASE_CLOSED);
+            assertThat(connection.isOpen()).isTrue();
+        }
+    }
+
+    @Test
+    void sameSeedSameMapAsTheTestWorlds() throws Exception {
+        assertThat(TestWorlds.DEFAULT.seed()).isEqualTo(1970);
+        RecordingListener events = new RecordingListener();
+        try (ServerConnection connection = connect(events)) {
+            await(connection.createLobby("Оля", 1970, NpcShare.NORMAL));
+            connection.startGame();
+
+            assertThat(TestWorlds.started(events).map()).isEqualTo(TestWorlds.DEFAULT);
+        }
+    }
+
+    @Test
+    void secondClientFindsAndJoinsTheLobby() throws Exception {
+        RecordingListener hostEvents = new RecordingListener();
+        RecordingListener guestEvents = new RecordingListener();
+        try (ServerConnection host = connect(hostEvents);
+                ServerConnection guest = connect(guestEvents)) {
+            long session = await(host.createLobby("Оля", 6, NpcShare.FEW)).session();
+
+            assertThat(await(guest.lobbies())).contains(new LobbyInfo(session, "Оля", 1, NpcShare.FEW));
+            ServerMessage.Joined joined = await(guest.joinLobby(session, "Ігор"));
+            assertThat(joined.player()).isEqualTo(2);
+            assertThat(guestEvents.next(RecordingListener.Lobby.class).lobby().players())
+                    .hasSize(2);
+            host.startGame();
+
+            GameStart hostStart = TestWorlds.started(hostEvents);
+            GameStart guestStart = TestWorlds.started(guestEvents);
+            assertThat(guestStart.map()).isEqualTo(hostStart.map());
+            assertThat(hostStart.map().countries().stream().filter(country -> country.player()))
                     .hasSize(2);
         }
     }
 
     @Test
-    void serverErrorKeepsTheConnectionUsable() {
-        try (ServerConnection connection = connect()) {
-            assertThatThrownBy(() -> EmbeddedGame.await(connection.createWorld(1, 0, NpcShare.FEW)))
-                    .isInstanceOfSatisfying(ServerErrorException.class, e -> {
-                        assertThat(e.error().code()).isEqualTo(ErrorCode.VALUE_OUT_OF_RANGE);
-                        assertThat(e.error().details()).containsEntry("field", "players");
-                    });
+    void takenNicknameFailsTheJoin() throws Exception {
+        try (ServerConnection host = connect(SessionListener.NONE);
+                ServerConnection guest = connect(SessionListener.NONE)) {
+            long session = await(host.createLobby("Оля", 7, NpcShare.FEW)).session();
 
-            assertThat(connection.isOpen()).isTrue();
-            assertThat(EmbeddedGame.await(connection.createWorld(1, 1, NpcShare.FEW))
-                            .map()
-                            .cells())
-                    .isNotEmpty();
+            assertThatThrownBy(() -> await(guest.joinLobby(session, "ОЛЯ")))
+                    .isInstanceOfSatisfying(
+                            ServerErrorException.class,
+                            e -> assertThat(e.error().code()).isEqualTo(ErrorCode.NICKNAME_TAKEN));
+            assertThat(guest.isOpen()).isTrue();
         }
     }
 
     @Test
-    void yearsFollowEachOther() {
-        try (ServerConnection connection = connect()) {
-            GameStart start = EmbeddedGame.await(connection.createWorld(5, 1, NpcShare.FEW));
-            assertThat(start.turn()).isZero();
+    void playerRejoinsAfterTheConnectionDrops() throws Exception {
+        RecordingListener hostEvents = new RecordingListener();
+        try (ServerConnection host = connect(hostEvents)) {
+            long session = await(host.createLobby("Оля", 8, NpcShare.FEW)).session();
+            ServerConnection guest = connect(SessionListener.NONE);
+            ServerMessage.Joined joined = await(guest.joinLobby(session, "Ігор"));
+            host.startGame();
+            TestWorlds.started(hostEvents);
+            guest.close();
+            // Хост бачить гостя не на зв'язку.
+            while (hostEvents.next(RecordingListener.Players.class).players().stream()
+                    .allMatch(PlayerInfo::connected)) {
+                Thread.onSpinWait();
+            }
 
-            assertThat(EmbeddedGame.await(connection.endYear(0))).isEqualTo(1);
-            assertThat(EmbeddedGame.await(connection.endYear(1))).isEqualTo(2);
+            RecordingListener backEvents = new RecordingListener();
+            try (ServerConnection back = connect(backEvents)) {
+                assertThat(await(back.rejoin(joined))).isEqualTo(joined);
 
-            assertThatThrownBy(() -> EmbeddedGame.await(connection.endYear(0)))
+                GameStart start = TestWorlds.started(backEvents);
+                assertThat(start.phase()).isEqualTo(YearPhase.ORDERS);
+                assertThat(start.map().seed()).isEqualTo(8);
+            }
+        }
+    }
+
+    @Test
+    void wrongTokenIsUnauthorized() {
+        try (ServerConnection host = connect(SessionListener.NONE);
+                ServerConnection other = connect(SessionListener.NONE)) {
+            ServerMessage.Joined joined = await(host.createLobby("Оля", 9, NpcShare.FEW));
+
+            assertThatThrownBy(() -> await(other.rejoin(new ServerMessage.Joined(joined.session(), 1, "0".repeat(64)))))
                     .isInstanceOfSatisfying(
                             ServerErrorException.class,
-                            e -> assertThat(e.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED));
-            assertThat(connection.isOpen()).isTrue();
+                            e -> assertThat(e.error().code()).isEqualTo(ErrorCode.UNAUTHORIZED));
         }
     }
 
     @Test
     void otherContentIsRejectedByTheServer() {
-        CompletableFuture<ServerConnection> connecting = ServerConnection.connect(SERVER.address(), "0".repeat(64));
+        CompletableFuture<ServerConnection> connecting =
+                ServerConnection.connect(SERVER.address(), "0".repeat(64), SessionListener.NONE);
 
-        assertThatThrownBy(() -> EmbeddedGame.await(connecting))
-                .isInstanceOfSatisfying(ServerErrorException.class, e -> {
-                    assertThat(e.error().code()).isEqualTo(ErrorCode.VERSION_MISMATCH);
-                    assertThat(e.error().details()).containsEntry("part", Handshake.CONTENT);
-                });
+        assertThatThrownBy(() -> await(connecting)).isInstanceOfSatisfying(ServerErrorException.class, e -> {
+            assertThat(e.error().code()).isEqualTo(ErrorCode.VERSION_MISMATCH);
+            assertThat(e.error().details()).containsEntry("part", Handshake.CONTENT);
+        });
     }
 
     @Test
     void noServerAtAddress() {
         CompletableFuture<ServerConnection> connecting =
-                ServerConnection.connect(new LocalAddress("kolo-nobody"), SERVER.contentHash());
+                ServerConnection.connect(new LocalAddress("kolo-nobody"), SERVER.contentHash(), SessionListener.NONE);
 
-        assertThatThrownBy(() -> EmbeddedGame.await(connecting)).isInstanceOf(ConnectionClosedException.class);
+        assertThatThrownBy(() -> await(connecting)).isInstanceOf(ConnectionClosedException.class);
     }
 
     @Test
-    void stoppedServerFailsRequests() {
+    void stoppedServerFailsRequestsAndTellsTheListener() throws Exception {
         EmbeddedServer server = EmbeddedServer.startWithBundledContent(worlds);
-        ServerConnection connection =
-                EmbeddedGame.await(ServerConnection.connect(server.address(), server.contentHash()));
+        RecordingListener events = new RecordingListener();
+        ServerConnection connection = await(ServerConnection.connect(server.address(), server.contentHash(), events));
 
         server.close();
 
-        assertThatThrownBy(() -> EmbeddedGame.await(connection.createWorld(1, 1, NpcShare.FEW)))
-                .isInstanceOf(ConnectionClosedException.class);
+        assertThat(events.next()).isEqualTo(new RecordingListener.Disconnected());
+        assertThatThrownBy(() -> await(connection.lobbies())).isInstanceOf(ConnectionClosedException.class);
         connection.close();
         assertThat(connection.isOpen()).isFalse();
     }
 
     @Test
     void closedConnectionFailsRequests() {
-        ServerConnection connection = connect();
+        ServerConnection connection = connect(SessionListener.NONE);
         connection.close();
 
-        assertThatThrownBy(() -> EmbeddedGame.await(connection.createWorld(1, 1, NpcShare.FEW)))
+        assertThatThrownBy(() -> await(connection.createLobby("Оля", 1, NpcShare.FEW)))
                 .isInstanceOf(ConnectionClosedException.class);
     }
 
-    @Test
-    void embeddedGameServesTheSameWorlds() {
-        assertThat(TestWorlds.DEFAULT.seed()).isEqualTo(1970);
-        try (ServerConnection connection = connect()) {
-            assertThat(EmbeddedGame.await(connection.createWorld(1970, 1, NpcShare.NORMAL))
-                            .map())
-                    .isEqualTo(TestWorlds.DEFAULT);
-        }
-    }
-
-    private static ServerConnection connect() {
-        return EmbeddedGame.await(ServerConnection.connect(SERVER.address(), SERVER.contentHash()));
+    private static ServerConnection connect(SessionListener listener) {
+        return await(ServerConnection.connect(SERVER.address(), SERVER.contentHash(), listener));
     }
 }

@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import kolo.engine.state.NpcShare;
 import kolo.engine.view.MapView;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
@@ -101,6 +102,30 @@ public final class TestClient implements AutoCloseable {
         return map.orElseThrow();
     }
 
+    /** Наступне повідомлення — цього типу. */
+    public <T extends ServerMessage> T next(Class<T> type) throws InterruptedException {
+        ServerMessage message = next();
+        if (!type.isInstance(message)) {
+            throw new AssertionError("очікувалося " + type.getSimpleName() + ", а прийшло " + message);
+        }
+        return type.cast(message);
+    }
+
+    /** Створює лобі й чекає свого номера та стану лобі. */
+    public ServerMessage.Joined createLobby(String nickname, long seed, NpcShare npcShare) throws InterruptedException {
+        send(new ClientMessage.CreateLobby(nickname, seed, npcShare));
+        ServerMessage.Joined joined = next(ServerMessage.Joined.class);
+        next(ServerMessage.Lobby.class);
+        return joined;
+    }
+
+    /** Одиночна гра: лобі, старт і карта до прийому наказів року 0. */
+    public MapView solo(long seed, NpcShare npcShare) throws InterruptedException {
+        createLobby("Хост", seed, npcShare);
+        send(new ClientMessage.StartGame());
+        return world();
+    }
+
     /** Наступне повідомлення — фаза року. */
     public ServerMessage.Phase phase() throws InterruptedException {
         ServerMessage message = next();
@@ -110,9 +135,10 @@ public final class TestClient implements AutoCloseable {
         return phase;
     }
 
-    /** Карта нового світу й фази його першого року — до прийому наказів. */
+    /** Карта нового світу, гравці й фази його першого року — до прийому наказів. */
     public MapView world() throws InterruptedException {
         MapView map = map();
+        next(ServerMessage.Players.class);
         expectPhase(0, YearPhase.START_OF_YEAR);
         expectPhase(0, YearPhase.ORDERS);
         return map;
@@ -121,8 +147,14 @@ public final class TestClient implements AutoCloseable {
     /** Закінчує рік {@code turn} і чекає фаз до прийому наказів наступного року. */
     public void endYear(int turn) throws InterruptedException {
         send(new ClientMessage.Ready(turn));
+        expectYearAfterReady(turn);
+    }
+
+    /** Фази розв'язання року {@code turn}, гравці й фази наступного року до прийому наказів. */
+    public void expectYearAfterReady(int turn) throws InterruptedException {
         expectPhase(turn, YearPhase.RESOLVING);
         expectPhase(turn, YearPhase.REPORT);
+        next(ServerMessage.Players.class);
         expectPhase(turn + 1, YearPhase.START_OF_YEAR);
         expectPhase(turn + 1, YearPhase.ORDERS);
     }

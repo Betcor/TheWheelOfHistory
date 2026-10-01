@@ -58,8 +58,8 @@ class ProtocolMapIntegrationTest {
 
         Handshake.confirm(welcome, hash);
         assertThat(MessageJson.readServer(MessageJson.write(welcome))).isEqualTo(welcome);
-        assertThat(MessageJson.readClient(MessageJson.write(new ClientMessage.CreateWorld(1, 16, NpcShare.MANY))))
-                .isEqualTo(new ClientMessage.CreateWorld(1, 16, NpcShare.MANY));
+        ClientMessage create = new ClientMessage.CreateLobby("Хост", 1, NpcShare.MANY);
+        assertThat(MessageJson.readClient(MessageJson.write(create))).isEqualTo(create);
     }
 
     @Test

@@ -16,6 +16,8 @@ import kolo.engine.state.NounPhrase;
 import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 import kolo.protocol.message.ClientMessage;
+import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 
 /**
@@ -38,12 +40,26 @@ final class MessageWriter {
                     json.writeNumberField("protocol_version", hello.protocolVersion());
                     json.writeStringField("content_hash", hello.contentHash());
                 }
-                case ClientMessage.CreateWorld create -> {
-                    json.writeStringField("type", MessageTypes.CREATE_WORLD);
+                case ClientMessage.ListLobbies list -> json.writeStringField("type", MessageTypes.LIST_LOBBIES);
+                case ClientMessage.CreateLobby create -> {
+                    json.writeStringField("type", MessageTypes.CREATE_LOBBY);
+                    json.writeStringField("nickname", create.nickname());
                     json.writeNumberField("seed", create.seed());
-                    json.writeNumberField("players", create.players());
                     json.writeStringField("npc_share", key(create.npcShare()));
                 }
+                case ClientMessage.JoinLobby join -> {
+                    json.writeStringField("type", MessageTypes.JOIN_LOBBY);
+                    json.writeNumberField("session", join.session());
+                    json.writeStringField("nickname", join.nickname());
+                }
+                case ClientMessage.StartGame start -> json.writeStringField("type", MessageTypes.START_GAME);
+                case ClientMessage.Rejoin rejoin -> {
+                    json.writeStringField("type", MessageTypes.REJOIN);
+                    json.writeNumberField("session", rejoin.session());
+                    json.writeNumberField("player", rejoin.player());
+                    json.writeStringField("token", rejoin.token());
+                }
+                case ClientMessage.Leave leave -> json.writeStringField("type", MessageTypes.LEAVE);
                 case ClientMessage.Ready ready -> {
                     json.writeStringField("type", MessageTypes.READY);
                     json.writeNumberField("turn", ready.turn());
@@ -77,6 +93,31 @@ final class MessageWriter {
                         }
                     }
                     json.writeEndObject();
+                }
+                case ServerMessage.Lobbies lobbies -> {
+                    json.writeStringField("type", MessageTypes.LOBBIES);
+                    json.writeArrayFieldStart("lobbies");
+                    for (LobbyInfo lobby : lobbies.lobbies()) {
+                        lobby(json, lobby);
+                    }
+                    json.writeEndArray();
+                }
+                case ServerMessage.Joined joined -> {
+                    json.writeStringField("type", MessageTypes.JOINED);
+                    json.writeNumberField("session", joined.session());
+                    json.writeNumberField("player", joined.player());
+                    json.writeStringField("token", joined.token());
+                }
+                case ServerMessage.Lobby lobby -> {
+                    json.writeStringField("type", MessageTypes.LOBBY);
+                    json.writeNumberField("session", lobby.session());
+                    json.writeNumberField("seed", lobby.seed());
+                    json.writeStringField("npc_share", key(lobby.npcShare()));
+                    players(json, lobby.players());
+                }
+                case ServerMessage.Players players -> {
+                    json.writeStringField("type", MessageTypes.PLAYERS);
+                    players(json, players.players());
                 }
                 case ServerMessage.MapStart start -> {
                     json.writeStringField("type", MessageTypes.MAP_START);
@@ -112,6 +153,30 @@ final class MessageWriter {
     static String key(Enum<?> value) {
         // Locale.ROOT: інакше в турецькій локалі «I» перетворюється на «ı».
         return value.name().toLowerCase(Locale.ROOT);
+    }
+
+    private static void lobby(JsonGenerator json, LobbyInfo lobby) throws IOException {
+        json.writeStartObject();
+        json.writeNumberField("session", lobby.session());
+        json.writeStringField("host", lobby.host());
+        json.writeNumberField("players", lobby.players());
+        json.writeStringField("npc_share", key(lobby.npcShare()));
+        json.writeEndObject();
+    }
+
+    private static void players(JsonGenerator json, List<PlayerInfo> players) throws IOException {
+        json.writeArrayFieldStart("players");
+        for (PlayerInfo player : players) {
+            json.writeStartObject();
+            json.writeNumberField("number", player.number());
+            json.writeStringField("nickname", player.nickname());
+            json.writeBooleanField("host", player.host());
+            json.writeBooleanField("connected", player.connected());
+            json.writeBooleanField("ready", player.ready());
+            optionalInt(json, "country", player.country());
+            json.writeEndObject();
+        }
+        json.writeEndArray();
     }
 
     private static void country(JsonGenerator json, CountryView country) throws IOException {

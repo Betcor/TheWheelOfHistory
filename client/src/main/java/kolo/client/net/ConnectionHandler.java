@@ -12,19 +12,18 @@ import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.ServerMessage;
-import kolo.protocol.message.YearPhase;
 
 /**
- * Клієнтський бік розмови: рукостискання, новий світ і кінець року. Працює лише в event loop свого каналу, тож стан
- * без блокувань. Одночасно — щонайбільше один запит.
+ * Клієнтський бік розмови. Працює лише в event loop свого каналу, тож стан без блокувань.
  *
- * <p>Новий світ завершується, коли зібрано карту й сервер почав прийом наказів ({@link YearPhase#ORDERS}); кінець
- * року — коли почався прийом наказів наступного року. Фази, на які ніхто не чекає (до карти нового світу — ще від
- * попередньої сесії), пропускаються.
+ * <p>Запити з відповіддю — список лобі ({@link ServerMessage.Lobbies}) і вхід у сесію ({@link ServerMessage.Joined});
+ * одночасно — щонайбільше один. Решта повідомлень — події сесії для {@link SessionListener}: стан лобі, гравці, карта
+ * (коли зібрано карту й прийшла перша фаза — {@link SessionListener#gameStarted}), фази року.
  *
- * <p>Помилка сервера ({@link ServerMessage.Error}) завершує запит, що чекає, {@link ServerErrorException}; пошкоджене
- * повідомлення чи порушений порядок — {@link kolo.engine.error.ProtocolException} і закриття; розрив — {@link
- * ConnectionClosedException} для всього, що чекає.
+ * <p>Помилка сервера ({@link ServerMessage.Error}) завершує запит, що чекає, {@link ServerErrorException}, а без
+ * запиту — подія {@link SessionListener#error}; пошкоджене повідомлення чи порушений порядок — {@link
+ * kolo.engine.error.ProtocolException} і закриття; розрив — {@link ConnectionClosedException} для запиту й подія
+ * {@link SessionListener#disconnected}.
  */
 final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage> {
 
@@ -32,15 +31,16 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
     static final String CONVERSATION = "conversation";
 
     private final String contentHash;
+    private final SessionListener listener;
     private final CompletableFuture<Void> welcomed = new CompletableFuture<>();
-    private CompletableFuture<GameStart> world;
+    private Pending<?> pending;
     private MapAssembler assembler;
-    private MapView received;
-    private CompletableFuture<Integer> year;
-    private int yearTurn;
+    private MapView map;
+    private boolean inGame;
 
-    ConnectionHandler(String contentHash) {
+    ConnectionHandler(String contentHash, SessionListener listener) {
         this.contentHash = Objects.requireNonNull(contentHash, "contentHash");
+        this.listener = Objects.requireNonNull(listener, "listener");
     }
 
     /** Завершується, коли сервер привітав клієнта й версії збіглися. */
@@ -48,43 +48,26 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
         return welcomed;
     }
 
-    /** Надсилає запит світу; викликати з event loop каналу. */
-    void createWorld(Channel channel, ClientMessage.CreateWorld request, CompletableFuture<GameStart> result) {
-        if (refused(channel, result)) {
-            return;
-        }
-        world = result;
-        assembler = new MapAssembler();
-        received = null;
-        send(channel, request);
-    }
-
-    /** Надсилає «Готово»; викликати з event loop каналу. */
-    void endYear(Channel channel, ClientMessage.Ready request, CompletableFuture<Integer> result) {
-        if (refused(channel, result)) {
-            return;
-        }
-        year = result;
-        yearTurn = request.turn();
-        send(channel, request);
-    }
-
-    private boolean refused(Channel channel, CompletableFuture<?> result) {
+    /** Надсилає запит і чекає відповіді типу {@code reply}; викликати з event loop каналу. */
+    <T extends ServerMessage> void request(
+            Channel channel, ClientMessage request, Class<T> reply, CompletableFuture<T> result) {
         if (!channel.isActive()) {
             result.completeExceptionally(new ConnectionClosedException("з'єднання закрито"));
-            return true;
+            return;
         }
-        if (world != null || year != null) {
+        if (pending != null) {
             result.completeExceptionally(new IllegalStateException("попередній запит ще не завершено"));
-            return true;
+            return;
         }
-        return false;
+        pending = new Pending<>(reply, result);
+        send(channel, request);
     }
 
-    private void send(Channel channel, ClientMessage request) {
-        channel.writeAndFlush(request).addListener(future -> {
+    /** Надсилає повідомлення без відповіді; помилку сервера отримає слухач. Викликати з event loop каналу. */
+    void send(Channel channel, ClientMessage message) {
+        channel.writeAndFlush(message).addListener(future -> {
             if (!future.isSuccess()) {
-                fail(new ConnectionClosedException("запит не надіслано", future.cause()));
+                failPending(new ConnectionClosedException("запит не надіслано", future.cause()));
             }
         });
     }
@@ -99,70 +82,92 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
                 Handshake.confirm(welcome, contentHash);
                 welcomed.complete(null);
             }
-            case ServerMessage.Error error -> fail(new ServerErrorException(error));
-            case ServerMessage.MapStart start -> requireMap().start(start);
-            case ServerMessage.MapCells cells ->
-                requireMap().add(cells).ifPresent(map -> {
-                    received = map;
+            case ServerMessage.Error error -> {
+                if (!welcomed.isDone()) {
+                    welcomed.completeExceptionally(new ServerErrorException(error));
+                } else if (pending != null) {
+                    failPending(new ServerErrorException(error));
+                } else {
+                    listener.error(error);
+                }
+            }
+            case ServerMessage.Lobbies lobbies -> reply(lobbies);
+            case ServerMessage.Joined joined -> {
+                // Нова сесія: що було з попередньою, вже не важить.
+                inGame = false;
+                assembler = null;
+                map = null;
+                reply(joined);
+            }
+            case ServerMessage.Lobby lobby -> listener.lobby(lobby);
+            case ServerMessage.Players players -> listener.players(players.players());
+            case ServerMessage.MapStart start -> {
+                assembler = new MapAssembler();
+                map = null;
+                assembler.start(start);
+            }
+            case ServerMessage.MapCells cells -> {
+                if (assembler == null) {
+                    throw ProtocolErrors.malformed(CONVERSATION, "map_not_started");
+                }
+                assembler.add(cells).ifPresent(done -> {
+                    map = done;
                     assembler = null;
                 });
+            }
             case ServerMessage.Phase phase -> phase(phase);
         }
     }
 
     private void phase(ServerMessage.Phase phase) {
-        if (phase.phase() != YearPhase.ORDERS) {
-            return;
-        }
-        if (world != null && received != null) {
-            CompletableFuture<GameStart> done = world;
-            GameStart start = new GameStart(received, phase.turn());
-            clearWorld();
-            done.complete(start);
-        } else if (year != null && phase.turn() > yearTurn) {
-            CompletableFuture<Integer> done = year;
-            year = null;
-            done.complete(phase.turn());
+        if (map != null) {
+            MapView started = map;
+            map = null;
+            inGame = true;
+            listener.gameStarted(new GameStart(started, phase.turn(), phase.phase()));
+        } else if (inGame) {
+            listener.phase(phase);
+        } else {
+            throw ProtocolErrors.malformed(CONVERSATION, "phase_without_map");
         }
     }
 
-    private void clearWorld() {
-        world = null;
-        assembler = null;
-        received = null;
+    private <T extends ServerMessage> void reply(T message) {
+        if (pending == null || !pending.type().isInstance(message)) {
+            throw ProtocolErrors.malformed(CONVERSATION, "unexpected_reply");
+        }
+        Pending<?> done = pending;
+        pending = null;
+        done.complete(message);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        fail(gameCause(cause));
+        Throwable reason = gameCause(cause);
+        if (!welcomed.isDone()) {
+            welcomed.completeExceptionally(reason);
+        }
+        failPending(reason);
         ctx.close();
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        fail(new ConnectionClosedException("сервер закрив з'єднання"));
+        ConnectionClosedException closed = new ConnectionClosedException("сервер закрив з'єднання");
+        boolean wasWelcomed = welcomed.isDone() && !welcomed.isCompletedExceptionally();
+        welcomed.completeExceptionally(closed);
+        failPending(closed);
+        if (wasWelcomed) {
+            listener.disconnected();
+        }
         super.channelInactive(ctx);
     }
 
-    private MapAssembler requireMap() {
-        if (assembler == null) {
-            throw ProtocolErrors.malformed(CONVERSATION, "map_not_requested");
-        }
-        return assembler;
-    }
-
-    /** Завершує помилкою те, що чекає: до привітання — привітання, після — запит. */
-    private void fail(Throwable cause) {
-        if (!welcomed.isDone()) {
-            welcomed.completeExceptionally(cause);
-        } else if (world != null) {
-            CompletableFuture<GameStart> pending = world;
-            clearWorld();
-            pending.completeExceptionally(cause);
-        } else if (year != null) {
-            CompletableFuture<Integer> pending = year;
-            year = null;
-            pending.completeExceptionally(cause);
+    private void failPending(Throwable cause) {
+        if (pending != null) {
+            Pending<?> failed = pending;
+            pending = null;
+            failed.result().completeExceptionally(cause);
         }
     }
 
@@ -174,5 +179,13 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
             }
         }
         return cause;
+    }
+
+    /** Запит, що чекає відповіді свого типу. */
+    private record Pending<T extends ServerMessage>(Class<T> type, CompletableFuture<T> result) {
+
+        void complete(ServerMessage message) {
+            result.complete(type.cast(message));
+        }
     }
 }

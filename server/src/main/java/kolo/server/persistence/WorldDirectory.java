@@ -3,6 +3,7 @@ package kolo.server.persistence;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.SaveFileException;
@@ -61,6 +62,11 @@ public final class WorldDirectory {
      *     запис не вдався
      */
     public WorldStore create(long seed, MapSnapshot map, StateSnapshot initial) {
+        return create(seed, map, initial, List.of());
+    }
+
+    /** Те саме з гравцями світу ({@link WorldStore#create(Path, String, MapSnapshot, StateSnapshot, List)}). */
+    public WorldStore create(long seed, MapSnapshot map, StateSnapshot initial, List<PlayerRecord> players) {
         try {
             Files.createDirectories(directory);
         } catch (IOException e) {
@@ -74,7 +80,7 @@ public final class WorldDirectory {
                 continue;
             }
             try {
-                return WorldStore.create(file, name, map, initial);
+                return WorldStore.create(file, name, map, initial, players);
             } catch (SaveFileException e) {
                 // Файл міг з'явитися між перевіркою й створенням — тоді беремо наступне ім'я.
                 if (!"file_exists".equals(e.details().get("problem"))) {
