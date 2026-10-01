@@ -14,11 +14,11 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ProtocolException;
 import kolo.engine.error.VersionMismatchException;
 import kolo.engine.state.NpcShare;
-import kolo.engine.view.MapView;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 import org.junit.jupiter.api.Test;
 
 /** Клієнтський бік розмови в {@link EmbeddedChannel} без кодека: повідомлення — об'єкти. */
@@ -55,23 +55,72 @@ class ConnectionHandlerTest {
     }
 
     @Test
-    void mapArrivesInChunks() throws Exception {
-        CompletableFuture<MapView> map = request();
+    void worldStartsWhenOrdersOpenAfterTheMap() throws Exception {
+        CompletableFuture<GameStart> world = request();
 
         assertThat(channel.<ClientMessage>readOutbound()).isEqualTo(REQUEST);
         for (ServerMessage part : MapChunks.split(TestMaps.MAP, 2)) {
-            assertThat(map).isNotDone();
+            assertThat(world).isNotDone();
             channel.writeInbound(part);
         }
+        channel.writeInbound(new ServerMessage.Phase(0, YearPhase.START_OF_YEAR));
+        assertThat(world).isNotDone();
+        channel.writeInbound(new ServerMessage.Phase(0, YearPhase.ORDERS));
 
-        assertThat(map.get()).isEqualTo(TestMaps.MAP);
-        // Наступний запит після отриманої карти дозволено.
+        assertThat(world.get()).isEqualTo(new GameStart(TestMaps.MAP, 0));
+        // Наступний запит після отриманого світу дозволено.
         assertThat(request()).isNotDone();
     }
 
     @Test
+    void phasesBeforeTheMapAreSkipped() throws Exception {
+        CompletableFuture<GameStart> world = request();
+
+        channel.writeInbound(new ServerMessage.Phase(4, YearPhase.ORDERS));
+        MapChunks.split(TestMaps.MAP).forEach(channel::writeInbound);
+        channel.writeInbound(new ServerMessage.Phase(0, YearPhase.ORDERS));
+
+        assertThat(world.get().turn()).isZero();
+    }
+
+    @Test
+    void yearEndsWhenNextYearOrdersOpen() throws Exception {
+        startWorld();
+        CompletableFuture<Integer> year = endYear(0);
+
+        assertThat(channel.<ClientMessage>readOutbound()).isEqualTo(new ClientMessage.Ready(0));
+        channel.writeInbound(new ServerMessage.Phase(0, YearPhase.RESOLVING));
+        channel.writeInbound(new ServerMessage.Phase(0, YearPhase.REPORT));
+        channel.writeInbound(new ServerMessage.Phase(1, YearPhase.START_OF_YEAR));
+        assertThat(year).isNotDone();
+        channel.writeInbound(new ServerMessage.Phase(1, YearPhase.ORDERS));
+
+        assertThat(year.get()).isEqualTo(1);
+        assertThat(endYear(1)).isNotDone();
+    }
+
+    @Test
+    void closedYearFailsTheRequestButKeepsTheConnection() {
+        startWorld();
+        CompletableFuture<Integer> year = endYear(3);
+
+        channel.writeInbound(new ServerMessage.Error(ErrorCode.PHASE_CLOSED, new TreeMap<>(Map.of("turn", 3L))));
+
+        assertThatThrownBy(year::get).hasCauseInstanceOf(ServerErrorException.class);
+        assertThat(channel.isOpen()).isTrue();
+    }
+
+    @Test
+    void yearAndWorldRequestsDoNotOverlap() {
+        startWorld();
+        endYear(0);
+
+        assertThatThrownBy(() -> request().get()).hasCauseInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void serverErrorFailsTheRequestButKeepsTheConnection() {
-        CompletableFuture<MapView> map = request();
+        CompletableFuture<GameStart> map = request();
 
         channel.writeInbound(error(ErrorCode.VALUE_OUT_OF_RANGE));
 
@@ -98,7 +147,7 @@ class ConnectionHandlerTest {
 
     @Test
     void chunkOutOfOrderFailsTheRequest() {
-        CompletableFuture<MapView> map = request();
+        CompletableFuture<GameStart> map = request();
         List<ServerMessage> parts = MapChunks.split(TestMaps.MAP, 2);
 
         channel.writeInbound(parts.getFirst());
@@ -110,7 +159,7 @@ class ConnectionHandlerTest {
 
     @Test
     void disconnectFailsWaitingRequest() {
-        CompletableFuture<MapView> map = request();
+        CompletableFuture<GameStart> map = request();
 
         channel.close();
 
@@ -138,10 +187,24 @@ class ConnectionHandlerTest {
         }
     }
 
-    private CompletableFuture<MapView> request() {
+    private CompletableFuture<GameStart> request() {
         welcome();
-        CompletableFuture<MapView> result = new CompletableFuture<>();
+        CompletableFuture<GameStart> result = new CompletableFuture<>();
         handler.createWorld(channel, REQUEST, result);
+        return result;
+    }
+
+    private void startWorld() {
+        CompletableFuture<GameStart> world = request();
+        MapChunks.split(TestMaps.MAP).forEach(channel::writeInbound);
+        channel.writeInbound(new ServerMessage.Phase(0, YearPhase.ORDERS));
+        assertThat(world).isCompleted();
+        channel.readOutbound();
+    }
+
+    private CompletableFuture<Integer> endYear(int turn) {
+        CompletableFuture<Integer> result = new CompletableFuture<>();
+        handler.endYear(channel, new ClientMessage.Ready(turn), result);
         return result;
     }
 

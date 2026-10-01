@@ -2,6 +2,7 @@ package kolo.client.screen;
 
 import java.util.OptionalInt;
 import java.util.concurrent.Executor;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
@@ -20,16 +21,27 @@ import kolo.client.i18n.Texts;
 import kolo.client.map.MapCanvas;
 import kolo.client.map.MapLayers;
 import kolo.client.map.MapMode;
+import kolo.client.net.WorldSource;
+import kolo.engine.state.WorldState;
 import kolo.engine.view.MapView;
 
-/** Карта світу (GD §22.2): режими карти, панель обраної провінції й рядок стану з провінцією під курсором. */
+/**
+ * Карта світу (GD §22.2): режими карти, поточний рік і кнопка «Готово», панель обраної провінції й рядок стану з
+ * провінцією під курсором. Поки систем немає, роки «порожні»: «Готово» лише переводить світ у наступний рік на
+ * сервері.
+ */
 public final class MapScreen {
 
     private static final double PANEL_WIDTH = 280;
 
     private MapScreen() {}
 
-    public static Parent create(Navigator navigator, Texts texts, MapLayers layers, Executor background) {
+    /**
+     * @param turn поточний рік світу (хід)
+     * @param world сесія світу на сервері — для кінця року
+     */
+    public static Parent create(
+            Navigator navigator, Texts texts, MapLayers layers, int turn, WorldSource world, Executor background) {
         MapView view = layers.view();
         MapCanvas canvas = new MapCanvas(layers, background);
 
@@ -55,12 +67,18 @@ public final class MapScreen {
             canvas.dispose();
             navigator.showMainMenu();
         });
+        Label year = new Label(yearText(texts, turn));
+        year.getStyleClass().add("title-4");
+        Button endYear = new Button(texts.text("map.end_year"));
         toolbar.getItems()
                 .addAll(
                         new Separator(),
                         new Label(texts.text(
                                 "map.world", view.seed(), view.countries().size())),
                         spacer,
+                        year,
+                        endYear,
+                        new Separator(),
                         fit,
                         menu);
 
@@ -76,6 +94,34 @@ public final class MapScreen {
         Label status = new Label(texts.text("map.status.hint"));
         status.setPadding(new Insets(4, 8, 4, 8));
 
+        // Поточний рік змінюється лише в потоці JavaFX.
+        int[] current = {turn};
+        endYear.setOnAction(event -> {
+            endYear.setDisable(true);
+            int finished = current[0];
+            status.setText(texts.text("map.year_resolving"));
+            background.execute(() -> {
+                try {
+                    int next = world.endYear(finished);
+                    Platform.runLater(() -> {
+                        current[0] = next;
+                        year.setText(yearText(texts, next));
+                        status.setText(texts.text("map.year_started", WorldState.year(next)));
+                        endYear.setDisable(false);
+                    });
+                } catch (RuntimeException e) {
+                    String message = ErrorTexts.of(texts, e);
+                    Platform.runLater(() -> {
+                        status.setText(message);
+                        endYear.setDisable(false);
+                    });
+                    if (!ErrorTexts.expected(e)) {
+                        throw e;
+                    }
+                }
+            });
+        });
+
         canvas.setOnHover(cell -> status.setText(
                 cell.isPresent()
                         ? ProvinceDescription.summary(view, cell.getAsInt(), texts)
@@ -88,6 +134,10 @@ public final class MapScreen {
         root.setBottom(status);
         canvas.requestFocus();
         return root;
+    }
+
+    private static String yearText(Texts texts, int turn) {
+        return texts.text("map.year", WorldState.year(turn));
     }
 
     private static void show(OptionalInt cell, MapView view, Texts texts, Label title, VBox details) {

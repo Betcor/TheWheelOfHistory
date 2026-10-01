@@ -1,16 +1,19 @@
 package kolo.server;
 
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import kolo.content.loader.ContentLoader;
 import kolo.engine.content.ContentPack;
 import kolo.engine.error.ContentException;
 import kolo.protocol.Protocol;
+import kolo.server.persistence.WorldDirectory;
 import kolo.server.transport.GameServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Точка входу окремого (headless) сервера: {@code [--port N]}, типово {@value Protocol#DEFAULT_PORT}.
+ * Точка входу окремого (headless) сервера: {@code [--port N] [--worlds DIR]}, типово порт {@value
+ * Protocol#DEFAULT_PORT} і тека {@code worlds} у поточній теці.
  *
  * <p>Контент завантажується одразу: з невалідним контентом сервер не стартує. Зупинка — сигналом процесу.
  */
@@ -23,14 +26,25 @@ public final class DedicatedServerMain {
     /** Код виходу: сервер не стартував. */
     static final int EXIT_FAILURE = 1;
 
+    /** Тека світів, якщо її не задано. */
+    static final Path DEFAULT_WORLDS = Path.of("worlds");
+
     private DedicatedServerMain() {}
 
+    /**
+     * Аргументи запуску.
+     *
+     * @param port TCP-порт; 0 — будь-який вільний
+     * @param worlds тека файлів світів
+     */
+    record Options(int port, Path worlds) {}
+
     public static void main(String[] args) throws InterruptedException {
-        int port;
+        Options options;
         try {
-            port = port(args);
+            options = options(args);
         } catch (IllegalArgumentException e) {
-            LOG.error("Невірні аргументи: {}. Використання: [--port 0..65535]", e.getMessage());
+            LOG.error("Невірні аргументи: {}. Використання: [--port 0..65535] [--worlds DIR]", e.getMessage());
             System.exit(EXIT_USAGE);
             return;
         }
@@ -42,21 +56,21 @@ public final class DedicatedServerMain {
             System.exit(EXIT_FAILURE);
             return;
         }
-        GameServer server = start(content, port);
+        GameServer server = start(content, options);
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "kolo-shutdown"));
         server.awaitClose();
     }
 
-    /**
-     * Сервер на TCP-порту з усіх адрес.
-     *
-     * @param port порт; 0 — будь-який вільний
-     */
-    static GameServer start(ContentPack content, int port) {
-        GameServer server = GameServer.start(() -> content);
+    /** Сервер на TCP-порту з усіх адрес. */
+    static GameServer start(ContentPack content, Options options) {
+        GameServer server = GameServer.start(() -> content, new WorldDirectory(options.worlds()));
         try {
-            InetSocketAddress address = server.bindTcp(new InetSocketAddress(port));
-            LOG.info("Сервер слухає {}, контент {}", address, content.hash());
+            InetSocketAddress address = server.bindTcp(new InetSocketAddress(options.port()));
+            LOG.info(
+                    "Сервер слухає {}, контент {}, світи у {}",
+                    address,
+                    content.hash(),
+                    options.worlds().toAbsolutePath());
             return server;
         } catch (RuntimeException e) {
             server.close();
@@ -65,28 +79,38 @@ public final class DedicatedServerMain {
     }
 
     /**
-     * Порт з аргументів.
+     * Аргументи запуску.
      *
      * @throws IllegalArgumentException якщо аргументи невірні
      */
-    static int port(String... args) {
+    static Options options(String... args) {
         int port = Protocol.DEFAULT_PORT;
+        Path worlds = DEFAULT_WORLDS;
         for (int i = 0; i < args.length; i++) {
-            if (!args[i].equals("--port")) {
-                throw new IllegalArgumentException("невідомий аргумент " + args[i]);
+            String name = args[i];
+            if (!name.equals("--port") && !name.equals("--worlds")) {
+                throw new IllegalArgumentException("невідомий аргумент " + name);
             }
             if (i + 1 == args.length) {
-                throw new IllegalArgumentException("бракує номера порту");
+                throw new IllegalArgumentException("бракує значення " + name);
+            }
+            String value = args[++i];
+            if (name.equals("--worlds")) {
+                if (value.isBlank()) {
+                    throw new IllegalArgumentException("порожня тека світів");
+                }
+                worlds = Path.of(value);
+                continue;
             }
             try {
-                port = Integer.parseInt(args[++i]);
+                port = Integer.parseInt(value);
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("порт — ціле число: " + args[i], e);
+                throw new IllegalArgumentException("порт — ціле число: " + value, e);
             }
             if (port < 0 || port > 65_535) {
                 throw new IllegalArgumentException("порт поза 0..65535: " + port);
             }
         }
-        return port;
+        return new Options(port, worlds);
     }
 }

@@ -20,17 +20,14 @@ import javafx.scene.layout.VBox;
 import kolo.client.app.Navigator;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapLayers;
-import kolo.client.net.ConnectionClosedException;
-import kolo.client.net.ServerErrorException;
+import kolo.client.net.GameStart;
 import kolo.client.net.WorldSource;
-import kolo.engine.error.GameException;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
-import kolo.engine.view.MapView;
 
 /**
- * Параметри нового світу (GD §3.4): seed, кількість гравців і частка NPC. Світ генерує сервер, клієнт отримує карту
- * повідомленнями; запит і підготовка шарів карти — у фоновому потоці, вікно тим часом не зависає.
+ * Параметри нового світу (GD §3.4): seed, кількість гравців і частка NPC. Світ генерує й зберігає сервер, клієнт
+ * отримує карту повідомленнями; запит і підготовка шарів карти — у фоновому потоці, вікно тим часом не зависає.
  */
 public final class NewWorldScreen {
 
@@ -82,23 +79,16 @@ public final class NewWorldScreen {
             progress.setVisible(true);
             background.execute(() -> {
                 try {
-                    MapView view = worlds.newWorld(chosen, playerCount, share);
-                    MapLayers layers = MapLayers.build(view);
-                    Platform.runLater(() -> navigator.showMap(layers));
-                } catch (ServerErrorException e) {
-                    String message = texts.error(e.error().code(), e.error().details());
-                    Platform.runLater(() -> failed(message, error, generate, back, progress));
-                } catch (GameException e) {
-                    String message = texts.error(e.code(), e.details());
-                    Platform.runLater(() -> failed(message, error, generate, back, progress));
-                } catch (ConnectionClosedException e) {
-                    Platform.runLater(
-                            () -> failed(texts.text("app.error.connection_lost"), error, generate, back, progress));
+                    GameStart start = worlds.newWorld(chosen, playerCount, share);
+                    MapLayers layers = MapLayers.build(start.map());
+                    Platform.runLater(() -> navigator.showMap(layers, start.turn()));
                 } catch (RuntimeException e) {
-                    // Межа фонового потоку: інакше виняток зник би мовчки, а кнопка лишилася б вимкненою.
-                    Platform.runLater(
-                            () -> failed(texts.text("app.error.unexpected"), error, generate, back, progress));
-                    throw e;
+                    String message = ErrorTexts.of(texts, e);
+                    Platform.runLater(() -> failed(message, error, generate, back, progress));
+                    // Межа фонового потоку: баг не має зникнути мовчки.
+                    if (!ErrorTexts.expected(e)) {
+                        throw e;
+                    }
                 }
             });
         });

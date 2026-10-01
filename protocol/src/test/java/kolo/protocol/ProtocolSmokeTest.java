@@ -23,6 +23,7 @@ import kolo.protocol.message.Handshake;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -104,8 +105,10 @@ class ProtocolSmokeTest {
                     for (ServerMessage part : MapChunks.split(MAP, 300)) {
                         ctx.write(part);
                     }
-                    ctx.flush();
+                    ctx.writeAndFlush(new ServerMessage.Phase(0, YearPhase.ORDERS));
                 }
+                case ClientMessage.Ready ready ->
+                    ctx.writeAndFlush(new ServerMessage.Phase(ready.turn() + 1, YearPhase.ORDERS));
             }
         }
     }
@@ -115,6 +118,7 @@ class ProtocolSmokeTest {
 
         private final CompletableFuture<MapView> received;
         private final MapAssembler assembler = new MapAssembler();
+        private MapView map;
 
         ToyClient(CompletableFuture<MapView> received) {
             this.received = received;
@@ -128,7 +132,15 @@ class ProtocolSmokeTest {
                     ctx.writeAndFlush(new ClientMessage.CreateWorld(7, 1, kolo.engine.state.NpcShare.FEW));
                 }
                 case ServerMessage.MapStart start -> assembler.start(start);
-                case ServerMessage.MapCells cells -> assembler.add(cells).ifPresent(received::complete);
+                case ServerMessage.MapCells cells -> assembler.add(cells).ifPresent(done -> map = done);
+                // Карта прийшла — закінчуємо рік 0; рік 1 означає, що сервер прийняв «Готово».
+                case ServerMessage.Phase phase -> {
+                    if (phase.turn() == 0 && map != null) {
+                        ctx.writeAndFlush(new ClientMessage.Ready(0));
+                    } else if (phase.turn() == 1) {
+                        received.complete(map);
+                    }
+                }
                 case ServerMessage.Error error ->
                     received.completeExceptionally(new AssertionError("помилка сервера " + error));
             }

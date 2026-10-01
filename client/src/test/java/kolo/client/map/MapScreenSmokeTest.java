@@ -42,7 +42,7 @@ class MapScreenSmokeTest {
         public void showNewWorld() {}
 
         @Override
-        public void showMap(MapLayers layers) {}
+        public void showMap(MapLayers layers, int turn) {}
 
         @Override
         public void exit() {}
@@ -77,7 +77,7 @@ class MapScreenSmokeTest {
         MapLayers layers = MapLayers.build(TestWorlds.DEFAULT);
         Texts texts = Texts.ukrainian();
         // Растеризація режиму — одразу в потоці виклику: плитки з'являються наступним runLater.
-        Parent screen = onFx(() -> MapScreen.create(NAVIGATOR, texts, layers, Runnable::run));
+        Parent screen = onFx(() -> MapScreen.create(NAVIGATOR, texts, layers, 0, TestWorlds.GAME, Runnable::run));
         Scene scene = onFx(() -> {
             Scene result = new Scene(screen, WIDTH, HEIGHT);
             screen.applyCss();

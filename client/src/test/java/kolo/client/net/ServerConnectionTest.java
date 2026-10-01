@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.netty.channel.local.LocalAddress;
+import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import kolo.client.TestWorlds;
 import kolo.engine.error.ErrorCode;
@@ -12,14 +13,24 @@ import kolo.engine.view.MapView;
 import kolo.protocol.message.Handshake;
 import kolo.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
-/** Клієнт ↔ вбудований сервер через {@code LocalChannel}: рукостискання, світ, помилки сервера й розрив. */
+/** Клієнт ↔ вбудований сервер через {@code LocalChannel}: рукостискання, світ, роки, помилки сервера й розрив. */
 @Timeout(60)
 class ServerConnectionTest {
 
-    private static final EmbeddedServer SERVER = EmbeddedServer.startWithBundledContent();
+    @TempDir
+    static Path worlds;
+
+    private static EmbeddedServer SERVER;
+
+    @BeforeAll
+    static void start() {
+        SERVER = EmbeddedServer.startWithBundledContent(worlds);
+    }
 
     @AfterAll
     static void stop() {
@@ -29,8 +40,10 @@ class ServerConnectionTest {
     @Test
     void sameSeedSameMap() {
         try (ServerConnection connection = connect()) {
-            MapView first = EmbeddedGame.await(connection.createWorld(42, 2, NpcShare.NORMAL));
-            MapView second = EmbeddedGame.await(connection.createWorld(42, 2, NpcShare.NORMAL));
+            MapView first = EmbeddedGame.await(connection.createWorld(42, 2, NpcShare.NORMAL))
+                    .map();
+            MapView second = EmbeddedGame.await(connection.createWorld(42, 2, NpcShare.NORMAL))
+                    .map();
 
             assertThat(second).isEqualTo(first);
             assertThat(first.seed()).isEqualTo(42);
@@ -50,8 +63,26 @@ class ServerConnectionTest {
 
             assertThat(connection.isOpen()).isTrue();
             assertThat(EmbeddedGame.await(connection.createWorld(1, 1, NpcShare.FEW))
+                            .map()
                             .cells())
                     .isNotEmpty();
+        }
+    }
+
+    @Test
+    void yearsFollowEachOther() {
+        try (ServerConnection connection = connect()) {
+            GameStart start = EmbeddedGame.await(connection.createWorld(5, 1, NpcShare.FEW));
+            assertThat(start.turn()).isZero();
+
+            assertThat(EmbeddedGame.await(connection.endYear(0))).isEqualTo(1);
+            assertThat(EmbeddedGame.await(connection.endYear(1))).isEqualTo(2);
+
+            assertThatThrownBy(() -> EmbeddedGame.await(connection.endYear(0)))
+                    .isInstanceOfSatisfying(
+                            ServerErrorException.class,
+                            e -> assertThat(e.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED));
+            assertThat(connection.isOpen()).isTrue();
         }
     }
 
@@ -76,7 +107,7 @@ class ServerConnectionTest {
 
     @Test
     void stoppedServerFailsRequests() {
-        EmbeddedServer server = EmbeddedServer.startWithBundledContent();
+        EmbeddedServer server = EmbeddedServer.startWithBundledContent(worlds);
         ServerConnection connection =
                 EmbeddedGame.await(ServerConnection.connect(server.address(), server.contentHash()));
 
@@ -101,7 +132,8 @@ class ServerConnectionTest {
     void embeddedGameServesTheSameWorlds() {
         assertThat(TestWorlds.DEFAULT.seed()).isEqualTo(1970);
         try (ServerConnection connection = connect()) {
-            assertThat(EmbeddedGame.await(connection.createWorld(1970, 1, NpcShare.NORMAL)))
+            assertThat(EmbeddedGame.await(connection.createWorld(1970, 1, NpcShare.NORMAL))
+                            .map())
                     .isEqualTo(TestWorlds.DEFAULT);
         }
     }

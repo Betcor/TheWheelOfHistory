@@ -21,6 +21,9 @@ public final class WorldState {
     /** Версія схеми стану; зміна структури підвищує її й додає міграцію снапшота. */
     public static final int SCHEMA_VERSION = 1;
 
+    /** Календарний рік ходу 0: гра починається 01.01.1970. */
+    public static final int START_YEAR = 1970;
+
     private final int schemaVersion;
     private final String contentHash;
     private final long seed;
@@ -103,6 +106,11 @@ public final class WorldState {
     /** Хід; рік = 1970 + turn. */
     public int turn() {
         return turn;
+    }
+
+    /** Календарний рік ходу {@code turn}. */
+    public static int year(int turn) {
+        return START_YEAR + turn;
     }
 
     public void setTurn(int turn) {

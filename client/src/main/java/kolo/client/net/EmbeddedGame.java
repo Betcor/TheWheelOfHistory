@@ -1,15 +1,16 @@
 package kolo.client.net;
 
+import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import kolo.engine.state.NpcShare;
-import kolo.engine.view.MapView;
 import kolo.server.EmbeddedServer;
 
 /**
  * Гра з вбудованим сервером (одиночна, hot-seat): сервер у процесі клієнта і з'єднання з ним через {@code
- * LocalChannel}. З'єднання встановлюється при першому запиті й відновлюється, якщо закрилося. Потокобезпечний, але
- * блокує — лише з фонового потоку.
+ * LocalChannel}. З'єднання встановлюється при новому світі й відновлюється, якщо закрилося; з розривом сесія світу
+ * закривається, тож кінець року без з'єднання — {@link ConnectionClosedException}. Потокобезпечний, але блокує —
+ * лише з фонового потоку.
  */
 public final class EmbeddedGame implements WorldSource, AutoCloseable {
 
@@ -20,14 +21,30 @@ public final class EmbeddedGame implements WorldSource, AutoCloseable {
         this.server = server;
     }
 
-    /** Запускає вбудований сервер із вбудованим контентом; контент завантажиться при першому запиті. */
+    /**
+     * Запускає вбудований сервер із вбудованим контентом і типовою текою світів; контент завантажиться при першому
+     * запиті.
+     */
     public static EmbeddedGame start() {
         return new EmbeddedGame(EmbeddedServer.startWithBundledContent());
     }
 
+    /** Те саме з власною текою світів. */
+    public static EmbeddedGame start(Path worlds) {
+        return new EmbeddedGame(EmbeddedServer.startWithBundledContent(worlds));
+    }
+
     @Override
-    public synchronized MapView newWorld(long seed, int players, NpcShare npcShare) {
+    public synchronized GameStart newWorld(long seed, int players, NpcShare npcShare) {
         return await(connection().createWorld(seed, players, npcShare));
+    }
+
+    @Override
+    public synchronized int endYear(int turn) {
+        if (connection == null || !connection.isOpen()) {
+            throw new ConnectionClosedException("немає з'єднання з сесією світу");
+        }
+        return await(connection.endYear(turn));
     }
 
     /** Закриває з'єднання й зупиняє сервер. */

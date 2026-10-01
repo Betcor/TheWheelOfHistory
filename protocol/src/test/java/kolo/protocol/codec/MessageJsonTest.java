@@ -15,6 +15,7 @@ import kolo.protocol.TestMessages;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,17 @@ class MessageJsonTest {
     void createWorldFormatIsFixed() {
         assertThat(json(MessageJson.write(new ClientMessage.CreateWorld(-5, 3, NpcShare.MANY))))
                 .isEqualTo("{\"type\":\"create_world\",\"seed\":-5,\"players\":3,\"npc_share\":\"many\"}");
+    }
+
+    @Test
+    void readyFormatIsFixed() {
+        assertThat(json(MessageJson.write(new ClientMessage.Ready(3)))).isEqualTo("{\"type\":\"ready\",\"turn\":3}");
+    }
+
+    @Test
+    void phaseFormatIsFixed() {
+        assertThat(json(MessageJson.write(new ServerMessage.Phase(12, YearPhase.START_OF_YEAR))))
+                .isEqualTo("{\"type\":\"phase\",\"turn\":12,\"phase\":\"start_of_year\"}");
     }
 
     @Test
@@ -61,7 +73,9 @@ class MessageJsonTest {
     void clientMessagesRoundTrip() {
         for (ClientMessage message : List.of(
                 new ClientMessage.Hello(7, TestMessages.HASH),
-                new ClientMessage.CreateWorld(Long.MIN_VALUE, 16, NpcShare.FEW))) {
+                new ClientMessage.CreateWorld(Long.MIN_VALUE, 16, NpcShare.FEW),
+                new ClientMessage.Ready(0),
+                new ClientMessage.Ready(Integer.MAX_VALUE))) {
             assertThat(MessageJson.readClient(MessageJson.write(message))).isEqualTo(message);
         }
     }
@@ -71,6 +85,9 @@ class MessageJsonTest {
         MapView map = TestMessages.map(Long.MAX_VALUE, 9);
         List<ServerMessage> messages = new java.util.ArrayList<>(MapChunks.split(map, 4));
         messages.add(new ServerMessage.Welcome(1, TestMessages.HASH));
+        for (YearPhase phase : YearPhase.values()) {
+            messages.add(new ServerMessage.Phase(phase.ordinal() * 100, phase));
+        }
         messages.add(new ServerMessage.Error(
                 ErrorCode.VERSION_MISMATCH,
                 ErrorDetails.of("part", "content", "client", "a'б", "server", Long.MIN_VALUE)));
@@ -137,6 +154,19 @@ class MessageJsonTest {
                         bytes("{\"type\":\"create_world\",\"seed\":1,\"players\":1,\"npc_share\":\"lots\"}")),
                 "npc_share",
                 "unknown_value");
+        assertProblem(
+                () -> MessageJson.readServer(bytes("{\"type\":\"phase\",\"turn\":1,\"phase\":\"lunch\"}")),
+                "phase",
+                "unknown_value");
+        assertProblem(() -> MessageJson.readClient(bytes("{\"type\":\"ready\"}")), "turn", "missing_field");
+    }
+
+    @Test
+    void negativeTurnIsRejected() {
+        assertThat(catchProtocol(() -> MessageJson.readClient(bytes("{\"type\":\"ready\",\"turn\":-1}")))
+                        .details())
+                .containsEntry("cause", "value_out_of_range")
+                .containsEntry("field", "turn");
     }
 
     @Test

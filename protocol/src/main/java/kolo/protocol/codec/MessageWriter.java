@@ -44,6 +44,10 @@ final class MessageWriter {
                     json.writeNumberField("players", create.players());
                     json.writeStringField("npc_share", key(create.npcShare()));
                 }
+                case ClientMessage.Ready ready -> {
+                    json.writeStringField("type", MessageTypes.READY);
+                    json.writeNumberField("turn", ready.turn());
+                }
             }
             json.writeEndObject();
         });
@@ -94,6 +98,11 @@ final class MessageWriter {
                         cell(json, cell);
                     }
                     json.writeEndArray();
+                }
+                case ServerMessage.Phase phase -> {
+                    json.writeStringField("type", MessageTypes.PHASE);
+                    json.writeNumberField("turn", phase.turn());
+                    json.writeStringField("phase", key(phase.phase()));
                 }
             }
             json.writeEndObject();
