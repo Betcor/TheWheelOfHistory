@@ -292,6 +292,9 @@ final class Files {
               count:
                 - { max_provinces: 50, min: 1, max: 2 }
                 - { max_provinces: 1000, min: 3, max: 5 }
+            turn_timers:
+              live_minutes: [2, 5]
+              async_hours: [12, 24]
             """;
 
     static final String MAP = """

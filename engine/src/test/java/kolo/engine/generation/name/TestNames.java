@@ -331,7 +331,8 @@ public final class TestNames {
                 religionBalance,
                 world,
                 resourceBalance,
-                TestPower.BUDGET);
+                TestPower.BUDGET,
+                TestPower.TIMERS);
     }
 
     private static BackstoryContent backstory() {

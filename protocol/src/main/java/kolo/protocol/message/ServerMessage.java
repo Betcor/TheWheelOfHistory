@@ -3,6 +3,7 @@ package kolo.protocol.message;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import kolo.engine.error.Checks;
@@ -10,6 +11,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.GameException;
 import kolo.engine.error.ValidationException;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 
@@ -127,8 +129,11 @@ public sealed interface ServerMessage
      * @param setup новий світ чи завантажений
      * @param players у лобі нового світу — гравці в порядку приєднання; завантаженого — гравці світу за номером (і ті,
      *     кого ще немає), потім гості; хост — рівно один
+     * @param timers таймери ходу, з яких хост обирає ({@link ClientMessage.SetTimer}), у порядку показу; серед них —
+     *     поточний {@link LobbySetup#timer()}
      */
-    record Lobby(long session, String world, LobbySetup setup, List<PlayerInfo> players) implements ServerMessage {
+    record Lobby(long session, String world, LobbySetup setup, List<PlayerInfo> players, List<TurnTimer> timers)
+            implements ServerMessage {
 
         public Lobby {
             Checks.inRange("session", session, 1, Long.MAX_VALUE);
@@ -138,6 +143,13 @@ public sealed interface ServerMessage
             Checks.inRange("players", players.size(), 1, Integer.MAX_VALUE);
             Checks.inRange(
                     "hosts", (int) players.stream().filter(PlayerInfo::host).count(), 1, 1);
+            timers = List.copyOf(timers);
+            if (!timers.contains(setup.timer())) {
+                throw new ValidationException(
+                        ErrorCode.UNKNOWN_REFERENCE,
+                        ErrorDetails.of(
+                                "field", "timers", "value", setup.timer().mode().key()));
+            }
         }
     }
 
@@ -196,14 +208,34 @@ public sealed interface ServerMessage
      * N}, потім {@link YearPhase#RESOLVING} і {@link YearPhase#REPORT} того самого року {@code N}, далі — рік {@code N +
      * 1}.
      *
+     * <p>З таймером ходу (GD §6.1) фаза наказів має межу: скільки часу лишилося на момент надсилання. Час — відлік, а
+     * не мить: годинники клієнта й сервера можуть розходитися. Коли час вийшов, рік розв'язується без «Готово» тих, хто
+     * не встиг.
+     *
      * @param turn рік фази (хід, не календарний рік)
      * @param phase фаза
+     * @param timeLeftMillis скільки мілісекунд лишилося до кінця фази наказів; лише в {@link YearPhase#ORDERS} з
+     *     таймером
      */
-    record Phase(int turn, YearPhase phase) implements ServerMessage {
+    record Phase(int turn, YearPhase phase, OptionalLong timeLeftMillis) implements ServerMessage {
 
         public Phase {
             Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
             Objects.requireNonNull(phase, "phase");
+            Objects.requireNonNull(timeLeftMillis, "timeLeftMillis");
+            if (timeLeftMillis.isPresent()) {
+                if (phase != YearPhase.ORDERS) {
+                    throw new ValidationException(
+                            ErrorCode.CONFLICTING_FIELDS,
+                            ErrorDetails.of("field", "time_left_millis", "phase", phase.name()));
+                }
+                Checks.inRange("time_left_millis", timeLeftMillis.getAsLong(), 0, Long.MAX_VALUE);
+            }
+        }
+
+        /** Фаза без межі часу. */
+        public Phase(int turn, YearPhase phase) {
+            this(turn, phase, OptionalLong.empty());
         }
     }
 

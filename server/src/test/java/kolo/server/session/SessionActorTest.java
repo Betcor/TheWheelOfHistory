@@ -17,6 +17,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.InvariantViolationException;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.state.WorldLimits;
 import kolo.engine.state.WorldState;
 import kolo.protocol.message.LobbyInfo;
@@ -42,10 +43,11 @@ class SessionActorTest {
     @TempDir
     Path worlds;
 
-    private static final LobbySetup FEW_11 = new LobbySetup.NewWorld(11, NpcShare.FEW);
+    private static final LobbySetup FEW_11 = new LobbySetup.NewWorld(11, NpcShare.FEW, TurnTimer.MANUAL);
 
     private final RecordingPeer host = new RecordingPeer();
     private final AtomicInteger closed = new AtomicInteger();
+    private final ManualClock clock = new ManualClock();
     /** Ключ світу з лобі хоста. */
     private String worldKey;
 
@@ -77,7 +79,8 @@ class SessionActorTest {
                         7,
                         joined.world(),
                         FEW_11,
-                        List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty()))));
+                        List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty())),
+                        TestServers.TIMERS));
         assertThat(session.lobby()).contains(new LobbyInfo(7, joined.world(), "Оля", 1, FEW_11));
         session.close();
     }
@@ -461,7 +464,8 @@ class SessionActorTest {
                 state -> {
                     throw new InvariantViolationException(ErrorDetails.of("check", "test"));
                 },
-                s -> closed.incrementAndGet());
+                s -> closed.incrementAndGet(),
+                clock);
         session.open(host, "Оля", 11, NpcShare.FEW);
         host.joined();
         host.lobby();
@@ -494,7 +498,8 @@ class SessionActorTest {
                 new WorldDirectory(notADirectory),
                 new PlayerTokens(),
                 SessionActor.engine(TestServers.CONTENT),
-                s -> closed.incrementAndGet());
+                s -> closed.incrementAndGet(),
+                clock);
         session.open(host, "Оля", 1, NpcShare.FEW);
         host.joined();
         host.lobby();
@@ -561,7 +566,8 @@ class SessionActorTest {
                 new WorldDirectory(worlds),
                 new PlayerTokens(),
                 years,
-                s -> closed.incrementAndGet());
+                s -> closed.incrementAndGet(),
+                clock);
     }
 
     /** Лобі з хостом «Оля» і малим світом. */

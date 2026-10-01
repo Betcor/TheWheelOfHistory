@@ -24,18 +24,24 @@ public final class Sessions {
     private final WorldDirectory worlds;
     private final Function<ContentPack, UnaryOperator<WorldState>> years;
     private final PlayerTokens tokens = new PlayerTokens();
+    private final SessionClock clock;
+    /** Власний годинник, який закривається разом із сесіями; переданий ззовні (у тестах) — ні. */
+    private final SystemSessionClock ownClock;
+
     private final TreeMap<Long, SessionActor> open = new TreeMap<>();
     private long nextId = 1;
     private boolean closed;
 
     /** @param worlds тека, де сесії створюють файли світів */
     public Sessions(WorldDirectory worlds) {
-        this(worlds, SessionActor::engine);
+        this(worlds, SessionActor::engine, new SystemSessionClock());
     }
 
-    Sessions(WorldDirectory worlds, Function<ContentPack, UnaryOperator<WorldState>> years) {
+    Sessions(WorldDirectory worlds, Function<ContentPack, UnaryOperator<WorldState>> years, SessionClock clock) {
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.years = Objects.requireNonNull(years, "years");
+        this.clock = Objects.requireNonNull(clock, "clock");
+        this.ownClock = clock instanceof SystemSessionClock system ? system : null;
     }
 
     public WorldDirectory worlds() {
@@ -52,7 +58,7 @@ public final class Sessions {
             throw new IllegalStateException("сесії закрито");
         }
         long id = nextId++;
-        SessionActor session = new SessionActor(id, content, worlds, tokens, years.apply(content), this::closed);
+        SessionActor session = new SessionActor(id, content, worlds, tokens, years.apply(content), this::closed, clock);
         open.put(id, session);
         return session;
     }
@@ -97,8 +103,11 @@ public final class Sessions {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
+                break;
             }
+        }
+        if (ownClock != null) {
+            ownClock.close();
         }
     }
 

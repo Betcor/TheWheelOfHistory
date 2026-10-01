@@ -492,7 +492,8 @@ final class TestBackstory {
                         TestReligions.BALANCE,
                         TestMaps.BALANCE,
                         TestResources.BALANCE,
-                        TestPower.BUDGET));
+                        TestPower.BUDGET,
+                        TestPower.TIMERS));
     }
 
     /** По рівню вишколу на кожен рівень 1..5 з рівними вагами, від провалу до успіху. */

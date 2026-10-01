@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.PlayerInfo;
@@ -201,6 +202,22 @@ public final class GameClient implements AutoCloseable {
         ServerConnection open = open();
         if (open != null) {
             open.ready(turn);
+        }
+    }
+
+    /** Хост обирає таймер ходу в лобі. */
+    public void setTimer(TurnTimer timer) {
+        ServerConnection open = open();
+        if (open != null) {
+            open.setTimer(timer);
+        }
+    }
+
+    /** Хост завершує рік {@code turn}, не чекаючи «Готово» всіх. */
+    public void endYear(int turn) {
+        ServerConnection open = open();
+        if (open != null) {
+            open.endYear(turn);
         }
     }
 

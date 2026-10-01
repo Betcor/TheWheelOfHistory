@@ -84,7 +84,9 @@ class WorldStoreSummaryTest {
         assertThatThrownBy(() -> WorldStore.summary(file, Migrator.bundled(2)))
                 .isInstanceOfSatisfying(
                         SaveVersionException.class,
-                        e -> assertThat(e.details()).containsEntry("version", 3).containsEntry("supported", 2));
+                        e -> assertThat(e.details())
+                                .containsEntry("version", Migrator.bundled().latest())
+                                .containsEntry("supported", 2));
     }
 
     @Test

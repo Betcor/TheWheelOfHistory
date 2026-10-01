@@ -291,7 +291,8 @@ final class TestContent {
                 TestReligions.BALANCE,
                 TestMaps.BALANCE,
                 TestResources.BALANCE,
-                TestPower.BUDGET);
+                TestPower.BUDGET,
+                TestPower.TIMERS);
     }
 
     static ContentPack pack(List<IdeologyDef> ideologies) {

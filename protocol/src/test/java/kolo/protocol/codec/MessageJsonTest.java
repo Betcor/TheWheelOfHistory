@@ -8,10 +8,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ProtocolException;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.view.MapView;
 import kolo.protocol.TestMessages;
 import kolo.protocol.message.ClientMessage;
@@ -27,6 +29,9 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
 class MessageJsonTest {
+
+    private static final TurnTimer LIVE_3 = new TurnTimer(TurnTimer.Mode.LIVE, 180);
+    private static final TurnTimer ASYNC_12 = new TurnTimer(TurnTimer.Mode.ASYNC, 43_200);
 
     // ---- Формат ----
 
@@ -83,19 +88,22 @@ class MessageJsonTest {
         ServerMessage.Lobby lobby = new ServerMessage.Lobby(
                 3,
                 TestMessages.WORLD,
-                new LobbySetup.SavedWorld("world-5", 5, 7),
+                new LobbySetup.SavedWorld("world-5", 5, 7, LIVE_3),
                 List.of(
                         new PlayerInfo(1, "Оля", false, false, false, OptionalInt.of(0)),
-                        new PlayerInfo(3, "Ігор", true, true, false, OptionalInt.empty())));
+                        new PlayerInfo(3, "Ігор", true, true, false, OptionalInt.empty())),
+                List.of(TurnTimer.MANUAL, LIVE_3));
 
         assertThat(json(MessageJson.write(lobby)))
                 .isEqualTo("{\"type\":\"lobby\",\"session\":3,\"world\":\"" + TestMessages.WORLD + "\","
-                        + "\"setup\":{\"kind\":\"saved_world\",\"name\":\"world-5\",\"seed\":5,\"turn\":7},"
+                        + "\"setup\":{\"kind\":\"saved_world\",\"name\":\"world-5\",\"seed\":5,\"turn\":7,"
+                        + "\"timer\":{\"mode\":\"live\",\"seconds\":180}},"
                         + "\"players\":["
                         + "{\"number\":1,\"nickname\":\"Оля\",\"host\":false,\"connected\":false,\"ready\":false,"
                         + "\"country\":0},"
                         + "{\"number\":3,\"nickname\":\"Ігор\",\"host\":true,\"connected\":true,\"ready\":false,"
-                        + "\"country\":null}]}");
+                        + "\"country\":null}],"
+                        + "\"timers\":[{\"mode\":\"manual\",\"seconds\":0},{\"mode\":\"live\",\"seconds\":180}]}");
     }
 
     @Test
@@ -103,18 +111,20 @@ class MessageJsonTest {
         ServerMessage.Lobby lobby = new ServerMessage.Lobby(
                 3,
                 TestMessages.WORLD,
-                new LobbySetup.NewWorld(9, NpcShare.FEW),
+                new LobbySetup.NewWorld(9, NpcShare.FEW, TurnTimer.MANUAL),
                 List.of(
                         new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty()),
-                        new PlayerInfo(4, "Ігор", false, true, false, OptionalInt.empty())));
+                        new PlayerInfo(4, "Ігор", false, true, false, OptionalInt.empty())),
+                List.of(TurnTimer.MANUAL));
 
         assertThat(json(MessageJson.write(lobby)))
                 .isEqualTo("{\"type\":\"lobby\",\"session\":3,\"world\":\"" + TestMessages.WORLD + "\","
-                        + "\"setup\":{\"kind\":\"new_world\",\"seed\":9,\"npc_share\":\"few\"},\"players\":["
+                        + "\"setup\":{\"kind\":\"new_world\",\"seed\":9,\"npc_share\":\"few\","
+                        + "\"timer\":{\"mode\":\"manual\",\"seconds\":0}},\"players\":["
                         + "{\"number\":1,\"nickname\":\"Оля\",\"host\":true,\"connected\":true,\"ready\":false,"
                         + "\"country\":null},"
                         + "{\"number\":4,\"nickname\":\"Ігор\",\"host\":false,\"connected\":true,\"ready\":false,"
-                        + "\"country\":null}]}");
+                        + "\"country\":null}],\"timers\":[{\"mode\":\"manual\",\"seconds\":0}]}");
     }
 
     @Test
@@ -125,10 +135,11 @@ class MessageJsonTest {
                         + "\"connected\":false,\"ready\":true,\"country\":1}]}");
         assertThat(json(MessageJson.write(new ServerMessage.Joined(3, "k1", 2, "ab12"))))
                 .isEqualTo("{\"type\":\"joined\",\"session\":3,\"world\":\"k1\",\"player\":2,\"token\":\"ab12\"}");
-        assertThat(json(MessageJson.write(new ServerMessage.Lobbies(
-                        List.of(new LobbyInfo(3, "k1", "Оля", 2, new LobbySetup.NewWorld(4, NpcShare.NORMAL)))))))
+        assertThat(json(MessageJson.write(new ServerMessage.Lobbies(List.of(
+                        new LobbyInfo(3, "k1", "Оля", 2, new LobbySetup.NewWorld(4, NpcShare.NORMAL, ASYNC_12)))))))
                 .isEqualTo("{\"type\":\"lobbies\",\"lobbies\":[{\"session\":3,\"world\":\"k1\",\"host\":\"Оля\","
-                        + "\"players\":2,\"setup\":{\"kind\":\"new_world\",\"seed\":4,\"npc_share\":\"normal\"}}]}");
+                        + "\"players\":2,\"setup\":{\"kind\":\"new_world\",\"seed\":4,\"npc_share\":\"normal\","
+                        + "\"timer\":{\"mode\":\"async\",\"seconds\":43200}}}]}");
     }
 
     @Test
@@ -137,9 +148,19 @@ class MessageJsonTest {
     }
 
     @Test
+    void timerAndEndYearFormatIsFixed() {
+        assertThat(json(MessageJson.write(new ClientMessage.SetTimer(LIVE_3))))
+                .isEqualTo("{\"type\":\"set_timer\",\"timer\":{\"mode\":\"live\",\"seconds\":180}}");
+        assertThat(json(MessageJson.write(new ClientMessage.EndYear(4))))
+                .isEqualTo("{\"type\":\"end_year\",\"turn\":4}");
+    }
+
+    @Test
     void phaseFormatIsFixed() {
         assertThat(json(MessageJson.write(new ServerMessage.Phase(12, YearPhase.START_OF_YEAR))))
-                .isEqualTo("{\"type\":\"phase\",\"turn\":12,\"phase\":\"start_of_year\"}");
+                .isEqualTo("{\"type\":\"phase\",\"turn\":12,\"phase\":\"start_of_year\",\"time_left_millis\":null}");
+        assertThat(json(MessageJson.write(new ServerMessage.Phase(12, YearPhase.ORDERS, OptionalLong.of(90_000)))))
+                .isEqualTo("{\"type\":\"phase\",\"turn\":12,\"phase\":\"orders\",\"time_left_millis\":90000}");
     }
 
     @Test
@@ -181,7 +202,10 @@ class MessageJsonTest {
                 new ClientMessage.LoadWorld("світ «1»", "x", Optional.empty()),
                 new ClientMessage.LoadWorld(
                         "w", "x", Optional.of(new PlayerToken(Integer.MAX_VALUE, TestMessages.HASH))),
-                new ClientMessage.AssignSeat(Integer.MAX_VALUE, 1))) {
+                new ClientMessage.AssignSeat(Integer.MAX_VALUE, 1),
+                new ClientMessage.SetTimer(TurnTimer.MANUAL),
+                new ClientMessage.SetTimer(new TurnTimer(TurnTimer.Mode.ASYNC, TurnTimer.MAX_SECONDS)),
+                new ClientMessage.EndYear(Integer.MAX_VALUE))) {
             assertThat(MessageJson.readClient(MessageJson.write(message))).isEqualTo(message);
         }
     }
@@ -197,16 +221,23 @@ class MessageJsonTest {
         messages.add(new ServerMessage.Worlds(
                 List.of(new WorldInfo("w", Optional.empty(), Long.MIN_VALUE, Integer.MAX_VALUE, List.of("a")))));
         messages.add(new ServerMessage.Lobbies(List.of(new LobbyInfo(
-                Long.MAX_VALUE, TestMessages.WORLD, "a", 1, new LobbySetup.SavedWorld("w", Long.MIN_VALUE, 0)))));
+                Long.MAX_VALUE,
+                TestMessages.WORLD,
+                "a",
+                1,
+                new LobbySetup.SavedWorld("w", Long.MIN_VALUE, 0, ASYNC_12)))));
         messages.add(new ServerMessage.Lobby(
                 1,
                 TestMessages.WORLD,
-                new LobbySetup.NewWorld(Long.MAX_VALUE, NpcShare.MANY),
-                List.of(new PlayerInfo(1, "a", true, true, false, OptionalInt.empty()))));
+                new LobbySetup.NewWorld(Long.MAX_VALUE, NpcShare.MANY, LIVE_3),
+                List.of(new PlayerInfo(1, "a", true, true, false, OptionalInt.empty())),
+                List.of(LIVE_3, ASYNC_12)));
         messages.add(new ServerMessage.Players(List.of(new PlayerInfo(1, "a", true, true, true, OptionalInt.of(0)))));
         for (YearPhase phase : YearPhase.values()) {
             messages.add(new ServerMessage.Phase(phase.ordinal() * 100, phase));
         }
+        messages.add(new ServerMessage.Phase(Integer.MAX_VALUE, YearPhase.ORDERS, OptionalLong.of(Long.MAX_VALUE)));
+        messages.add(new ServerMessage.Phase(0, YearPhase.ORDERS, OptionalLong.of(0)));
         messages.add(new ServerMessage.Error(
                 ErrorCode.VERSION_MISMATCH,
                 ErrorDetails.of("part", "content", "client", "a'б", "server", Long.MIN_VALUE)));
@@ -324,13 +355,45 @@ class MessageJsonTest {
     @Test
     void lobbyWithoutExactlyOneHostIsRejected() {
         String json = "{\"type\":\"lobby\",\"session\":3,\"world\":\"k\","
-                + "\"setup\":{\"kind\":\"new_world\",\"seed\":9,\"npc_share\":\"few\"},\"players\":["
+                + "\"setup\":{\"kind\":\"new_world\",\"seed\":9,\"npc_share\":\"few\","
+                + "\"timer\":{\"mode\":\"manual\",\"seconds\":0}},\"players\":["
                 + "{\"number\":1,\"nickname\":\"Оля\",\"host\":false,\"connected\":true,\"ready\":false,"
-                + "\"country\":null}]}";
+                + "\"country\":null}],\"timers\":[{\"mode\":\"manual\",\"seconds\":0}]}";
 
         assertThat(catchProtocol(() -> MessageJson.readServer(bytes(json))).details())
                 .containsEntry("cause", "value_out_of_range")
                 .containsEntry("field", "hosts");
+    }
+
+    @Test
+    void timerMustBeValid() {
+        assertProblem(
+                () -> MessageJson.readClient(
+                        bytes("{\"type\":\"set_timer\",\"timer\":{\"mode\":\"slow\",\"seconds\":1}}")),
+                "timer.mode",
+                "unknown_value");
+        assertThat(catchProtocol(() -> MessageJson.readClient(
+                                bytes("{\"type\":\"set_timer\",\"timer\":{\"mode\":\"manual\",\"seconds\":5}}")))
+                        .details())
+                .containsEntry("location", "timer")
+                .containsEntry("cause", "conflicting_fields");
+        assertThat(catchProtocol(() -> MessageJson.readServer(
+                                bytes("{\"type\":\"phase\",\"turn\":1,\"phase\":\"report\",\"time_left_millis\":5}")))
+                        .details())
+                .containsEntry("cause", "conflicting_fields");
+    }
+
+    @Test
+    void lobbyTimerMustBeAmongChoices() {
+        String json = "{\"type\":\"lobby\",\"session\":3,\"world\":\"k\","
+                + "\"setup\":{\"kind\":\"new_world\",\"seed\":9,\"npc_share\":\"few\","
+                + "\"timer\":{\"mode\":\"live\",\"seconds\":60}},\"players\":["
+                + "{\"number\":1,\"nickname\":\"Оля\",\"host\":true,\"connected\":true,\"ready\":false,"
+                + "\"country\":null}],\"timers\":[{\"mode\":\"manual\",\"seconds\":0}]}";
+
+        assertThat(catchProtocol(() -> MessageJson.readServer(bytes(json))).details())
+                .containsEntry("cause", "unknown_reference")
+                .containsEntry("field", "timers");
     }
 
     @Test

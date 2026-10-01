@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import kolo.client.TestWorlds;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
@@ -125,7 +126,7 @@ class GameClientTest {
             assertThat(joined.player()).isEqualTo(first.player());
             assertThat(joined.token()).isEqualTo(first.token());
             assertThat(events.next(RecordingListener.Lobby.class).lobby().setup())
-                    .isEqualTo(new LobbySetup.SavedWorld(world.name(), 16, 1));
+                    .isEqualTo(new LobbySetup.SavedWorld(world.name(), 16, 1, TurnTimer.MANUAL));
             game.startGame();
             GameStart resumed = TestWorlds.started(events);
             assertThat(resumed.turn()).isEqualTo(1);

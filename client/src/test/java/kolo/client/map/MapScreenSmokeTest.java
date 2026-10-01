@@ -33,6 +33,7 @@ import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
 import kolo.client.screen.ScreenContext;
 import kolo.client.state.SessionModel;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
@@ -135,10 +136,11 @@ class MapScreenSmokeTest {
         session.lobby(new ServerMessage.Lobby(
                 1,
                 world,
-                new LobbySetup.SavedWorld("world-5", 5, 3),
+                new LobbySetup.SavedWorld("world-5", 5, 3, TurnTimer.MANUAL),
                 List.of(
                         new PlayerInfo(1, "Оля", false, false, false, OptionalInt.of(0)),
-                        new PlayerInfo(2, "Марко", true, true, false, OptionalInt.empty()))));
+                        new PlayerInfo(2, "Марко", true, true, false, OptionalInt.empty())),
+                List.of(TurnTimer.MANUAL)));
         Parent screen = onFx(() -> {
             Parent lobby = LobbyScreen.create(context());
             new Scene(lobby, WIDTH, HEIGHT);
@@ -150,7 +152,7 @@ class MapScreenSmokeTest {
         assertThat(onFx(() -> screen.lookupAll(".label").stream()
                         .map(node -> ((Label) node).getText())
                         .toList()))
-                .contains("Світ «world-5» · seed 5 · продовження з 1973 року");
+                .contains("Світ «world-5» · seed 5 · продовження з 1973 року · таймер: ручний");
         onFx(() -> {
             session.reset();
             return null;
@@ -162,8 +164,8 @@ class MapScreenSmokeTest {
         MapLayers layers = MapLayers.build(TestWorlds.DEFAULT);
         Texts texts = Texts.ukrainian();
         // Растеризація режиму — одразу в потоці виклику: плитки з'являються наступним runLater.
-        Parent screen =
-                onFx(() -> MapScreen.create(context(), layers, new GameStart(TestWorlds.DEFAULT, 0, YearPhase.ORDERS)));
+        Parent screen = onFx(() -> MapScreen.create(
+                context(), layers, new GameStart(TestWorlds.DEFAULT, new ServerMessage.Phase(0, YearPhase.ORDERS))));
         Scene scene = onFx(() -> {
             Scene result = new Scene(screen, WIDTH, HEIGHT);
             screen.applyCss();

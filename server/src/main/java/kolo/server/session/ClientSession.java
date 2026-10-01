@@ -104,6 +104,8 @@ public final class ClientSession {
                 case ClientMessage.ListWorlds list -> listWorlds();
                 case ClientMessage.LoadWorld load -> loadWorld(load);
                 case ClientMessage.AssignSeat assign -> assignSeat(assign);
+                case ClientMessage.SetTimer set -> setTimer(set);
+                case ClientMessage.EndYear end -> endYear(end);
             }
         } catch (GameException e) {
             ServerMessage.Error error = ServerMessage.Error.of(e);
@@ -178,6 +180,20 @@ public final class ClientSession {
         SessionActor current =
                 session().orElseThrow(() -> new ForbiddenException(ErrorDetails.of("action", "assign_seat")));
         current.assign(scoped, assign.guest(), assign.seat());
+    }
+
+    private void setTimer(ClientMessage.SetTimer set) {
+        requireWelcomed();
+        SessionActor current =
+                session().orElseThrow(() -> new ForbiddenException(ErrorDetails.of("action", "set_timer")));
+        current.setTimer(scoped, set.timer());
+    }
+
+    private void endYear(ClientMessage.EndYear end) {
+        requireWelcomed();
+        SessionActor current =
+                session().orElseThrow(() -> new PhaseClosedException(ErrorDetails.of("turn", end.turn())));
+        current.endYear(scoped, end.turn());
     }
 
     private void startGame() {

@@ -547,7 +547,8 @@ final class ContentYaml {
             Religion religion,
             World world,
             Resources resources,
-            @JsonProperty("power_budget") PowerBudget powerBudget) {
+            @JsonProperty("power_budget") PowerBudget powerBudget,
+            @JsonProperty("turn_timers") TurnTimers turnTimers) {
         BalanceFile {
             powerCorridors = orEmpty(powerCorridors);
         }
@@ -638,6 +639,15 @@ final class ContentYaml {
             @JsonProperty("max_advantage") Integer maxAdvantage) {
         PowerBudget {
             weights = weights == null ? Map.of() : weights;
+        }
+    }
+
+    record TurnTimers(
+            @JsonProperty("live_minutes") List<Integer> liveMinutes,
+            @JsonProperty("async_hours") List<Integer> asyncHours) {
+        TurnTimers {
+            liveMinutes = orEmpty(liveMinutes);
+            asyncHours = orEmpty(asyncHours);
         }
     }
 

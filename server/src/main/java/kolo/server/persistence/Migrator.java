@@ -26,7 +26,7 @@ final class Migrator {
 
     /** Скрипти в порядку версій; новий скрипт — лише в кінець, старі не змінюються. */
     private static final List<String> BUNDLED_SCRIPTS =
-            List.of("0001_world.sql", "0002_players.sql", "0003_world_key.sql");
+            List.of("0001_world.sql", "0002_players.sql", "0003_world_key.sql", "0004_turn_timer.sql");
 
     private static final String CREATE_TABLE = "CREATE TABLE IF NOT EXISTS schema_migrations ("
             + "version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)";

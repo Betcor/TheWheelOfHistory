@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import kolo.client.TestWorlds;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.LobbySetup;
@@ -74,6 +75,33 @@ class ServerConnectionTest {
     }
 
     @Test
+    void hostSetsATimerAndEndsTheYear() throws Exception {
+        TurnTimer live = new TurnTimer(TurnTimer.Mode.LIVE, 300);
+        RecordingListener events = new RecordingListener();
+        try (ServerConnection connection = connect(events)) {
+            await(connection.createLobby("Оля", 9, NpcShare.FEW));
+            ServerMessage.Lobby lobby =
+                    events.next(RecordingListener.Lobby.class).lobby();
+            assertThat(lobby.setup().timer()).isEqualTo(TurnTimer.MANUAL);
+            assertThat(lobby.timers()).contains(live);
+
+            connection.setTimer(live);
+
+            assertThat(events.next(RecordingListener.Lobby.class)
+                            .lobby()
+                            .setup()
+                            .timer())
+                    .isEqualTo(live);
+            connection.startGame();
+            TestWorlds.started(events);
+            ServerMessage.Phase orders = events.awaitOrders(0);
+            assertThat(orders.timeLeftMillis().orElseThrow()).isBetween(1L, 300_000L);
+            connection.endYear(0);
+            assertThat(events.awaitOrders(1).timeLeftMillis()).isPresent();
+        }
+    }
+
+    @Test
     void sameSeedSameMapAsTheTestWorlds() throws Exception {
         assertThat(TestWorlds.DEFAULT.seed()).isEqualTo(1970);
         RecordingListener events = new RecordingListener();
@@ -96,7 +124,11 @@ class ServerConnectionTest {
 
             assertThat(await(guest.lobbies()))
                     .contains(new LobbyInfo(
-                            session, created.world(), "Оля", 1, new LobbySetup.NewWorld(6, NpcShare.FEW)));
+                            session,
+                            created.world(),
+                            "Оля",
+                            1,
+                            new LobbySetup.NewWorld(6, NpcShare.FEW, TurnTimer.MANUAL)));
             ServerMessage.Joined joined = await(guest.joinLobby(session, "Ігор"));
             assertThat(joined.player()).isEqualTo(2);
             assertThat(guestEvents.next(RecordingListener.Lobby.class).lobby().players())
@@ -146,7 +178,7 @@ class ServerConnectionTest {
                 assertThat(await(back.rejoin(joined))).isEqualTo(joined);
 
                 GameStart start = TestWorlds.started(backEvents);
-                assertThat(start.phase()).isEqualTo(YearPhase.ORDERS);
+                assertThat(start.phase().phase()).isEqualTo(YearPhase.ORDERS);
                 assertThat(start.map().seed()).isEqualTo(8);
             }
         }

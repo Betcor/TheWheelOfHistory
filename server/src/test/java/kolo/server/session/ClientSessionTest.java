@@ -13,6 +13,7 @@ import kolo.engine.content.ContentPack;
 import kolo.engine.error.ContentException;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
@@ -20,6 +21,7 @@ import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.WorldInfo;
+import kolo.protocol.message.YearPhase;
 import kolo.server.TestServers;
 import kolo.server.persistence.WorldDirectory;
 import org.junit.jupiter.api.AfterEach;
@@ -112,7 +114,11 @@ class ClientSessionTest {
         session.handle(new ClientMessage.ListLobbies());
         assertThat(peer.next())
                 .isEqualTo(new ServerMessage.Lobbies(List.of(new LobbyInfo(
-                        joined.session(), joined.world(), "Оля", 1, new LobbySetup.NewWorld(42, NpcShare.NORMAL)))));
+                        joined.session(),
+                        joined.world(),
+                        "Оля",
+                        1,
+                        new LobbySetup.NewWorld(42, NpcShare.NORMAL, TurnTimer.MANUAL)))));
 
         session.handle(new ClientMessage.StartGame());
 
@@ -184,6 +190,37 @@ class ClientSessionTest {
 
         assertThat(peer.error().code()).isEqualTo(ErrorCode.FORBIDDEN);
         assertThat(peer.closed()).isFalse();
+    }
+
+    @Test
+    void timerAndEndYearWithoutSessionAreErrors() throws Exception {
+        welcome();
+
+        session.handle(new ClientMessage.SetTimer(TurnTimer.MANUAL));
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.FORBIDDEN);
+        session.handle(new ClientMessage.EndYear(0));
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+        assertThat(peer.closed()).isFalse();
+    }
+
+    @Test
+    void hostSetsTheTimerAndEndsTheYear() throws Exception {
+        welcome();
+        TurnTimer live = new TurnTimer(TurnTimer.Mode.LIVE, 180);
+        session.handle(new ClientMessage.CreateLobby("Оля", 42, NpcShare.FEW));
+        peer.joined();
+        peer.lobby();
+
+        session.handle(new ClientMessage.SetTimer(live));
+
+        assertThat(peer.lobby().setup().timer()).isEqualTo(live);
+        session.handle(new ClientMessage.StartGame());
+        peer.map();
+        peer.players();
+        peer.expectPhase(0, YearPhase.START_OF_YEAR);
+        assertThat(peer.phase().timeLeftMillis()).isPresent();
+        session.handle(new ClientMessage.EndYear(0));
+        peer.expectPhase(0, YearPhase.RESOLVING);
     }
 
     @Test
@@ -313,7 +350,7 @@ class ClientSessionTest {
         trusted.handle(new ClientMessage.LoadWorld("world-42", "Марко", Optional.empty()));
 
         assertThat(local.joined().player()).isEqualTo(2);
-        assertThat(local.lobby().setup()).isEqualTo(new LobbySetup.SavedWorld("world-42", 42, 0));
+        assertThat(local.lobby().setup()).isEqualTo(new LobbySetup.SavedWorld("world-42", 42, 0, TurnTimer.MANUAL));
         trusted.handle(new ClientMessage.AssignSeat(2, 1));
         ServerMessage.Joined seated = local.joined();
         assertThat(seated.player()).isEqualTo(1);

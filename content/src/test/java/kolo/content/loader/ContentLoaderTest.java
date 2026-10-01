@@ -83,6 +83,7 @@ import kolo.engine.content.TerrainTagDef;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
+import kolo.engine.content.TurnTimersDef;
 import kolo.engine.content.WorldBalanceDef;
 import kolo.engine.content.WorldClimateDef;
 import kolo.engine.content.WorldClimateId;
@@ -2340,6 +2341,39 @@ class ContentLoaderTest {
                 balance(Files.BALANCE.replace("  max_advantage: 30", "  max_advantage: 0")),
                 ErrorCode.INVALID_CONTENT,
                 Map.of("location", "power_budget", "field", "power_budget.max_advantage"));
+    }
+
+    @Test
+    void loadsTurnTimersInSeconds() {
+        TurnTimersDef timers =
+                ContentLoader.load(Files.valid().source()).balance().timers();
+
+        assertThat(timers.liveSeconds()).containsExactly(120, 300);
+        assertThat(timers.asyncSeconds()).containsExactly(43_200, 86_400);
+    }
+
+    @Test
+    void invalidTurnTimersAreRejected() {
+        assertContentError(
+                balance(Files.BALANCE.replaceAll("(?s)turn_timers:.*", "")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "turn_timers", "cause", "blank_value"));
+        assertContentError(
+                balance(Files.BALANCE.replace("live_minutes: [2, 5]", "live_minutes: [5, 2]")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "turn_timers", "field", "turn_timers.live[1]"));
+        assertContentError(
+                balance(Files.BALANCE.replace("async_hours: [12, 24]", "async_hours: []")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "turn_timers", "cause", "empty_collection"));
+        assertContentError(
+                balance(Files.BALANCE.replace("async_hours: [12, 24]", "async_hours: [12, 100000000]")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "turn_timers", "field", "turn_timers.async[1]"));
+        assertContentError(
+                balance(Files.BALANCE.replace("live_minutes: [2, 5]", "live_minutes: [2, null]")),
+                ErrorCode.INVALID_CONTENT,
+                Map.of("location", "turn_timers.live_minutes[1]", "cause", "blank_value"));
     }
 
     @Test
