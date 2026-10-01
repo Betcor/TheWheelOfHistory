@@ -2,6 +2,7 @@ package kolo.server;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
+import java.util.OptionalInt;
 import kolo.content.loader.ContentLoader;
 import kolo.engine.content.ContentPack;
 import kolo.engine.error.ContentException;
@@ -12,8 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Точка входу окремого (headless) сервера: {@code [--port N] [--worlds DIR]}, типово порт {@value
- * Protocol#DEFAULT_PORT} і тека {@code worlds} у поточній теці.
+ * Точка входу окремого (headless) сервера: {@code [--port N] [--worlds DIR] [--no-discovery]}, типово порт {@value
+ * Protocol#DEFAULT_PORT}, тека {@code worlds} у поточній теці й відповіді на пошук у локальній мережі (UDP-порт
+ * {@value Protocol#DISCOVERY_PORT}); {@code --no-discovery} вимикає їх — сервер в інтернеті локальної мережі не має.
  *
  * <p>Контент завантажується одразу: з невалідним контентом сервер не стартує. Зупинка — сигналом процесу.
  */
@@ -36,15 +38,19 @@ public final class DedicatedServerMain {
      *
      * @param port TCP-порт; 0 — будь-який вільний
      * @param worlds тека файлів світів
+     * @param discovery UDP-порт відповідей на пошук у локальній мережі (0 — будь-який вільний); порожньо — не
+     *     відповідати
      */
-    record Options(int port, Path worlds) {}
+    record Options(int port, Path worlds, OptionalInt discovery) {}
 
     public static void main(String[] args) throws InterruptedException {
         Options options;
         try {
             options = options(args);
         } catch (IllegalArgumentException e) {
-            LOG.error("Невірні аргументи: {}. Використання: [--port 0..65535] [--worlds DIR]", e.getMessage());
+            LOG.error(
+                    "Невірні аргументи: {}. Використання: [--port 0..65535] [--worlds DIR] [--no-discovery]",
+                    e.getMessage());
             System.exit(EXIT_USAGE);
             return;
         }
@@ -66,6 +72,7 @@ public final class DedicatedServerMain {
         GameServer server = GameServer.start(() -> content, new WorldDirectory(options.worlds()));
         try {
             InetSocketAddress address = server.bindTcp(new InetSocketAddress(options.port()));
+            options.discovery().ifPresent(port -> discovery(server, port, address.getPort()));
             LOG.info(
                     "Сервер слухає {}, контент {}, світи у {}",
                     address,
@@ -78,6 +85,16 @@ public final class DedicatedServerMain {
         }
     }
 
+    /** Відповіді на пошук у локальній мережі; порт недоступний — сервер працює й без них. */
+    private static void discovery(GameServer server, int port, int gamePort) {
+        try {
+            LOG.info("Пошук у локальній мережі: UDP {}", server.bindDiscovery(new InetSocketAddress(port), gamePort));
+        } catch (Exception e) {
+            // Netty кидає й перевірювані винятки без оголошення (BindException — порт зайнятий).
+            LOG.warn("Пошук у локальній мережі недоступний: UDP-порт {} — {}", port, e.toString());
+        }
+    }
+
     /**
      * Аргументи запуску.
      *
@@ -86,8 +103,13 @@ public final class DedicatedServerMain {
     static Options options(String... args) {
         int port = Protocol.DEFAULT_PORT;
         Path worlds = DEFAULT_WORLDS;
+        OptionalInt discovery = OptionalInt.of(Protocol.DISCOVERY_PORT);
         for (int i = 0; i < args.length; i++) {
             String name = args[i];
+            if (name.equals("--no-discovery")) {
+                discovery = OptionalInt.empty();
+                continue;
+            }
             if (!name.equals("--port") && !name.equals("--worlds")) {
                 throw new IllegalArgumentException("невідомий аргумент " + name);
             }
@@ -111,6 +133,6 @@ public final class DedicatedServerMain {
                 throw new IllegalArgumentException("порт поза 0..65535: " + port);
             }
         }
-        return new Options(port, worlds);
+        return new Options(port, worlds, discovery);
     }
 }

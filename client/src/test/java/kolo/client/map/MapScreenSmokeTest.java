@@ -25,6 +25,7 @@ import kolo.client.app.Navigator;
 import kolo.client.i18n.Texts;
 import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
+import kolo.client.net.LanPorts;
 import kolo.client.screen.ConnectScreen;
 import kolo.client.screen.LoadScreen;
 import kolo.client.screen.LobbyScreen;
@@ -109,7 +110,7 @@ class MapScreenSmokeTest {
         assertThat(started.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
         Platform.setImplicitExit(false);
         session = new SessionModel(Platform::runLater);
-        game = GameClient.start(worlds, 0, session, BACKGROUND);
+        game = GameClient.start(worlds, LanPorts.ANY, session, BACKGROUND);
     }
 
     private static ScreenContext context() {

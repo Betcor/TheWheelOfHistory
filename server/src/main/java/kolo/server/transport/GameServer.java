@@ -1,5 +1,6 @@
 package kolo.server.transport;
 
+import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -14,6 +15,7 @@ import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalIoHandler;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.channel.nio.NioIoHandler;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -29,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import kolo.engine.content.ContentPack;
 import kolo.protocol.codec.ProtocolPipeline;
+import kolo.server.discovery.DiscoveryResponder;
 import kolo.server.persistence.WorldDirectory;
 import kolo.server.session.ClientSession;
 import kolo.server.session.Sessions;
@@ -59,6 +62,7 @@ public final class GameServer implements AutoCloseable {
     private final CountDownLatch closed = new CountDownLatch(1);
     private EventLoopGroup localGroup;
     private EventLoopGroup tcpGroup;
+    private EventLoopGroup udpGroup;
     private boolean closing;
 
     private GameServer(Supplier<ContentPack> content, WorldDirectory worlds) {
@@ -111,6 +115,36 @@ public final class GameServer implements AutoCloseable {
             group = tcpGroup;
         }
         return (InetSocketAddress) bind(group, NioServerSocketChannel.class, address);
+    }
+
+    /**
+     * Відповідає на UDP-запити пошуку гри в локальній мережі ({@link DiscoveryResponder}).
+     *
+     * @param address адреса й порт UDP; порт 0 — будь-який вільний
+     * @param gamePort TCP-порт гри, який називати клієнтам
+     * @return справжня адреса, зокрема обраний порт
+     * @throws io.netty.channel.ChannelException якщо адреса зайнята чи недоступна (Netty кидає й {@link
+     *     java.net.BindException} без оголошення)
+     */
+    public InetSocketAddress bindDiscovery(InetSocketAddress address, int gamePort) {
+        DiscoveryResponder responder = new DiscoveryResponder(gamePort);
+        EventLoopGroup group;
+        synchronized (this) {
+            requireOpen();
+            if (udpGroup == null) {
+                udpGroup = group("kolo-server-discovery", NioIoHandler.newFactory());
+            }
+            group = udpGroup;
+        }
+        Channel channel = new Bootstrap()
+                .group(group)
+                .channel(NioDatagramChannel.class)
+                .handler(responder)
+                .bind(address)
+                .syncUninterruptibly()
+                .channel();
+        channels.add(channel);
+        return (InetSocketAddress) channel.localAddress();
     }
 
     /** Чекає {@link #close()} — для окремого сервера, чий головний потік живе, доки живе сервер. */
