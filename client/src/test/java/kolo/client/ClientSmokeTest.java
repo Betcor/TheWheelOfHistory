@@ -5,22 +5,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapLayers;
 import kolo.client.map.MapMode;
+import kolo.client.net.EmbeddedGame;
 import kolo.client.screen.ProvinceDescription;
 import kolo.engine.state.NpcShare;
 import kolo.engine.view.MapView;
-import kolo.server.EmbeddedServer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
- * Смок без вікна: те, що клієнт робить між кнопкою «Згенерувати світ» і першим кадром карти, — вбудований сервер,
- * шари карти, кольори кожного режиму й тексти про кожну провінцію.
+ * Смок без вікна: те, що клієнт робить між кнопкою «Згенерувати світ» і першим кадром карти, — вбудований сервер і
+ * з'єднання з ним через {@code LocalChannel}, шари карти, кольори кожного режиму й тексти про кожну провінцію.
  */
 class ClientSmokeTest {
 
     @Test
+    @Timeout(60)
     void newWorldToMapLayers() {
         Texts texts = Texts.ukrainian();
-        MapView view = EmbeddedServer.withBundledContent().newWorld(42, 1, NpcShare.NORMAL);
+        MapView view;
+        try (EmbeddedGame game = EmbeddedGame.start()) {
+            view = game.newWorld(42, 1, NpcShare.NORMAL);
+        }
 
         MapLayers layers = MapLayers.build(view);
         for (MapMode mode : MapMode.values()) {

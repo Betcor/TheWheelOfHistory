@@ -1,64 +1,55 @@
 package kolo.server;
 
+import io.netty.channel.local.LocalAddress;
+import java.net.SocketAddress;
 import java.util.function.Supplier;
 import kolo.content.loader.ContentLoader;
 import kolo.engine.content.ContentPack;
-import kolo.engine.generation.map.WorldSizeInput;
-import kolo.engine.generation.world.StartWorld;
-import kolo.engine.generation.world.WorldGenerator;
-import kolo.engine.generation.world.WorldStates;
-import kolo.engine.rng.Rng;
-import kolo.engine.state.NpcShare;
-import kolo.engine.state.WorldState;
-import kolo.engine.view.MapView;
-import kolo.engine.view.MapViews;
+import kolo.server.session.LazyContent;
+import kolo.server.transport.GameServer;
 
 /**
- * Вбудований сервер для одиночної гри, hot-seat і LAN-хоста.
+ * Вбудований сервер для одиночної гри, hot-seat і LAN-хоста: той самий {@link GameServer}, що й окремий, але
+ * в процесі клієнта й на адресі {@code LocalChannel}. Клієнт говорить із ним лише повідомленнями протоколу через
+ * {@link #address()} — так само, як з віддаленим сервером.
  *
- * <p>Поки мережі й сесій немає, клієнт викликає його напряму: згенерувати світ і отримати карту для показу. З мережею
- * ці виклики стануть повідомленнями протоколу через {@code LocalChannel}, а клієнт і далі бачитиме лише представлення
- * світу ({@link MapView}), а не стан.
- *
- * <p>Контент завантажується при першому зверненні, а не при створенні: старт клієнта до меню його не чекає.
- * Потокобезпечний: клієнт звертається з фонового потоку.
+ * <p>Контент завантажується при першому зверненні, а не при старті: старт клієнта до меню його не чекає.
  */
-public final class EmbeddedServer {
+public final class EmbeddedServer implements AutoCloseable {
 
-    private final Supplier<ContentPack> source;
-    private ContentPack content;
+    private final Supplier<ContentPack> content;
+    private final GameServer server;
+    private final LocalAddress address;
 
-    private EmbeddedServer(Supplier<ContentPack> source) {
-        this.source = source;
+    private EmbeddedServer(Supplier<ContentPack> content) {
+        this.content = new LazyContent(content);
+        this.server = GameServer.start(this.content);
+        this.address = server.bindLocal();
     }
 
-    /** Сервер із вбудованим контентом гри. */
-    public static EmbeddedServer withBundledContent() {
+    /** Запускає сервер із вбудованим контентом гри. */
+    public static EmbeddedServer startWithBundledContent() {
         return new EmbeddedServer(ContentLoader::loadBundled);
     }
 
-    /**
-     * Генерує новий світ і повертає його карту. Той самий seed і параметри — та сама карта.
-     *
-     * @param seed seed світу (GD §3.4)
-     * @param players кількість гравців
-     * @param npcShare частка NPC-держав
-     * @throws kolo.engine.error.ContentException якщо вбудований контент невалідний
-     * @throws kolo.engine.error.ValidationException якщо параметри світу поза межами
-     * @throws kolo.engine.error.InvariantViolationException якщо генерація порушила інваріант
-     */
-    public MapView newWorld(long seed, int players, NpcShare npcShare) {
-        WorldSizeInput input = WorldSizeInput.of(players, npcShare);
-        ContentPack pack = content();
-        StartWorld world = WorldGenerator.generate(Rng.of(seed), pack, input);
-        WorldState state = WorldStates.of(seed, pack, world);
-        return MapViews.of(state);
+    /** Адреса для з'єднання клієнта ({@code LocalChannel}). */
+    public SocketAddress address() {
+        return address;
     }
 
-    private synchronized ContentPack content() {
-        if (content == null) {
-            content = source.get();
-        }
-        return content;
+    /**
+     * Хеш контенту сервера — клієнт одиночної гри вітається з ним, бо грає тим самим контентом. Перше звернення
+     * завантажує контент: викликати не з потоку UI.
+     *
+     * @throws kolo.engine.error.ContentException якщо вбудований контент невалідний
+     */
+    public String contentHash() {
+        return content.get().hash();
+    }
+
+    /** Зупиняє сервер і закриває всі з'єднання. */
+    @Override
+    public void close() {
+        server.close();
     }
 }

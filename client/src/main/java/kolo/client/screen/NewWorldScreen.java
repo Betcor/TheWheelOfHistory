@@ -20,21 +20,23 @@ import javafx.scene.layout.VBox;
 import kolo.client.app.Navigator;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapLayers;
+import kolo.client.net.ConnectionClosedException;
+import kolo.client.net.ServerErrorException;
+import kolo.client.net.WorldSource;
 import kolo.engine.error.GameException;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
 import kolo.engine.view.MapView;
-import kolo.server.EmbeddedServer;
 
 /**
- * Параметри нового світу (GD §3.4): seed, кількість гравців і частка NPC. Генерація світу й підготовка шарів карти —
- * у фоновому потоці, вікно тим часом не зависає.
+ * Параметри нового світу (GD §3.4): seed, кількість гравців і частка NPC. Світ генерує сервер, клієнт отримує карту
+ * повідомленнями; запит і підготовка шарів карти — у фоновому потоці, вікно тим часом не зависає.
  */
 public final class NewWorldScreen {
 
     private NewWorldScreen() {}
 
-    public static Parent create(Navigator navigator, Texts texts, EmbeddedServer server, Executor background) {
+    public static Parent create(Navigator navigator, Texts texts, WorldSource worlds, Executor background) {
         TextField seed = new TextField();
         seed.setPromptText(texts.text("new_world.seed_random"));
         Spinner<Integer> players = new Spinner<>(WorldLimits.MIN_PLAYERS, WorldLimits.MAX_PLAYERS, 1);
@@ -80,11 +82,18 @@ public final class NewWorldScreen {
             progress.setVisible(true);
             background.execute(() -> {
                 try {
-                    MapView view = server.newWorld(chosen, playerCount, share);
+                    MapView view = worlds.newWorld(chosen, playerCount, share);
                     MapLayers layers = MapLayers.build(view);
                     Platform.runLater(() -> navigator.showMap(layers));
+                } catch (ServerErrorException e) {
+                    String message = texts.error(e.error().code(), e.error().details());
+                    Platform.runLater(() -> failed(message, error, generate, back, progress));
                 } catch (GameException e) {
-                    Platform.runLater(() -> failed(texts.text(e.code().key()), error, generate, back, progress));
+                    String message = texts.error(e.code(), e.details());
+                    Platform.runLater(() -> failed(message, error, generate, back, progress));
+                } catch (ConnectionClosedException e) {
+                    Platform.runLater(
+                            () -> failed(texts.text("app.error.connection_lost"), error, generate, back, progress));
                 } catch (RuntimeException e) {
                     // Межа фонового потоку: інакше виняток зник би мовчки, а кнопка лишилася б вимкненою.
                     Platform.runLater(
