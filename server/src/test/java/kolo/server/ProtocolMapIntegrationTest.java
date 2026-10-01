@@ -6,7 +6,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.List;
 import java.util.Optional;
-import kolo.content.loader.ContentLoader;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
 import kolo.engine.view.MapView;
@@ -27,14 +26,12 @@ import org.junit.jupiter.api.Test;
  */
 class ProtocolMapIntegrationTest {
 
-    private static final EmbeddedServer SERVER = EmbeddedServer.withBundledContent();
-
     @Test
     void everyWorldMapCrossesTheWire() {
         for (long seed = 0; seed < 6; seed++) {
             int players = 1 + (int) (seed * 5 % WorldLimits.MAX_PLAYERS);
             NpcShare share = NpcShare.values()[(int) (seed % NpcShare.values().length)];
-            MapView map = SERVER.newWorld(seed, players, share);
+            MapView map = TestServers.map(seed, players, share);
 
             assertThat(transfer(MapChunks.split(map))).isEqualTo(map);
         }
@@ -42,7 +39,7 @@ class ProtocolMapIntegrationTest {
 
     @Test
     void largestMapFramesStayWellBelowTheLimit() {
-        MapView map = SERVER.newWorld(1, WorldLimits.MAX_PLAYERS, NpcShare.MANY);
+        MapView map = TestServers.map(1, WorldLimits.MAX_PLAYERS, NpcShare.MANY);
 
         int largest = 0;
         for (ServerMessage message : MapChunks.split(map)) {
@@ -55,7 +52,7 @@ class ProtocolMapIntegrationTest {
 
     @Test
     void handshakeWithBundledContentHash() {
-        String hash = ContentLoader.loadBundled().hash();
+        String hash = TestServers.CONTENT.hash();
 
         ServerMessage.Welcome welcome = Handshake.accept(Handshake.hello(hash), hash);
 
@@ -68,7 +65,7 @@ class ProtocolMapIntegrationTest {
     @Test
     @Tag("budget")
     void largestMapFitsBudget() {
-        MapView map = SERVER.newWorld(1, WorldLimits.MAX_PLAYERS, NpcShare.MANY);
+        MapView map = TestServers.map(1, WorldLimits.MAX_PLAYERS, NpcShare.MANY);
 
         Budget.Timed<MapView> sent = Budget.best(() -> transfer(MapChunks.split(map)));
 

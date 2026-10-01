@@ -18,5 +18,10 @@ public final class Protocol {
     /** Скільки комірок карти в одній частині ({@code MapCells}): ~250 КБ JSON. */
     public static final int MAP_CHUNK_CELLS = 1000;
 
+    /**
+     * Типовий TCP-порт сервера (LAN-хост, окремий сервер). Не частина формату повідомлень: зміна не змінює версії.
+     */
+    public static final int DEFAULT_PORT = 19_700;
+
     private Protocol() {}
 }

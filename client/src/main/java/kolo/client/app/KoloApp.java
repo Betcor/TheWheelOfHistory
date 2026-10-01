@@ -11,22 +11,23 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapLayers;
+import kolo.client.net.EmbeddedGame;
 import kolo.client.screen.MainMenuScreen;
 import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
-import kolo.server.EmbeddedServer;
 
 /**
  * JavaFX-застосунок клієнта: головне меню → параметри нового світу → карта.
  *
- * <p>Важка робота (генерація світу, растеризація карти) — в одному фоновому потоці, UI змінюється лише в потоці JavaFX.
+ * <p>Світ живе на вбудованому сервері ({@link EmbeddedGame}): клієнт говорить із ним повідомленнями протоколу. Важка
+ * робота (очікування сервера, растеризація карти) — в одному фоновому потоці, UI змінюється лише в потоці JavaFX.
  */
 public final class KoloApp extends Application implements Navigator {
     private static final double INITIAL_WIDTH = 1280;
     private static final double INITIAL_HEIGHT = 800;
 
     private final Texts texts = Texts.ukrainian();
-    private final EmbeddedServer server = EmbeddedServer.withBundledContent();
+    private final EmbeddedGame game = EmbeddedGame.start();
     private final ExecutorService background = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "kolo-background");
         thread.setDaemon(true);
@@ -52,6 +53,7 @@ public final class KoloApp extends Application implements Navigator {
     @Override
     public void stop() {
         background.shutdownNow();
+        game.close();
     }
 
     @Override
@@ -61,7 +63,7 @@ public final class KoloApp extends Application implements Navigator {
 
     @Override
     public void showNewWorld() {
-        show(NewWorldScreen.create(this, texts, server, background));
+        show(NewWorldScreen.create(this, texts, game, background));
     }
 
     @Override

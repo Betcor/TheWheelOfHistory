@@ -67,7 +67,7 @@ class MapScreenSmokeTest {
         Texts texts = Texts.ukrainian();
         onFx(() -> {
             new Scene(MainMenuScreen.create(NAVIGATOR, texts), WIDTH, HEIGHT);
-            new Scene(NewWorldScreen.create(NAVIGATOR, texts, TestWorlds.SERVER, Runnable::run), WIDTH, HEIGHT);
+            new Scene(NewWorldScreen.create(NAVIGATOR, texts, TestWorlds.GAME, Runnable::run), WIDTH, HEIGHT);
             return null;
         });
     }
