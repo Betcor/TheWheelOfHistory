@@ -106,6 +106,7 @@ public final class ClientSession {
                 case ClientMessage.AssignSeat assign -> assignSeat(assign);
                 case ClientMessage.SetTimer set -> setTimer(set);
                 case ClientMessage.EndYear end -> endYear(end);
+                case ClientMessage.Resume resume -> resume(resume);
             }
         } catch (GameException e) {
             ServerMessage.Error error = ServerMessage.Error.of(e);
@@ -194,6 +195,13 @@ public final class ClientSession {
         SessionActor current =
                 session().orElseThrow(() -> new PhaseClosedException(ErrorDetails.of("turn", end.turn())));
         current.endYear(scoped, end.turn());
+    }
+
+    private void resume(ClientMessage.Resume resume) {
+        requireWelcomed();
+        SessionActor current =
+                session().orElseThrow(() -> new PhaseClosedException(ErrorDetails.of("turn", resume.turn())));
+        current.resume(scoped, resume.turn());
     }
 
     private void startGame() {

@@ -96,6 +96,10 @@ final class MessageWriter {
                     json.writeStringField("type", MessageTypes.END_YEAR);
                     json.writeNumberField("turn", end.turn());
                 }
+                case ClientMessage.Resume resume -> {
+                    json.writeStringField("type", MessageTypes.RESUME);
+                    json.writeNumberField("turn", resume.turn());
+                }
             }
             json.writeEndObject();
         });

@@ -221,6 +221,14 @@ public final class GameClient implements AutoCloseable {
         }
     }
 
+    /** Хост відновлює рік {@code turn}, на якому сесію призупинено. */
+    public void resume(int turn) {
+        ServerConnection open = open();
+        if (open != null) {
+            open.resume(turn);
+        }
+    }
+
     /** Полишає сесію; повернутися до неї вже не можна. */
     public void leave() {
         ServerConnection open;

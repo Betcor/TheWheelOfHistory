@@ -53,9 +53,14 @@ tasks.withType<Test>().configureEach {
 
 // Тести бюджетів продуктивності (тег `budget`) міряють час, тож не мусять ділити процесор з іншими тестами: при
 // org.gradle.parallel модулі тестуються одночасно, і на повільному CI замір ловить чуже навантаження. Звичайний `test`
-// їх пропускає, а `budgetTest` запускається після `test` усіх модулів.
+// їх пропускає, а `budgetTest` запускається після `test` усіх модулів і лише по одній задачі на збірку (BudgetTestLock):
+// бюджети різних модулів теж не міряють час одночасно.
 tasks.named<Test>("test") {
     useJUnitPlatform { excludeTags("budget") }
+}
+
+val budgetTestLock = gradle.sharedServices.registerIfAbsent("budgetTestLock", BudgetTestLock::class) {
+    maxParallelUsages = 1
 }
 
 val budgetTest = tasks.register<Test>("budgetTest") {
@@ -67,6 +72,7 @@ val budgetTest = tasks.register<Test>("budgetTest") {
     // Без тестів із тегом у модулі задача нічого не запускає — це не помилка.
     filter.isFailOnNoMatchingTests = false
     mustRunAfter(rootProject.allprojects.map { other -> other.tasks.withType<Test>().matching { it.name == "test" } })
+    usesService(budgetTestLock)
 }
 
 tasks.named("check") {

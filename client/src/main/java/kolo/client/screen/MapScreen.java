@@ -87,6 +87,9 @@ public final class MapScreen {
         Button finish = new Button(texts.text("map.finish_year"));
         finish.setTooltip(new Tooltip(texts.text("map.finish_year.tooltip")));
         Label timeLeft = new Label();
+        Label paused = new Label(texts.text("map.paused"));
+        paused.setTooltip(new Tooltip(texts.text("map.paused.tooltip")));
+        Button resume = new Button(texts.text("map.resume"));
         Button reconnect = new Button(texts.text("map.reconnect"));
         reconnect.setVisible(false);
         reconnect.setManaged(false);
@@ -98,8 +101,10 @@ public final class MapScreen {
                         spacer,
                         year,
                         timeLeft,
+                        paused,
                         endYear,
                         finish,
+                        resume,
                         reconnect,
                         new Separator(),
                         fit,
@@ -124,9 +129,11 @@ public final class MapScreen {
         int[] current = {start.turn()};
         boolean[] sent = {false};
         boolean[] finished = {false};
+        boolean[] resumed = {false};
         Runnable refreshReady = () -> {
             ServerMessage.Phase phase = session.phase().get();
             boolean orders = phase != null && phase.phase() == YearPhase.ORDERS && phase.turn() == current[0];
+            boolean pause = phase != null && phase.phase() == YearPhase.PAUSED && phase.turn() == current[0];
             boolean meReady = session.players().get().stream().anyMatch(p -> game.isMe(p) && p.ready());
             boolean connected = session.connected().get();
             endYear.setDisable(!orders || sent[0] || meReady || !connected);
@@ -134,6 +141,11 @@ public final class MapScreen {
             finish.setVisible(host);
             finish.setManaged(host);
             finish.setDisable(!orders || finished[0] || !connected);
+            paused.setVisible(pause);
+            paused.setManaged(pause);
+            resume.setVisible(pause && host);
+            resume.setManaged(pause && host);
+            resume.setDisable(resumed[0] || !connected);
         };
         endYear.setOnAction(event -> {
             sent[0] = true;
@@ -144,6 +156,11 @@ public final class MapScreen {
             finished[0] = true;
             refreshReady.run();
             game.endYear(current[0]);
+        });
+        resume.setOnAction(event -> {
+            resumed[0] = true;
+            refreshReady.run();
+            game.resume(current[0]);
         });
 
         // Відлік до кінця фази наказів: межа — з моделі, час, що лишився, — щосекунди за годинником клієнта.
@@ -175,6 +192,15 @@ public final class MapScreen {
             }
             if (phase.phase() == YearPhase.RESOLVING) {
                 status.setText(texts.text("map.year_resolving"));
+            } else if (phase.phase() == YearPhase.PAUSED) {
+                resumed[0] = false;
+            } else if (phase.phase() == YearPhase.ORDERS
+                    && phase.turn() == current[0]
+                    && old != null
+                    && old.phase() == YearPhase.PAUSED) {
+                sent[0] = false;
+                finished[0] = false;
+                status.setText(texts.text("map.year_resumed", WorldState.year(phase.turn())));
             } else if (phase.phase() == YearPhase.ORDERS && phase.turn() > current[0]) {
                 current[0] = phase.turn();
                 sent[0] = false;
@@ -216,6 +242,7 @@ public final class MapScreen {
         session.setOnError(error -> {
             sent[0] = false;
             finished[0] = false;
+            resumed[0] = false;
             status.setText(texts.error(error.code(), error.details()));
             refreshReady.run();
         });

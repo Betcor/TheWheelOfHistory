@@ -148,11 +148,12 @@ class MessageJsonTest {
     }
 
     @Test
-    void timerAndEndYearFormatIsFixed() {
+    void timerEndYearAndResumeFormatIsFixed() {
         assertThat(json(MessageJson.write(new ClientMessage.SetTimer(LIVE_3))))
                 .isEqualTo("{\"type\":\"set_timer\",\"timer\":{\"mode\":\"live\",\"seconds\":180}}");
         assertThat(json(MessageJson.write(new ClientMessage.EndYear(4))))
                 .isEqualTo("{\"type\":\"end_year\",\"turn\":4}");
+        assertThat(json(MessageJson.write(new ClientMessage.Resume(4)))).isEqualTo("{\"type\":\"resume\",\"turn\":4}");
     }
 
     @Test
@@ -161,6 +162,8 @@ class MessageJsonTest {
                 .isEqualTo("{\"type\":\"phase\",\"turn\":12,\"phase\":\"start_of_year\",\"time_left_millis\":null}");
         assertThat(json(MessageJson.write(new ServerMessage.Phase(12, YearPhase.ORDERS, OptionalLong.of(90_000)))))
                 .isEqualTo("{\"type\":\"phase\",\"turn\":12,\"phase\":\"orders\",\"time_left_millis\":90000}");
+        assertThat(json(MessageJson.write(new ServerMessage.Phase(12, YearPhase.PAUSED))))
+                .isEqualTo("{\"type\":\"phase\",\"turn\":12,\"phase\":\"paused\",\"time_left_millis\":null}");
     }
 
     @Test
@@ -205,7 +208,8 @@ class MessageJsonTest {
                 new ClientMessage.AssignSeat(Integer.MAX_VALUE, 1),
                 new ClientMessage.SetTimer(TurnTimer.MANUAL),
                 new ClientMessage.SetTimer(new TurnTimer(TurnTimer.Mode.ASYNC, TurnTimer.MAX_SECONDS)),
-                new ClientMessage.EndYear(Integer.MAX_VALUE))) {
+                new ClientMessage.EndYear(Integer.MAX_VALUE),
+                new ClientMessage.Resume(0))) {
             assertThat(MessageJson.readClient(MessageJson.write(message))).isEqualTo(message);
         }
     }

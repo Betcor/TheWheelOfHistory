@@ -439,8 +439,7 @@ class SessionActorTest {
 
         session.ready(host, 0);
 
-        host.expectPhase(0, YearPhase.RESOLVING);
-        ServerMessage.Error error = host.error();
+        ServerMessage.Error error = host.expectPause(0);
         assertThat(error.code()).isEqualTo(ErrorCode.INVARIANT_VIOLATION);
         assertThat(error.details()).containsEntry("check", "test");
         assertThat(session.state()).isEqualTo(SessionState.PAUSED);
@@ -476,17 +475,72 @@ class SessionActorTest {
         host.players();
         session.ready(guest, 0);
         guest.players();
-        guest.expectPhase(0, YearPhase.RESOLVING);
-        guest.error();
+        guest.expectPause(0);
         RecordingPeer back = new RecordingPeer();
 
         session.rejoin(back, joined.player(), joined.token());
 
         back.joined();
         back.map();
-        back.expectPhase(0, YearPhase.RESOLVING);
+        back.expectPhase(0, YearPhase.PAUSED);
         assertThat(back.error().code()).isEqualTo(ErrorCode.INVARIANT_VIOLATION);
         session.close();
+    }
+
+    @Test
+    void hostResumesThePausedYearAndItIsPlayedAgain() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        UnaryOperator<WorldState> engine = SessionActor.engine(TestServers.CONTENT);
+        RecordingPeer guest = new RecordingPeer();
+        SessionActor session = session(state -> {
+            if (attempts.incrementAndGet() == 1) {
+                throw new InvariantViolationException(ErrorDetails.of("check", "test"));
+            }
+            return engine.apply(state);
+        });
+        session.open(host, "Оля", 11, NpcShare.FEW);
+        host.joined();
+        host.lobby();
+        session.join(guest, "Ігор");
+        guest.joined();
+        startTwo(session, guest);
+        session.endYear(host, 0);
+        host.expectPause(0);
+        guest.expectPause(0);
+
+        // Відновлює лише хост і лише рік на паузі.
+        session.resume(guest, 0);
+        assertThat(guest.error().code()).isEqualTo(ErrorCode.FORBIDDEN);
+        session.resume(host, 1);
+        ServerMessage.Error wrongYear = host.error();
+        assertThat(wrongYear.code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+        assertThat(wrongYear.details()).containsEntry("turn", 1L);
+        assertThat(session.state()).isEqualTo(SessionState.PAUSED);
+        session.resume(host, 0);
+
+        for (RecordingPeer peer : List.of(host, guest)) {
+            assertThat(peer.players().players()).noneMatch(PlayerInfo::ready);
+            peer.expectPhase(0, YearPhase.ORDERS);
+        }
+        assertThat(session.state()).isEqualTo(SessionState.RUNNING);
+        // Відновлену сесію відновлювати нічого.
+        session.resume(host, 0);
+        assertThat(host.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+        session.ready(host, 0);
+        host.players();
+        guest.players();
+        session.ready(guest, 0);
+        host.expectYear(0);
+        guest.expectYear(0);
+        assertThat(attempts).hasValue(2);
+        session.leave(guest);
+        host.players();
+        leaveAndAwait(session);
+        try (WorldStore store = WorldStore.open(worlds.resolve("world-11" + WorldStore.EXTENSION))) {
+            assertThat(store.lastTurn()).isEqualTo(1);
+            // Невдала спроба пропусків не додала: рік зіграли обидва.
+            assertThat(store.players()).extracting(SavedPlayer::missedTurns).containsExactly(0, 0);
+        }
     }
 
     @Test

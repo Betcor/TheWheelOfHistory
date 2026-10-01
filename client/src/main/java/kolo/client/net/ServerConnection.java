@@ -179,6 +179,11 @@ public final class ServerConnection implements AutoCloseable {
         send(new ClientMessage.EndYear(turn));
     }
 
+    /** Хост відновлює рік {@code turn}, на якому сесію призупинено; фазу наказів отримає слухач. */
+    public void resume(int turn) {
+        send(new ClientMessage.Resume(turn));
+    }
+
     /** Полишає сесію. */
     public void leave() {
         send(new ClientMessage.Leave());

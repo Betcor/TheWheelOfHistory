@@ -4,13 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
+import kolo.engine.error.InvariantViolationException;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.TurnTimer;
+import kolo.engine.state.WorldState;
 import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
@@ -40,6 +46,7 @@ class SessionActorTimerTest {
     private final RecordingPeer guest = new RecordingPeer();
     private WorldDirectory worlds;
     private long nextId = 1;
+    private UnaryOperator<WorldState> years = SessionActor.engine(TestServers.CONTENT);
 
     @BeforeEach
     void setUp() {
@@ -167,6 +174,41 @@ class SessionActorTimerTest {
     }
 
     @Test
+    void resumedYearGetsTheFullTimeAgain() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        UnaryOperator<WorldState> engine = years;
+        years = state -> {
+            if (attempts.incrementAndGet() == 1) {
+                throw new InvariantViolationException(ErrorDetails.of("check", "test"));
+            }
+            return engine.apply(state);
+        };
+        SessionActor session = running(LIVE_2);
+        clock.advance(Duration.ofSeconds(30));
+        session.endYear(host, 0);
+        host.expectPause(0);
+        guest.expectPause(0);
+        // На паузі час не йде: межі немає ні в сесії, ні у файлі.
+        assertThat(clock.pending()).isZero();
+        assertThat(savedDeadline(0)).isEmpty();
+        clock.advance(Duration.ofMinutes(10));
+
+        session.resume(host, 0);
+
+        for (RecordingPeer peer : List.of(host, guest)) {
+            peer.players();
+            assertThat(peer.phase()).isEqualTo(orders(0, TWO_MINUTES));
+        }
+        clock.advance(TWO_MINUTES.minusSeconds(1));
+        assertThat(host.quiet()).isTrue();
+        clock.advance(Duration.ofSeconds(1));
+        host.expectPhase(0, YearPhase.RESOLVING);
+        host.expectPhase(0, YearPhase.REPORT);
+        assertThat(attempts).hasValue(2);
+        assertThat(missedTurnsAfterClosing(session)).containsExactly(1, 1);
+    }
+
+    @Test
     void loadedWorldKeepsTheDeadlineOfItsYear() throws Exception {
         SessionActor first = running(LIVE_2);
         clock.advance(Duration.ofSeconds(50));
@@ -227,14 +269,7 @@ class SessionActorTimerTest {
     private ServerMessage.Joined joinedGuest;
 
     private SessionActor session() {
-        return new SessionActor(
-                nextId++,
-                TestServers.CONTENT,
-                worlds,
-                new PlayerTokens(),
-                SessionActor.engine(TestServers.CONTENT),
-                s -> {},
-                clock);
+        return new SessionActor(nextId++, TestServers.CONTENT, worlds, new PlayerTokens(), years, s -> {}, clock);
     }
 
     /** Лобі нового світу з хостом «Оля» і гостем «Ігор»; обидва вже отримали останній стан лобі. */
@@ -275,6 +310,13 @@ class SessionActorTimerTest {
 
     private static ServerMessage.Phase orders(int turn, Duration left) {
         return new ServerMessage.Phase(turn, YearPhase.ORDERS, OptionalLong.of(left.toMillis()));
+    }
+
+    /** Межа року {@code turn} у файлі відкритої сесії (файл читається паралельно — WAL). */
+    private Optional<Instant> savedDeadline(int turn) {
+        try (WorldStore store = WorldStore.open(dir.resolve("world-11" + WorldStore.EXTENSION))) {
+            return store.timer().deadlineOf(turn);
+        }
     }
 
     /** Пропуски гравців у файлі, коли сесію закрито. */
