@@ -9,7 +9,10 @@ public interface Navigator {
 
     void showNewWorld();
 
-    void showMap(MapLayers layers);
+    /**
+     * @param turn поточний рік світу (хід)
+     */
+    void showMap(MapLayers layers, int turn);
 
     void exit();
 }

@@ -15,7 +15,11 @@ import kolo.engine.view.CountryView;
 
 /** Повідомлення сервера клієнтові. */
 public sealed interface ServerMessage
-        permits ServerMessage.Welcome, ServerMessage.Error, ServerMessage.MapStart, ServerMessage.MapCells {
+        permits ServerMessage.Welcome,
+                ServerMessage.Error,
+                ServerMessage.MapStart,
+                ServerMessage.MapCells,
+                ServerMessage.Phase {
 
     /**
      * Відповідь на {@link ClientMessage.Hello}: версії збіглися, з'єднання відкрите.
@@ -109,6 +113,22 @@ public sealed interface ServerMessage
             Checks.inRange("first", first, 0, Integer.MAX_VALUE);
             cells = List.copyOf(cells);
             Checks.inRange("cells", cells.size(), 1, Integer.MAX_VALUE);
+        }
+    }
+
+    /**
+     * Сесія перейшла до фази року. Порядок фаз: {@link YearPhase#START_OF_YEAR} і {@link YearPhase#ORDERS} року {@code
+     * N}, потім {@link YearPhase#RESOLVING} і {@link YearPhase#REPORT} того самого року {@code N}, далі — рік {@code N +
+     * 1}.
+     *
+     * @param turn рік фази (хід, не календарний рік)
+     * @param phase фаза
+     */
+    record Phase(int turn, YearPhase phase) implements ServerMessage {
+
+        public Phase {
+            Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
+            Objects.requireNonNull(phase, "phase");
         }
     }
 }

@@ -23,6 +23,7 @@ import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 
 /**
  * Простий клієнт для тестів сервера через справжній транспорт: шле повідомлення й складає відповіді в чергу. Сервер
@@ -98,6 +99,39 @@ public final class TestClient implements AutoCloseable {
             map = assembler.add((ServerMessage.MapCells) next());
         }
         return map.orElseThrow();
+    }
+
+    /** Наступне повідомлення — фаза року. */
+    public ServerMessage.Phase phase() throws InterruptedException {
+        ServerMessage message = next();
+        if (!(message instanceof ServerMessage.Phase phase)) {
+            throw new AssertionError("очікувалася фаза року, а прийшло " + message);
+        }
+        return phase;
+    }
+
+    /** Карта нового світу й фази його першого року — до прийому наказів. */
+    public MapView world() throws InterruptedException {
+        MapView map = map();
+        expectPhase(0, YearPhase.START_OF_YEAR);
+        expectPhase(0, YearPhase.ORDERS);
+        return map;
+    }
+
+    /** Закінчує рік {@code turn} і чекає фаз до прийому наказів наступного року. */
+    public void endYear(int turn) throws InterruptedException {
+        send(new ClientMessage.Ready(turn));
+        expectPhase(turn, YearPhase.RESOLVING);
+        expectPhase(turn, YearPhase.REPORT);
+        expectPhase(turn + 1, YearPhase.START_OF_YEAR);
+        expectPhase(turn + 1, YearPhase.ORDERS);
+    }
+
+    private void expectPhase(int turn, YearPhase phase) throws InterruptedException {
+        ServerMessage.Phase received = phase();
+        if (!received.equals(new ServerMessage.Phase(turn, phase))) {
+            throw new AssertionError("очікувалася фаза " + phase + " року " + turn + ", а прийшло " + received);
+        }
     }
 
     /** Чекає, доки сервер закриє з'єднання. */

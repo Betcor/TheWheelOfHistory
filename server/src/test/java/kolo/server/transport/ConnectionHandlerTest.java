@@ -6,12 +6,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import kolo.engine.content.ContentPack;
 import kolo.engine.error.ErrorCode;
-import kolo.engine.state.NpcShare;
 import kolo.protocol.Protocol;
 import kolo.protocol.codec.MessageJson;
 import kolo.protocol.codec.ProtocolPipeline;
@@ -19,30 +20,55 @@ import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.ServerMessage;
 import kolo.server.TestServers;
+import kolo.server.persistence.WorldDirectory;
 import kolo.server.session.ClientSession;
+import kolo.server.session.Sessions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Обробник з'єднання в {@link EmbeddedChannel} зі справжніми фреймами; сесія виконується в потоці тесту, тож
- * відповіді готові одразу.
+ * Обробник з'єднання в {@link EmbeddedChannel} зі справжніми фреймами; розмова виконується в потоці тесту, тож
+ * відповіді готові одразу. Світ і роки (потік сесії) — у {@code GameServerTest}.
  */
 class ConnectionHandlerTest {
 
     private static final String HASH = TestServers.CONTENT.hash();
 
+    @TempDir
+    static Path worlds;
+
     @Test
-    void helloAndWorldOverFrames() {
+    void helloAndRequestErrorOverFrames() {
         EmbeddedChannel channel = channel(() -> TestServers.CONTENT);
 
         channel.writeInbound(frame(MessageJson.write(Handshake.hello(HASH))));
-        channel.writeInbound(frame(MessageJson.write(new ClientMessage.CreateWorld(3, 1, NpcShare.FEW))));
+        channel.writeInbound(frame(MessageJson.write(new ClientMessage.Ready(0))));
 
         List<ServerMessage> replies = replies(channel);
         assertThat(replies.getFirst()).isEqualTo(new ServerMessage.Welcome(Protocol.VERSION, HASH));
-        assertThat(replies.get(1)).isInstanceOf(ServerMessage.MapStart.class);
-        assertThat(replies.getLast()).isInstanceOf(ServerMessage.MapCells.class);
+        assertThat(((ServerMessage.Error) replies.get(1)).code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+        assertThat(replies).hasSize(2);
         assertThat(channel.isOpen()).isTrue();
         channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void closedConnectionLeavesItsSession() {
+        List<String> events = new ArrayList<>();
+        EmbeddedChannel channel = new EmbeddedChannel();
+        ProtocolPipeline.server(channel.pipeline());
+        Sessions sessions = new Sessions(new WorldDirectory(worlds));
+        channel.pipeline()
+                .addLast(new ConnectionHandler(
+                        peer -> new ClientSession(() -> TestServers.CONTENT, sessions, peer), task -> {
+                            events.add("task");
+                            task.run();
+                        }));
+
+        channel.close();
+
+        assertThat(events).containsExactly("task");
+        sessions.closeAll(1, TimeUnit.SECONDS);
     }
 
     @Test
@@ -93,7 +119,9 @@ class ConnectionHandlerTest {
     private static EmbeddedChannel channel(Supplier<ContentPack> content) {
         EmbeddedChannel channel = new EmbeddedChannel();
         ProtocolPipeline.server(channel.pipeline());
-        channel.pipeline().addLast(new ConnectionHandler(new ClientSession(content), Runnable::run));
+        Sessions sessions = new Sessions(new WorldDirectory(worlds));
+        channel.pipeline()
+                .addLast(new ConnectionHandler(peer -> new ClientSession(content, sessions, peer), Runnable::run));
         return channel;
     }
 

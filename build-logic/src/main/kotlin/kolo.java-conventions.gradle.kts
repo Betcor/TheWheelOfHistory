@@ -41,6 +41,10 @@ tasks.withType<Test>().configureEach {
     systemProperty("file.encoding", "UTF-8")
     // Інакше jqwik створює .jqwik-database прямо в каталозі модуля.
     systemProperty("jqwik.database", layout.buildDirectory.file("jqwik-database").get().asFile.absolutePath)
+    // Домашня тека гри (файли світів вбудованого сервера) — у build, а не в домашній теці розробника; щоразу чиста.
+    val koloHome = layout.buildDirectory.dir("test-home/$name").get().asFile
+    systemProperty("kolo.home", koloHome.absolutePath)
+    doFirst { koloHome.deleteRecursively() }
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

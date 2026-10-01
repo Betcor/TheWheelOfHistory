@@ -18,7 +18,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.NpcShare;
-import kolo.engine.view.MapView;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
@@ -88,19 +87,35 @@ public final class ServerConnection implements AutoCloseable {
     }
 
     /**
-     * Просить сервер створити світ і отримує його карту частинами.
+     * Просить сервер створити світ, отримує його карту частинами й чекає прийому наказів першого року.
      *
-     * @return карта світу; поки вона не прийшла, новий запит завершується {@link IllegalStateException}
+     * @return карта й поточний рік; поки запит не завершено, новий завершується {@link IllegalStateException}
      */
-    public CompletableFuture<MapView> createWorld(long seed, int players, NpcShare npcShare) {
+    public CompletableFuture<GameStart> createWorld(long seed, int players, NpcShare npcShare) {
         ClientMessage.CreateWorld request = new ClientMessage.CreateWorld(seed, players, npcShare);
-        CompletableFuture<MapView> result = new CompletableFuture<>();
+        CompletableFuture<GameStart> result = new CompletableFuture<>();
+        execute(result, () -> handler.createWorld(channel, request, result));
+        return result;
+    }
+
+    /**
+     * «Готово» для року {@code turn}: чекає, доки сервер розв'яже рік і почне прийом наказів наступного.
+     *
+     * @return новий поточний рік
+     */
+    public CompletableFuture<Integer> endYear(int turn) {
+        ClientMessage.Ready request = new ClientMessage.Ready(turn);
+        CompletableFuture<Integer> result = new CompletableFuture<>();
+        execute(result, () -> handler.endYear(channel, request, result));
+        return result;
+    }
+
+    private void execute(CompletableFuture<?> result, Runnable task) {
         try {
-            channel.eventLoop().execute(() -> handler.createWorld(channel, request, result));
+            channel.eventLoop().execute(task);
         } catch (RejectedExecutionException e) {
             result.completeExceptionally(new ConnectionClosedException("з'єднання закрито", e));
         }
-        return result;
     }
 
     /** Чи відкрите з'єднання. */

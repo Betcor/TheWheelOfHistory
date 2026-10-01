@@ -13,6 +13,7 @@ import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
 import net.jqwik.api.ForAll;
@@ -59,12 +60,22 @@ class MessagePropertiesTest {
             @ForAll int players,
             @ForAll NpcShare share,
             @ForAll @IntRange(min = 1) int version,
-            @ForAll("text") String hash) {
+            @ForAll("text") String hash,
+            @ForAll @IntRange(min = 0) int turn) {
         ClientMessage create = new ClientMessage.CreateWorld(seed, players, share);
         ClientMessage hello = new ClientMessage.Hello(version, hash);
+        ClientMessage ready = new ClientMessage.Ready(turn);
 
         assertThat(MessageJson.readClient(MessageJson.write(create))).isEqualTo(create);
         assertThat(MessageJson.readClient(MessageJson.write(hello))).isEqualTo(hello);
+        assertThat(MessageJson.readClient(MessageJson.write(ready))).isEqualTo(ready);
+    }
+
+    @Property(tries = 200)
+    void anyPhaseRoundTrips(@ForAll @IntRange(min = 0) int turn, @ForAll YearPhase phase) {
+        ServerMessage message = new ServerMessage.Phase(turn, phase);
+
+        assertThat(MessageJson.readServer(MessageJson.write(message))).isEqualTo(message);
     }
 
     @Provide

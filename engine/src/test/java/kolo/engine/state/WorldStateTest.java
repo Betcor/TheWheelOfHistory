@@ -11,6 +11,12 @@ import org.junit.jupiter.api.Test;
 class WorldStateTest {
 
     @Test
+    void turnZeroIsYear1970() {
+        assertThat(WorldState.year(0)).isEqualTo(1970);
+        assertThat(WorldState.year(31)).isEqualTo(2001);
+    }
+
+    @Test
     void deepCopyIsEqualButIndependent() {
         WorldState original = TestWorldStates.state();
         WorldState copy = original.deepCopy();

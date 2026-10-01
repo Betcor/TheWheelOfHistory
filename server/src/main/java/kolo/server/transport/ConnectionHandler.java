@@ -11,21 +11,24 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Function;
 import kolo.engine.error.GameException;
 import kolo.protocol.ProtocolErrors;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.ServerMessage;
 import kolo.server.session.ClientSession;
-import kolo.server.session.Reply;
+import kolo.server.session.Peer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Останній обробник серверного каналу: передає повідомлення клієнта в {@link ClientSession} і пише відповіді.
+ * Останній обробник серверного каналу: передає повідомлення клієнта в {@link ClientSession} і пише відповіді, свої й
+ * сесії гри ({@link Peer} цього каналу).
  *
- * <p>Сесія працює не в event loop, а в окремому виконавці: генерація світу триває секунди, а event loop тим часом
- * обслуговує інші з'єднання. Виконавець однопотоковий, тож повідомлення з'єднання обробляються по черзі, а сесія не
- * потребує блокувань. Запис у канал Netty потокобезпечний і зберігає порядок.
+ * <p>Розмова працює не в event loop, а в окремому однопотоковому виконавці з'єднань: перше привітання може чекати
+ * завантаження контенту, а event loop тим часом обслуговує інші з'єднання. Один потік — повідомлення з'єднання
+ * обробляються по черзі, і розмова не потребує блокувань. Важка робота (генерація світу, рік) — у потоці сесії гри.
+ * Запис у канал Netty потокобезпечний і зберігає порядок.
  *
  * <p>Пошкоджене вхідне повідомлення чи завеликий фрейм — {@link ServerMessage.Error} з {@code PROTOCOL_ERROR} і
  * закриття: після них межі фреймів у потоці вже ненадійні.
@@ -34,12 +37,33 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ClientMessage>
 
     private static final Logger LOG = LoggerFactory.getLogger(ConnectionHandler.class);
 
-    private final ClientSession session;
+    private final Function<Peer, ClientSession> sessions;
     private final Executor worker;
+    private ClientSession session;
 
-    ConnectionHandler(ClientSession session, Executor worker) {
-        this.session = Objects.requireNonNull(session, "session");
+    /**
+     * @param sessions розмова для співрозмовника-каналу
+     * @param worker однопотоковий виконавець розмов
+     */
+    ConnectionHandler(Function<Peer, ClientSession> sessions, Executor worker) {
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.worker = Objects.requireNonNull(worker, "worker");
+    }
+
+    @Override
+    public void handlerAdded(ChannelHandlerContext ctx) {
+        Channel channel = ctx.channel();
+        session = sessions.apply((messages, close) -> send(channel, messages, close));
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        try {
+            worker.execute(session::disconnected);
+        } catch (RejectedExecutionException e) {
+            // Сервер зупиняється й сам закриває сесії.
+        }
+        super.channelInactive(ctx);
     }
 
     @Override
@@ -57,16 +81,13 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ClientMessage>
         if (!channel.isActive()) {
             return;
         }
-        Reply reply;
         try {
-            reply = session.handle(message);
+            session.handle(message);
         } catch (RuntimeException e) {
-            // Межа сесії: баг сервера не має вбити потік сесій; клієнт побачить розрив з'єднання.
+            // Межа розмови: баг сервера не має вбити потік з'єднань; клієнт побачить розрив з'єднання.
             LOG.error("Збій обробки повідомлення {} від {}", message.getClass().getSimpleName(), channel, e);
             channel.close();
-            return;
         }
-        send(channel, reply.messages(), reply.close());
     }
 
     @Override

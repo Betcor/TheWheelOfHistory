@@ -17,7 +17,7 @@ import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
 
 /**
- * JavaFX-застосунок клієнта: головне меню → параметри нового світу → карта.
+ * JavaFX-застосунок клієнта: головне меню → параметри нового світу → карта з роками.
  *
  * <p>Світ живе на вбудованому сервері ({@link EmbeddedGame}): клієнт говорить із ним повідомленнями протоколу. Важка
  * робота (очікування сервера, растеризація карти) — в одному фоновому потоці, UI змінюється лише в потоці JavaFX.
@@ -67,8 +67,8 @@ public final class KoloApp extends Application implements Navigator {
     }
 
     @Override
-    public void showMap(MapLayers layers) {
-        show(MapScreen.create(this, texts, layers, background));
+    public void showMap(MapLayers layers, int turn) {
+        show(MapScreen.create(this, texts, layers, turn, game, background));
     }
 
     @Override

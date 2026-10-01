@@ -28,6 +28,7 @@ import kolo.engine.view.CountryView;
 import kolo.protocol.ProtocolErrors;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 
 /** Читання повідомлень, записаних {@link MessageWriter}: структура й значення перевіряються суворо. */
 final class MessageReader {
@@ -53,6 +54,10 @@ final class MessageReader {
                 int players = root.field("players").intValue();
                 NpcShare share = root.field("npc_share").enumValue(NpcShare.class);
                 yield root.build(() -> new ClientMessage.CreateWorld(seed, players, share));
+            }
+            case MessageTypes.READY -> {
+                int turn = root.field("turn").intValue();
+                yield root.build(() -> new ClientMessage.Ready(turn));
             }
             default -> throw type.malformed("unknown_type");
         };
@@ -82,6 +87,11 @@ final class MessageReader {
                 int first = root.field("first").intValue();
                 List<CellView> cells = root.field("cells").list(MessageReader::cell);
                 yield root.build(() -> new ServerMessage.MapCells(first, cells));
+            }
+            case MessageTypes.PHASE -> {
+                int turn = root.field("turn").intValue();
+                YearPhase phase = root.field("phase").enumValue(YearPhase.class);
+                yield root.build(() -> new ServerMessage.Phase(turn, phase));
             }
             default -> throw type.malformed("unknown_type");
         };

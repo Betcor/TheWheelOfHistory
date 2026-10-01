@@ -2,22 +2,31 @@ package kolo.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import kolo.engine.state.NpcShare;
 import kolo.engine.view.MapView;
 import kolo.protocol.message.ClientMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
-/** Смок: вбудований сервер стартує, вітає клієнта й віддає світ за замовчуванням через {@code LocalChannel}. */
+/**
+ * Смок: вбудований сервер стартує, вітає клієнта, віддає світ за замовчуванням через {@code LocalChannel} і проводить
+ * рік.
+ */
 class EmbeddedServerSmokeTest {
+
+    @TempDir
+    Path worlds;
 
     @Test
     @Timeout(60)
     void generatesDefaultWorld() throws Exception {
-        try (EmbeddedServer server = EmbeddedServer.startWithBundledContent();
+        try (EmbeddedServer server = EmbeddedServer.startWithBundledContent(worlds);
                 TestClient client = TestClient.welcomed(server.address(), server.contentHash())) {
             client.send(new ClientMessage.CreateWorld(1970, 1, NpcShare.NORMAL));
-            MapView map = client.map();
+            MapView map = client.world();
+            client.endYear(0);
 
             assertThat(map.cells()).isNotEmpty();
             assertThat(map.countries()).isNotEmpty();
