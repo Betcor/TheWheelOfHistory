@@ -48,7 +48,8 @@ public final class CountryCardSections {
         }
     }
 
-    public static List<Section> of(GenerationLabels labels, Texts texts) {
+    /** @param turn поточний хід: вік відомих людей — на цей рік */
+    public static List<Section> of(GenerationLabels labels, Texts texts, int turn) {
         CountryCard card = labels.card();
         ContentPack content = labels.content();
         List<Section> sections = new ArrayList<>();
@@ -148,12 +149,17 @@ public final class CountryCardSections {
             String about = texts.text(
                     "card.person.value",
                     content.personKind(person.kind()).name(),
-                    -person.bornTurn(),
+                    age(person.bornTurn(), turn),
                     traits.isEmpty() ? texts.text("card.person.no_traits") : String.join(", ", traits));
             people.add(new Line(person.name().fullName().nominative(), about));
         }
         sections.add(new Section(texts.text("card.section.people"), people));
         return sections;
+    }
+
+    /** Вік на хід {@code turn}, повних років (1 хід = 1 рік). */
+    static int age(int bornTurn, int turn) {
+        return Math.subtractExact(turn, bornTurn);
     }
 
     /** Населення: «850 тис.», «6 млн», «12,4 млн». */

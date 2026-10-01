@@ -19,7 +19,10 @@ import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.StackPane;
 import kolo.client.TestWorlds;
 import kolo.client.app.Navigator;
 import kolo.client.generation.WheelView;
@@ -254,7 +257,8 @@ class MapScreenSmokeTest {
             screen.layout();
             return result;
         });
-        MapCanvas canvas = onFx(() -> (MapCanvas) ((BorderPane) screen).getCenter());
+        MapCanvas canvas = onFx(() -> (MapCanvas)
+                ((StackPane) ((BorderPane) screen).getCenter()).getChildren().getFirst());
 
         waitUntil(() -> onFxQuietly(() -> canvas.rasterReady() && canvas.frames() > 0));
         int rasterFrames = onFx(canvas::frames);
@@ -273,6 +277,23 @@ class MapScreenSmokeTest {
         waitUntil(() -> onFxQuietly(() -> canvas.frames() > rasterFrames));
         WritableImage vector = onFx(() -> scene.snapshot(null));
         assertThat(colors(vector)).hasSizeGreaterThan(3);
+
+        // «Моя держава» — бічна панель картки поверх карти; Esc її закриває.
+        onFx(() -> {
+            button(screen, texts.text("map.my_country")).fire();
+            return null;
+        });
+        assertThat(labels(screen)).contains(texts.text("card.section.state"));
+        onFx(() -> {
+            canvas.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
+            return null;
+        });
+        // Кнопка «Закрити» — у заголовку панелі.
+        assertThat(onFx(() -> button(screen, texts.text("map.card.close"))
+                        .getParent()
+                        .getParent()
+                        .isVisible()))
+                .isFalse();
         onFx(() -> {
             canvas.dispose();
             return null;

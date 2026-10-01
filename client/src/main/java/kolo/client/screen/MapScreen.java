@@ -1,5 +1,6 @@
 package kolo.client.screen;
 
+import atlantafx.base.theme.Styles;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -11,9 +12,9 @@ import javafx.animation.Timeline;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -22,12 +23,14 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
 import javafx.util.Duration;
 import kolo.client.generation.CountryCardSections;
 import kolo.client.generation.CountryCardView;
@@ -51,12 +54,15 @@ import kolo.protocol.message.YearPhase;
  * натиснули всі гравці на зв'язку, коли хост натиснув «Завершити рік» або коли вийшов час таймера ходу (тоді видно
  * відлік). Зв'язок втрачено — кнопка «Перепідключитися» повертає гравця до його держави.
  *
+ * <p>«Моя держава» відкриває картку держави (GD §22.2) бічною панеллю зліва поверх карти; закривається кнопкою чи Esc.
+ *
  * <p>Hot-seat (GD §21): після «Готово» карта ховається й комп'ютер передають наступному гравцеві в черзі; останній
  * дочікується року, і на початку нового комп'ютер знову передають першому.
  */
 public final class MapScreen {
 
     private static final double PANEL_WIDTH = 280;
+    private static final double CARD_WIDTH = 460;
 
     private MapScreen() {}
 
@@ -84,7 +90,6 @@ public final class MapScreen {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Button country = new Button(texts.text("map.my_country"));
-        country.setOnAction(event -> showCard(context, layers, start, country));
         Button fit = new Button(texts.text("map.fit"));
         fit.setOnAction(event -> canvas.fit());
         Button menu = new Button(texts.text("map.main_menu"));
@@ -144,6 +149,21 @@ public final class MapScreen {
 
         // Поточний рік і чи вже натиснуто «Готово» — лише в потоці JavaFX.
         int[] current = {start.turn()};
+        CardPanel card = CardPanel.create(texts);
+        Runnable closeCard = () -> {
+            card.panel().setVisible(false);
+            canvas.requestFocus();
+        };
+        card.close().setOnAction(event -> closeCard.run());
+        country.setOnAction(event -> {
+            if (card.panel().isVisible()) {
+                closeCard.run();
+                return;
+            }
+            // Вік відомих людей — на поточний рік, тож картку перебудовано щоразу.
+            card.content().setContent(cardView(context, layers, start, current[0]));
+            card.panel().setVisible(true);
+        });
         boolean[] sent = {false};
         boolean[] finished = {false};
         boolean[] resumed = {false};
@@ -312,7 +332,15 @@ public final class MapScreen {
                         : texts.text("map.status.hint")));
         canvas.setOnSelect(cell -> show(cell, view, texts, title, details));
 
-        BorderPane root = new BorderPane(canvas);
+        StackPane center = new StackPane(canvas, card.panel());
+        StackPane.setAlignment(card.panel(), Pos.TOP_LEFT);
+        BorderPane root = new BorderPane(center);
+        root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ESCAPE && card.panel().isVisible()) {
+                closeCard.run();
+                event.consume();
+            }
+        });
         root.setTop(toolbar);
         root.setRight(panel);
         root.setBottom(status);
@@ -328,8 +356,33 @@ public final class MapScreen {
         return root;
     }
 
-    /** Картка держави гравця (GD §4.12) — окремим вікном поверх карти. */
-    private static void showCard(ScreenContext context, MapLayers layers, GameStart start, Node owner) {
+    /** Бічна панель картки держави зліва поверх карти: заголовок із кнопкою «Закрити» і прокрутка з карткою. */
+    private record CardPanel(VBox panel, Button close, ScrollPane content) {
+
+        static CardPanel create(Texts texts) {
+            Label title = new Label(texts.text("map.my_country"));
+            title.getStyleClass().add("title-4");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button close = new Button(texts.text("map.card.close"));
+            close.setTooltip(new Tooltip(texts.text("map.card.close.tooltip")));
+            HBox header = new HBox(8, title, spacer, close);
+            header.setAlignment(Pos.CENTER_LEFT);
+            header.setPadding(new Insets(8, 8, 8, 16));
+            ScrollPane content = new ScrollPane();
+            content.setFitToWidth(true);
+            VBox.setVgrow(content, Priority.ALWAYS);
+            VBox panel = new VBox(header, new Separator(), content);
+            panel.getStyleClass().addAll(Styles.BG_DEFAULT, Styles.BORDER_DEFAULT);
+            panel.setPrefWidth(CARD_WIDTH);
+            panel.setMaxWidth(CARD_WIDTH);
+            panel.setVisible(false);
+            return new CardPanel(panel, close, content);
+        }
+    }
+
+    /** Картка держави гравця (GD §4.12) на хід {@code turn}. */
+    private static Node cardView(ScreenContext context, MapLayers layers, GameStart start, int turn) {
         Texts texts = context.texts();
         GenerationLabels labels = new GenerationLabels(
                 context.game().content(),
@@ -339,14 +392,8 @@ public final class MapScreen {
                         .filter(c -> c.number() == number)
                         .map(c -> c.name())
                         .findFirst());
-        ScrollPane content = new ScrollPane(CountryCardView.create(
-                start.card().name().fullName().nominative(), CountryCardSections.of(labels, texts)));
-        content.setFitToWidth(true);
-        Stage window = new Stage();
-        window.initOwner(owner.getScene().getWindow());
-        window.setTitle(texts.text("map.my_country"));
-        window.setScene(new Scene(content, 720, 640));
-        window.show();
+        return CountryCardView.create(
+                start.card().name().fullName().nominative(), CountryCardSections.of(labels, texts, turn));
     }
 
     private static String yearText(Texts texts, int turn) {

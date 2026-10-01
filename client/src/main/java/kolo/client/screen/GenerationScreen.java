@@ -188,7 +188,8 @@ public final class GenerationScreen {
                     .anyMatch(p -> context.game().isMe(p) && p.ready());
             ready.setText(texts.text(meReady ? "generation.to_map" : "map.end_year"));
             root.setCenter(scroll(CountryCardView.create(
-                    labels.card().name().fullName().nominative(), CountryCardSections.of(labels, texts))));
+                    labels.card().name().fullName().nominative(),
+                    CountryCardSections.of(labels, texts, start.turn()))));
             return;
         }
         GenerationPlan.Stage stage = progress.stage();

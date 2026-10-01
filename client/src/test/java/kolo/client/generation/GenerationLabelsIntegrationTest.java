@@ -61,7 +61,8 @@ class GenerationLabelsIntegrationTest {
     void cardOfARealCountryHasNoRawIds() {
         GameStart start = TestWorlds.start(42, 2, NpcShare.NORMAL);
 
-        List<CountryCardSections.Section> sections = CountryCardSections.of(labels(start), TEXTS);
+        List<CountryCardSections.Section> sections =
+                CountryCardSections.of(labels(start), TEXTS, start.phase().turn());
 
         List<String> shown = new ArrayList<>();
         sections.forEach(section -> {
@@ -84,6 +85,21 @@ class GenerationLabelsIntegrationTest {
         assertThat(sections.get(4).lines())
                 .hasSizeGreaterThanOrEqualTo(start.card().origin().backstory().size());
         assertThat(sections.get(5).lines()).hasSize(start.card().people().size());
+    }
+
+    @Test
+    void ageOfPeopleOnTheCardIsForTheCurrentYear() {
+        GameStart start = TestWorlds.start(42, 2, NpcShare.NORMAL);
+        int later = start.phase().turn() + 5;
+
+        List<CountryCardSections.Line> people =
+                CountryCardSections.of(labels(start), TEXTS, later).get(5).lines();
+
+        assertThat(start.card().people()).isNotEmpty();
+        for (int i = 0; i < people.size(); i++) {
+            int age = later - start.card().people().get(i).bornTurn();
+            assertThat(people.get(i).value()).contains(", " + age + " р.");
+        }
     }
 
     @Test
