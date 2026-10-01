@@ -13,6 +13,7 @@ import kolo.engine.error.GameException;
 import kolo.engine.error.ValidationException;
 import kolo.engine.state.TurnTimer;
 import kolo.engine.view.CellView;
+import kolo.engine.view.CountryCard;
 import kolo.engine.view.CountryView;
 
 /** Повідомлення сервера клієнтові. */
@@ -26,7 +27,8 @@ public sealed interface ServerMessage
                 ServerMessage.MapStart,
                 ServerMessage.MapCells,
                 ServerMessage.Phase,
-                ServerMessage.Worlds {
+                ServerMessage.Worlds,
+                ServerMessage.OwnCountry {
 
     /**
      * Відповідь на {@link ClientMessage.Hello}: версії збіглися, з'єднання відкрите.
@@ -204,7 +206,21 @@ public sealed interface ServerMessage
     }
 
     /**
-     * Сесія перейшла до фази року. Порядок фаз: {@link YearPhase#START_OF_YEAR} і {@link YearPhase#ORDERS} року {@code
+     * Картка держави гравця — лише йому (туман війни): після карти й перед фазою, коли гра почалася або гравець
+     * повернувся в неї.
+     *
+     * @param card картка держави гравця з записами коліс генерації
+     */
+    record OwnCountry(CountryCard card) implements ServerMessage {
+
+        public OwnCountry {
+            Objects.requireNonNull(card, "card");
+        }
+    }
+
+    /**
+     * Сесія перейшла до фази року. Новий світ починається фазою {@link YearPhase#GENERATION} року 0. Порядок фаз: {@link
+     * YearPhase#START_OF_YEAR} і {@link YearPhase#ORDERS} року {@code
      * N}, потім {@link YearPhase#RESOLVING} і {@link YearPhase#REPORT} того самого року {@code N}, далі — рік {@code N +
      * 1}.
      *

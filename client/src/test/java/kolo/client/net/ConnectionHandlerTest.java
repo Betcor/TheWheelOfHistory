@@ -122,6 +122,7 @@ class ConnectionHandlerTest {
         for (ServerMessage part : MapChunks.split(TestMaps.MAP, 2)) {
             channel.writeInbound(part);
         }
+        channel.writeInbound(new ServerMessage.OwnCountry(TestCards.CARD));
         channel.writeInbound(new ServerMessage.Players(PLAYERS));
         assertThat(listener.next()).isInstanceOf(RecordingListener.Players.class);
         assertThat(listener.quiet()).isTrue();
@@ -130,10 +131,28 @@ class ConnectionHandlerTest {
         channel.writeInbound(new ServerMessage.Phase(0, YearPhase.ORDERS));
 
         assertThat(listener.next())
-                .isEqualTo(new RecordingListener.Started(
-                        new GameStart(TestMaps.MAP, new ServerMessage.Phase(0, YearPhase.START_OF_YEAR))));
+                .isEqualTo(new RecordingListener.Started(new GameStart(
+                        TestMaps.MAP, TestCards.CARD, new ServerMessage.Phase(0, YearPhase.START_OF_YEAR))));
         assertThat(listener.next())
                 .isEqualTo(new RecordingListener.Phase(new ServerMessage.Phase(0, YearPhase.ORDERS)));
+    }
+
+    @Test
+    void phaseWithoutTheCardIsAProtocolErrorAndCloses() {
+        for (ServerMessage part : MapChunks.split(TestMaps.MAP, 2)) {
+            channel.writeInbound(part);
+        }
+
+        channel.writeInbound(new ServerMessage.Phase(0, YearPhase.GENERATION));
+
+        assertThat(channel.isOpen()).isFalse();
+    }
+
+    @Test
+    void cardWithoutAMapIsAProtocolErrorAndCloses() {
+        channel.writeInbound(new ServerMessage.OwnCountry(TestCards.CARD));
+
+        assertThat(channel.isOpen()).isFalse();
     }
 
     @Test
@@ -171,6 +190,7 @@ class ConnectionHandlerTest {
     @Test
     void joinedForgetsThePreviousGame() throws Exception {
         MapChunks.split(TestMaps.MAP).forEach(channel::writeInbound);
+        channel.writeInbound(new ServerMessage.OwnCountry(TestCards.CARD));
         channel.writeInbound(new ServerMessage.Phase(0, YearPhase.ORDERS));
         listener.next(RecordingListener.Started.class);
         join();

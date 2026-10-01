@@ -77,8 +77,7 @@ class SessionsTest {
         host.joined();
         host.lobby();
         session.start(host);
-        host.map();
-        host.expectOrders(0);
+        RecordingPeer.enterNewWorld(session, host);
 
         sessions.closeAll(30, TimeUnit.SECONDS);
 

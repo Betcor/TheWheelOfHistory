@@ -6,6 +6,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import kolo.engine.error.GameException;
+import kolo.engine.view.CountryCard;
 import kolo.engine.view.MapView;
 import kolo.protocol.ProtocolErrors;
 import kolo.protocol.message.ClientMessage;
@@ -37,6 +38,9 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
     private Pending<?> pending;
     private MapAssembler assembler;
     private MapView map;
+    /** Картка своєї держави: приходить після карти й перед фазою. */
+    private CountryCard card;
+
     private boolean inGame;
 
     ConnectionHandler(String contentHash, SessionListener listener) {
@@ -104,6 +108,7 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
                 inGame = false;
                 assembler = null;
                 map = null;
+                card = null;
                 reply(joined);
             }
             case ServerMessage.Lobby lobby -> listener.lobby(lobby);
@@ -111,6 +116,7 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
             case ServerMessage.MapStart start -> {
                 assembler = new MapAssembler();
                 map = null;
+                card = null;
                 assembler.start(start);
             }
             case ServerMessage.MapCells cells -> {
@@ -122,16 +128,27 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
                     assembler = null;
                 });
             }
+            case ServerMessage.OwnCountry own -> {
+                if (map == null) {
+                    throw ProtocolErrors.malformed(CONVERSATION, "card_without_map");
+                }
+                card = own.card();
+            }
             case ServerMessage.Phase phase -> phase(phase);
         }
     }
 
     private void phase(ServerMessage.Phase phase) {
         if (map != null) {
+            if (card == null) {
+                throw ProtocolErrors.malformed(CONVERSATION, "phase_without_card");
+            }
             MapView started = map;
+            CountryCard own = card;
             map = null;
+            card = null;
             inGame = true;
-            listener.gameStarted(new GameStart(started, phase));
+            listener.gameStarted(new GameStart(started, own, phase));
         } else if (inGame) {
             listener.phase(phase);
         } else {

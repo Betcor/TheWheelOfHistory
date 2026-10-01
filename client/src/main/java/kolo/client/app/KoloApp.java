@@ -14,6 +14,7 @@ import kolo.client.map.MapLayers;
 import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
 import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.GenerationScreen;
 import kolo.client.screen.HandoffScreen;
 import kolo.client.screen.LoadScreen;
 import kolo.client.screen.LobbyScreen;
@@ -22,13 +23,14 @@ import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
 import kolo.client.screen.ScreenContext;
 import kolo.client.state.SessionModel;
+import kolo.protocol.message.YearPhase;
 
 /**
  * JavaFX-застосунок клієнта: головне меню → новий світ, збережений світ або підключення → лобі → карта з роками.
  *
  * <p>Світ живе на сервері — вбудованому ({@link GameClient}: одиночна гра й LAN-хост) чи віддаленому: клієнт говорить
  * із ним повідомленнями протоколу. Коли гра почалася (чи клієнт повернувся в неї), застосунок готує шари карти у
- * фоновому потоці й показує карту. UI змінюється лише в потоці JavaFX.
+ * фоновому потоці й показує карту, а в новому світі спершу — генерацію держави гравця. UI змінюється лише в потоці JavaFX.
  */
 public final class KoloApp extends Application implements Navigator {
     private static final double INITIAL_WIDTH = 1280;
@@ -98,6 +100,11 @@ public final class KoloApp extends Application implements Navigator {
     }
 
     @Override
+    public void showGeneration(MapLayers layers, GameStart start) {
+        show(GenerationScreen.create(context, layers, start));
+    }
+
+    @Override
     public void showHandoff(int player, String nickname) {
         show(HandoffScreen.create(context, player, nickname));
     }
@@ -110,7 +117,15 @@ public final class KoloApp extends Application implements Navigator {
     private void gameStarted(GameStart start) {
         background.execute(() -> {
             MapLayers layers = MapLayers.build(start.map());
-            Platform.runLater(() -> showMap(layers, start));
+            // Контент підписує картку держави й колеса; завантажується раз — тут, не в потоці UI.
+            game.content();
+            Platform.runLater(() -> {
+                if (start.phase().phase() == YearPhase.GENERATION) {
+                    showGeneration(layers, start);
+                } else {
+                    showMap(layers, start);
+                }
+            });
         });
     }
 

@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +23,7 @@ import kolo.engine.state.WorldState;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
+import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
 import kolo.server.TestServers;
@@ -152,8 +153,7 @@ class SessionActorTest {
         assertThat(session.lobby()).contains(new LobbyInfo(7, worldKey, "Ігор", 1, FEW_11));
         // Тепер почати гру може новий хост.
         session.start(guest);
-        guest.map();
-        guest.expectOrders(0);
+        RecordingPeer.enterNewWorld(session, guest);
         session.close();
     }
 
@@ -203,12 +203,22 @@ class SessionActorTest {
 
         assertThat(host.map()).isEqualTo(TestServers.map(11, 2, NpcShare.FEW));
         assertThat(guest.map()).isEqualTo(TestServers.map(11, 2, NpcShare.FEW));
+        // Кожен — лише картку своєї держави.
+        assertThat(host.card().number()).isZero();
+        assertThat(guest.card().number()).isEqualTo(1);
         assertThat(host.players().players())
                 .containsExactly(
                         new PlayerInfo(1, "Оля", true, true, false, OptionalInt.of(0)),
                         new PlayerInfo(2, "Ігор", false, true, false, OptionalInt.of(1)));
-        host.expectPhase(0, YearPhase.START_OF_YEAR);
-        host.expectPhase(0, YearPhase.ORDERS);
+        host.expectPhase(0, YearPhase.GENERATION);
+        guest.expectGeneration();
+        // Таймера ще немає, рік не почався, доки генерацію не переглянули всі.
+        session.ready(host, 0);
+        host.players();
+        guest.players();
+        assertThat(host.quiet()).isTrue();
+        session.ready(guest, 0);
+        host.expectOrders(0);
         guest.expectOrders(0);
         assertThat(session.state()).isEqualTo(SessionState.RUNNING);
         assertThat(session.lobby()).isEmpty();
@@ -322,6 +332,7 @@ class SessionActorTest {
 
         assertThat(back.joined()).isEqualTo(joined);
         assertThat(back.map()).isEqualTo(TestServers.map(11, 2, NpcShare.FEW));
+        assertThat(back.card().number()).isEqualTo(1);
         back.expectPhase(0, YearPhase.ORDERS);
         PlayerInfo returned = new PlayerInfo(2, "Ігор", false, true, false, OptionalInt.of(1));
         assertThat(back.players().players()).contains(returned);
@@ -348,6 +359,7 @@ class SessionActorTest {
 
         back.joined();
         back.map();
+        back.card();
         assertThat(guest.closed()).isTrue();
         // Старе з'єднання вже не гравець: його вихід нічого не змінює.
         session.leave(guest);
@@ -404,16 +416,86 @@ class SessionActorTest {
     }
 
     @Test
-    void readyQueuedDuringGenerationAppliesToTheFirstYear() throws Exception {
+    void readyQueuedDuringWorldCreationEndsTheGenerationPhase() throws Exception {
         SessionActor session = lobby();
         session.start(host);
-        // Завдання сесії виконуються по черзі: «Готово» дійде після генерації — уже в році 0.
+        // Завдання сесії виконуються по черзі: «Готово» дійде після створення світу — у фазі генерації.
         session.ready(host, 0);
 
         host.map();
+        host.card();
+        host.expectGeneration();
         host.expectOrders(0);
-        host.expectYear(0);
+        assertThat(host.quiet()).isTrue();
         session.close();
+    }
+
+    @Test
+    void playerWhoLeavesDuringGenerationIsNotWaitedFor() throws Exception {
+        RecordingPeer guest = new RecordingPeer();
+        SessionActor session = lobby();
+        session.join(guest, "Ігор");
+        guest.joined();
+        guest.lobby();
+        host.lobby();
+        session.start(host);
+        for (RecordingPeer peer : List.of(host, guest)) {
+            peer.map();
+            peer.card();
+            peer.expectGeneration();
+        }
+        session.ready(host, 0);
+        host.players();
+        guest.players();
+
+        session.leave(guest);
+
+        host.expectOrders(0);
+        session.close();
+    }
+
+    @Test
+    void generationAcceptsOnlyReadyForTheFirstYear() throws Exception {
+        SessionActor session = lobby();
+        session.start(host);
+        host.map();
+        host.card();
+        host.expectGeneration();
+
+        session.ready(host, 1);
+        assertThat(host.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+        session.endYear(host, 0);
+        assertThat(host.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+
+        session.ready(host, 0);
+        host.expectOrders(0);
+        session.close();
+    }
+
+    @Test
+    void worldSavedDuringGenerationIsLoadedAtTheFirstYear() throws Exception {
+        SessionActor session = session(SessionActor.engine(TestServers.CONTENT));
+        session.open(host, "Оля", 11, NpcShare.FEW);
+        ServerMessage.Joined joined = host.joined();
+        host.lobby();
+        session.start(host);
+        host.map();
+        host.card();
+        host.expectGeneration();
+        leaveAndAwait(session);
+
+        RecordingPeer back = new RecordingPeer();
+        SessionActor loaded = session(SessionActor.engine(TestServers.CONTENT));
+        loaded.load(back, "world-11", "Оля", Optional.of(new PlayerToken(1, joined.token())), false);
+        back.joined();
+        back.lobby();
+        loaded.start(back);
+
+        // Завантажений світ генерацію не повторює: картка є, рік 0 — одразу.
+        back.map();
+        assertThat(back.card().number()).isZero();
+        back.expectOrders(0);
+        loaded.close();
     }
 
     @Test
@@ -482,6 +564,7 @@ class SessionActorTest {
 
         back.joined();
         back.map();
+        back.card();
         back.expectPhase(0, YearPhase.PAUSED);
         assertThat(back.error().code()).isEqualTo(ErrorCode.INVARIANT_VIOLATION);
         session.close();
@@ -641,7 +724,9 @@ class SessionActorTest {
         host.lobby();
         session.start(host);
         assertThat(host.map()).isEqualTo(TestServers.map(11, 1, NpcShare.FEW));
-        host.expectOrders(0);
+        host.card();
+        host.expectGeneration();
+        RecordingPeer.passGeneration(session, host);
         return session;
     }
 
@@ -659,10 +744,7 @@ class SessionActorTest {
         guest.lobby();
         host.lobby();
         session.start(host);
-        for (RecordingPeer peer : new ArrayList<>(List.of(host, guest))) {
-            peer.map();
-            peer.expectOrders(0);
-        }
+        RecordingPeer.enterNewWorld(session, host, guest);
     }
 
     private void leaveAndAwait(SessionActor session) throws InterruptedException {

@@ -19,6 +19,7 @@ import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.TurnTimer;
+import kolo.engine.view.CountryCard;
 import kolo.engine.view.MapView;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
@@ -119,7 +120,8 @@ class ProtocolSmokeTest {
                     for (ServerMessage part : MapChunks.split(MAP, 300)) {
                         ctx.write(part);
                     }
-                    ctx.writeAndFlush(new ServerMessage.Phase(0, YearPhase.ORDERS));
+                    ctx.write(new ServerMessage.OwnCountry(TestMessages.card(0, 7)));
+                    ctx.writeAndFlush(new ServerMessage.Phase(0, YearPhase.GENERATION));
                 }
                 case ClientMessage.Ready ready ->
                     ctx.writeAndFlush(new ServerMessage.Phase(ready.turn() + 1, YearPhase.ORDERS));
@@ -134,6 +136,7 @@ class ProtocolSmokeTest {
         private final CompletableFuture<MapView> received;
         private final MapAssembler assembler = new MapAssembler();
         private MapView map;
+        private CountryCard card;
 
         ToyClient(CompletableFuture<MapView> received) {
             this.received = received;
@@ -154,9 +157,10 @@ class ProtocolSmokeTest {
                 case ServerMessage.Players players -> {}
                 case ServerMessage.MapStart start -> assembler.start(start);
                 case ServerMessage.MapCells cells -> assembler.add(cells).ifPresent(done -> map = done);
+                case ServerMessage.OwnCountry own -> card = own.card();
                 // Карта прийшла — закінчуємо рік 0; рік 1 означає, що сервер прийняв «Готово».
                 case ServerMessage.Phase phase -> {
-                    if (phase.turn() == 0 && map != null) {
+                    if (phase.turn() == 0 && map != null && card != null) {
                         ctx.writeAndFlush(new ClientMessage.Ready(0));
                     } else if (phase.turn() == 1) {
                         received.complete(map);

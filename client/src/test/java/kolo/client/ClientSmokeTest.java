@@ -42,6 +42,8 @@ class ClientSmokeTest {
             game.startGame();
             GameStart start = TestWorlds.started(events);
             view = start.map();
+            // Генерацію переглянуто — рік 0.
+            game.ready(start.turn());
             events.awaitOrders(start.turn());
             game.ready(start.turn());
             events.awaitOrders(start.turn() + 1);

@@ -22,11 +22,14 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import kolo.client.TestWorlds;
 import kolo.client.app.Navigator;
+import kolo.client.generation.WheelView;
 import kolo.client.i18n.Texts;
 import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
 import kolo.client.net.LanPorts;
+import kolo.client.net.TestCards;
 import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.GenerationScreen;
 import kolo.client.screen.HandoffScreen;
 import kolo.client.screen.LoadScreen;
 import kolo.client.screen.LobbyScreen;
@@ -35,6 +38,7 @@ import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
 import kolo.client.screen.ScreenContext;
 import kolo.client.state.SessionModel;
+import kolo.engine.state.NpcShare;
 import kolo.engine.state.TurnTimer;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
@@ -74,6 +78,9 @@ class MapScreenSmokeTest {
 
         @Override
         public void showMap(MapLayers layers, GameStart start) {}
+
+        @Override
+        public void showGeneration(MapLayers layers, GameStart start) {}
 
         @Override
         public void showHandoff(int player, String nickname) {}
@@ -166,12 +173,81 @@ class MapScreenSmokeTest {
     }
 
     @Test
+    void generationShowsStagesAndTheCountryCard() throws Exception {
+        Texts texts = Texts.ukrainian();
+        GameStart start = TestWorlds.start(1970, 1, NpcShare.NORMAL);
+        MapLayers layers = MapLayers.build(start.map());
+        Parent screen = onFx(() -> {
+            Parent generation = GenerationScreen.create(context(), layers, start);
+            new Scene(generation, WIDTH, HEIGHT);
+            generation.applyCss();
+            generation.layout();
+            return generation;
+        });
+
+        // Перший етап — «Земля»: ключові колеса крутяться, «Пропустити» одразу показує їхній результат.
+        assertThat(labels(screen)).anyMatch(text -> text.contains(texts.text("generation.stage.land")));
+        onFx(() -> {
+            button(screen, texts.text("generation.skip")).fire();
+            return null;
+        });
+        assertThat(onFx(() -> screen.lookupAll(".label").stream()
+                        .filter(node -> node.getParent() instanceof WheelView)
+                        .map(node -> ((Label) node).getText())
+                        .toList()))
+                .isNotEmpty()
+                .doesNotContain("?");
+        onFx(() -> {
+            button(screen, texts.text("generation.next")).fire();
+            return null;
+        });
+        assertThat(labels(screen)).anyMatch(text -> text.contains(texts.text("generation.stage.regime")));
+
+        onFx(() -> {
+            button(screen, texts.text("generation.show_all")).fire();
+            screen.applyCss();
+            screen.layout();
+            return null;
+        });
+        assertThat(labels(screen))
+                .contains(
+                        texts.text("card.section.state"),
+                        start.card().name().fullName().nominative());
+        onFx(() -> {
+            // Екран прибрано — анімації зупинено.
+            screen.getScene().setRoot(new javafx.scene.layout.Pane());
+            return null;
+        });
+    }
+
+    private static List<String> labels(Parent screen) throws Exception {
+        return onFx(() -> {
+            screen.applyCss();
+            screen.layout();
+            return screen.lookupAll(".label").stream()
+                    .map(node -> ((Label) node).getText())
+                    .toList();
+        });
+    }
+
+    private static javafx.scene.control.Button button(Parent screen, String text) {
+        return screen.lookupAll(".button").stream()
+                .filter(node -> node instanceof javafx.scene.control.Button b
+                        && b.getText().equals(text))
+                .map(node -> (javafx.scene.control.Button) node)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
     void mapDrawsRasterAndVectorFrames() throws Exception {
         MapLayers layers = MapLayers.build(TestWorlds.DEFAULT);
         Texts texts = Texts.ukrainian();
         // Растеризація режиму — одразу в потоці виклику: плитки з'являються наступним runLater.
         Parent screen = onFx(() -> MapScreen.create(
-                context(), layers, new GameStart(TestWorlds.DEFAULT, new ServerMessage.Phase(0, YearPhase.ORDERS))));
+                context(),
+                layers,
+                new GameStart(TestWorlds.DEFAULT, TestCards.CARD, new ServerMessage.Phase(0, YearPhase.ORDERS))));
         Scene scene = onFx(() -> {
             Scene result = new Scene(screen, WIDTH, HEIGHT);
             screen.applyCss();

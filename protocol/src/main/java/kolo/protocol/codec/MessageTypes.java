@@ -27,6 +27,7 @@ final class MessageTypes {
     static final String MAP_CELLS = "map_cells";
     static final String PHASE = "phase";
     static final String WORLDS = "worlds";
+    static final String OWN_COUNTRY = "own_country";
 
     /** Значення поля {@code kind} у {@code setup} лобі. */
     static final String NEW_WORLD = "new_world";

@@ -52,8 +52,10 @@ class BundledSessionIntegrationTest {
                 player.lobby();
             }
             assertThat(player.map()).isEqualTo(TestServers.map(1970, 4, NpcShare.NORMAL));
-            player.expectOrders(0);
+            assertThat(player.card().number()).isEqualTo(n);
+            player.expectGeneration();
         }
+        RecordingPeer.passGeneration(session, players.toArray(RecordingPeer[]::new));
 
         for (int turn = 0; turn < 5; turn++) {
             for (RecordingPeer player : players) {
