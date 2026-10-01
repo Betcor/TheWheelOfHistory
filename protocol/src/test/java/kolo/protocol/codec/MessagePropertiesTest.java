@@ -2,24 +2,32 @@ package kolo.protocol.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.TreeMap;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
 import kolo.engine.view.MapView;
 import kolo.protocol.TestMessages;
 import kolo.protocol.message.ClientMessage;
+import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.MapChunks;
+import kolo.protocol.message.Nicknames;
+import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
+import net.jqwik.api.Combinators;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
 import net.jqwik.api.constraints.IntRange;
+import net.jqwik.api.constraints.LongRange;
 
 class MessagePropertiesTest {
 
@@ -57,18 +65,47 @@ class MessagePropertiesTest {
     @Property(tries = 300)
     void anyClientMessageRoundTrips(
             @ForAll long seed,
-            @ForAll int players,
+            @ForAll @LongRange(min = 1) long session,
+            @ForAll @IntRange(min = 1) int player,
             @ForAll NpcShare share,
             @ForAll @IntRange(min = 1) int version,
             @ForAll("text") String hash,
+            @ForAll("nickname") String nickname,
             @ForAll @IntRange(min = 0) int turn) {
-        ClientMessage create = new ClientMessage.CreateWorld(seed, players, share);
-        ClientMessage hello = new ClientMessage.Hello(version, hash);
-        ClientMessage ready = new ClientMessage.Ready(turn);
+        for (ClientMessage message : List.of(
+                new ClientMessage.Hello(version, hash),
+                new ClientMessage.ListLobbies(),
+                new ClientMessage.CreateLobby(nickname, seed, share),
+                new ClientMessage.JoinLobby(session, nickname),
+                new ClientMessage.StartGame(),
+                new ClientMessage.Rejoin(session, player, hash),
+                new ClientMessage.Leave(),
+                new ClientMessage.Ready(turn))) {
+            assertThat(MessageJson.readClient(MessageJson.write(message))).isEqualTo(message);
+        }
+    }
 
-        assertThat(MessageJson.readClient(MessageJson.write(create))).isEqualTo(create);
-        assertThat(MessageJson.readClient(MessageJson.write(hello))).isEqualTo(hello);
-        assertThat(MessageJson.readClient(MessageJson.write(ready))).isEqualTo(ready);
+    @Property(tries = 200)
+    void anyLobbyMessageRoundTrips(
+            @ForAll @LongRange(min = 1) long session,
+            @ForAll long seed,
+            @ForAll NpcShare share,
+            @ForAll("players") List<PlayerInfo> players,
+            @ForAll("text") String token) {
+        List<PlayerInfo> withHost = new ArrayList<>();
+        for (int i = 0; i < players.size(); i++) {
+            PlayerInfo p = players.get(i);
+            withHost.add(new PlayerInfo(p.number(), p.nickname(), i == 0, p.connected(), p.ready(), p.country()));
+        }
+        for (ServerMessage message : List.of(
+                new ServerMessage.Lobby(session, seed, share, withHost),
+                new ServerMessage.Players(players),
+                new ServerMessage.Joined(session, players.getFirst().number(), token),
+                new ServerMessage.Lobbies(withHost.stream()
+                        .map(p -> new LobbyInfo(p.number(), p.nickname(), withHost.size(), share))
+                        .toList()))) {
+            assertThat(MessageJson.readServer(MessageJson.write(message))).isEqualTo(message);
+        }
     }
 
     @Property(tries = 200)
@@ -87,6 +124,31 @@ class MessagePropertiesTest {
                 Arbitraries.of(true, false).map(Object.class::cast));
         return Arbitraries.maps(Arbitraries.strings().alpha().ofMinLength(1).ofMaxLength(8), value)
                 .ofMaxSize(5);
+    }
+
+    @Provide
+    Arbitrary<List<PlayerInfo>> players() {
+        Arbitrary<PlayerInfo> player = Combinators.combine(
+                        Arbitraries.integers().greaterOrEqual(1),
+                        nickname(),
+                        Arbitraries.of(true, false),
+                        Arbitraries.of(true, false),
+                        Arbitraries.integers()
+                                .between(-1, 39)
+                                .map(n -> n < 0 ? OptionalInt.empty() : OptionalInt.of(n)))
+                .as((number, nickname, connected, ready, country) ->
+                        new PlayerInfo(number, nickname, false, connected, ready, country));
+        return player.list().ofMinSize(1).ofMaxSize(16);
+    }
+
+    @Provide
+    Arbitrary<String> nickname() {
+        return Arbitraries.strings()
+                .withCharRange('а', 'я')
+                .withChars('\'', '"', 'Ї', '€', ' ', 'Z')
+                .ofMinLength(1)
+                .ofMaxLength(Nicknames.MAX_LENGTH)
+                .filter(s -> s.strip().equals(s) && !s.isEmpty());
     }
 
     @Provide

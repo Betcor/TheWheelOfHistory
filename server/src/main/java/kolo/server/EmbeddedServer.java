@@ -1,6 +1,7 @@
 package kolo.server;
 
 import io.netty.channel.local.LocalAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.file.Path;
 import java.util.function.Supplier;
@@ -47,6 +48,18 @@ public final class EmbeddedServer implements AutoCloseable {
     /** Адреса для з'єднання клієнта ({@code LocalChannel}). */
     public SocketAddress address() {
         return address;
+    }
+
+    /**
+     * Відкриває гру для локальної мережі (LAN-хост): сервер слухає ще й TCP. Повторний виклик відкриває ще одну адресу.
+     *
+     * @param address адреса й порт; порт 0 — будь-який вільний
+     * @return справжня адреса, зокрема обраний порт
+     * @throws Exception (Netty кидає без оголошення, зокрема {@link java.net.BindException}) якщо порт зайнятий чи
+     *     недоступний
+     */
+    public InetSocketAddress openLan(InetSocketAddress address) {
+        return server.bindTcp(address);
     }
 
     /**

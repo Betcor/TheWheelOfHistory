@@ -14,7 +14,7 @@ public final class TestServers {
 
     private TestServers() {}
 
-    /** Карта світу, яку сервер надсилає на {@code CreateWorld}. */
+    /** Карта світу, яку сервер надсилає при старті гри з {@code players} гравцями. */
     public static MapView map(long seed, int players, NpcShare npcShare) {
         return MapViews.of(NewWorlds.generate(CONTENT, seed, players, npcShare));
     }

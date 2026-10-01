@@ -14,6 +14,8 @@ import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalIoHandler;
 import io.netty.channel.local.LocalServerChannel;
+import java.util.List;
+import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.view.MapView;
@@ -22,6 +24,7 @@ import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.MapChunks;
+import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
 import org.junit.jupiter.api.Test;
@@ -101,7 +104,15 @@ class ProtocolSmokeTest {
         protected void channelRead0(ChannelHandlerContext ctx, ClientMessage message) {
             switch (message) {
                 case ClientMessage.Hello hello -> ctx.writeAndFlush(Handshake.accept(hello, TestMessages.HASH));
-                case ClientMessage.CreateWorld create -> {
+                case ClientMessage.CreateLobby create -> {
+                    ctx.write(new ServerMessage.Joined(1, 1, "token"));
+                    ctx.writeAndFlush(new ServerMessage.Lobby(
+                            1,
+                            create.seed(),
+                            create.npcShare(),
+                            List.of(new PlayerInfo(1, create.nickname(), true, true, false, OptionalInt.empty()))));
+                }
+                case ClientMessage.StartGame start -> {
                     for (ServerMessage part : MapChunks.split(MAP, 300)) {
                         ctx.write(part);
                     }
@@ -109,6 +120,7 @@ class ProtocolSmokeTest {
                 }
                 case ClientMessage.Ready ready ->
                     ctx.writeAndFlush(new ServerMessage.Phase(ready.turn() + 1, YearPhase.ORDERS));
+                default -> failures.completeExceptionally(new AssertionError("несподіване " + message));
             }
         }
     }
@@ -129,8 +141,13 @@ class ProtocolSmokeTest {
             switch (message) {
                 case ServerMessage.Welcome welcome -> {
                     Handshake.confirm(welcome, TestMessages.HASH);
-                    ctx.writeAndFlush(new ClientMessage.CreateWorld(7, 1, kolo.engine.state.NpcShare.FEW));
+                    ctx.writeAndFlush(new ClientMessage.CreateLobby("Оля", 7, kolo.engine.state.NpcShare.FEW));
                 }
+                // Лобі створено — хост одразу починає гру.
+                case ServerMessage.Lobby lobby -> ctx.writeAndFlush(new ClientMessage.StartGame());
+                case ServerMessage.Joined joined -> {}
+                case ServerMessage.Lobbies lobbies -> {}
+                case ServerMessage.Players players -> {}
                 case ServerMessage.MapStart start -> assembler.start(start);
                 case ServerMessage.MapCells cells -> assembler.add(cells).ifPresent(done -> map = done);
                 // Карта прийшла — закінчуємо рік 0; рік 1 означає, що сервер прийняв «Готово».

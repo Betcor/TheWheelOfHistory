@@ -1,8 +1,9 @@
 package kolo.client.screen;
 
+import java.util.List;
 import java.util.OptionalInt;
-import java.util.concurrent.Executor;
-import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.WeakChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
@@ -16,19 +17,23 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import kolo.client.app.Navigator;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapCanvas;
 import kolo.client.map.MapLayers;
 import kolo.client.map.MapMode;
-import kolo.client.net.WorldSource;
+import kolo.client.net.GameClient;
+import kolo.client.net.GameStart;
+import kolo.client.state.SessionModel;
 import kolo.engine.state.WorldState;
 import kolo.engine.view.MapView;
+import kolo.protocol.message.PlayerInfo;
+import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.YearPhase;
 
 /**
- * Карта світу (GD §22.2): режими карти, поточний рік і кнопка «Готово», панель обраної провінції й рядок стану з
- * провінцією під курсором. Поки систем немає, роки «порожні»: «Готово» лише переводить світ у наступний рік на
- * сервері.
+ * Карта світу (GD §22.2): режими карти, поточний рік і кнопка «Готово», панель обраної провінції, гравці (хто вже
+ * готовий, хто не на зв'язку) і рядок стану. Поки систем немає, роки «порожні»: рік розв'язується, коли «Готово»
+ * натиснули всі гравці на зв'язку. Зв'язок втрачено — кнопка «Перепідключитися» повертає гравця до його держави.
  */
 public final class MapScreen {
 
@@ -36,14 +41,13 @@ public final class MapScreen {
 
     private MapScreen() {}
 
-    /**
-     * @param turn поточний рік світу (хід)
-     * @param world сесія світу на сервері — для кінця року
-     */
-    public static Parent create(
-            Navigator navigator, Texts texts, MapLayers layers, int turn, WorldSource world, Executor background) {
+    /** @param start світ, у який клієнт увійшов: рік і фаза */
+    public static Parent create(ScreenContext context, MapLayers layers, GameStart start) {
+        Texts texts = context.texts();
+        GameClient game = context.game();
+        SessionModel session = context.session();
         MapView view = layers.view();
-        MapCanvas canvas = new MapCanvas(layers, background);
+        MapCanvas canvas = new MapCanvas(layers, context.background());
 
         ToggleGroup modes = new ToggleGroup();
         ToolBar toolbar = new ToolBar();
@@ -65,11 +69,16 @@ public final class MapScreen {
         Button menu = new Button(texts.text("map.main_menu"));
         menu.setOnAction(event -> {
             canvas.dispose();
-            navigator.showMainMenu();
+            game.leave();
+            session.reset();
+            context.navigator().showMainMenu();
         });
-        Label year = new Label(yearText(texts, turn));
+        Label year = new Label(yearText(texts, start.turn()));
         year.getStyleClass().add("title-4");
         Button endYear = new Button(texts.text("map.end_year"));
+        Button reconnect = new Button(texts.text("map.reconnect"));
+        reconnect.setVisible(false);
+        reconnect.setManaged(false);
         toolbar.getItems()
                 .addAll(
                         new Separator(),
@@ -78,6 +87,7 @@ public final class MapScreen {
                         spacer,
                         year,
                         endYear,
+                        reconnect,
                         new Separator(),
                         fit,
                         menu);
@@ -86,7 +96,10 @@ public final class MapScreen {
         title.getStyleClass().add("title-4");
         title.setWrapText(true);
         VBox details = new VBox(6);
-        VBox panel = new VBox(12, title, details);
+        Label playersTitle = new Label(texts.text("map.players"));
+        playersTitle.getStyleClass().add("title-4");
+        VBox players = new VBox(4);
+        VBox panel = new VBox(12, title, details, new Separator(), playersTitle, players);
         panel.setPadding(new Insets(12));
         panel.setPrefWidth(PANEL_WIDTH);
         panel.setMinWidth(PANEL_WIDTH);
@@ -94,32 +107,85 @@ public final class MapScreen {
         Label status = new Label(texts.text("map.status.hint"));
         status.setPadding(new Insets(4, 8, 4, 8));
 
-        // Поточний рік змінюється лише в потоці JavaFX.
-        int[] current = {turn};
+        // Поточний рік і чи вже натиснуто «Готово» — лише в потоці JavaFX.
+        int[] current = {start.turn()};
+        boolean[] sent = {false};
+        Runnable refreshReady = () -> {
+            ServerMessage.Phase phase = session.phase().get();
+            boolean orders = phase != null && phase.phase() == YearPhase.ORDERS && phase.turn() == current[0];
+            boolean meReady = session.players().get().stream().anyMatch(p -> game.isMe(p) && p.ready());
+            endYear.setDisable(
+                    !orders || sent[0] || meReady || !session.connected().get());
+        };
         endYear.setOnAction(event -> {
-            endYear.setDisable(true);
-            int finished = current[0];
-            status.setText(texts.text("map.year_resolving"));
-            background.execute(() -> {
-                try {
-                    int next = world.endYear(finished);
-                    Platform.runLater(() -> {
-                        current[0] = next;
-                        year.setText(yearText(texts, next));
-                        status.setText(texts.text("map.year_started", WorldState.year(next)));
-                        endYear.setDisable(false);
-                    });
-                } catch (RuntimeException e) {
-                    String message = ErrorTexts.of(texts, e);
-                    Platform.runLater(() -> {
-                        status.setText(message);
-                        endYear.setDisable(false);
-                    });
-                    if (!ErrorTexts.expected(e)) {
-                        throw e;
-                    }
+            sent[0] = true;
+            refreshReady.run();
+            game.ready(current[0]);
+        });
+
+        ChangeListener<ServerMessage.Phase> phases = (property, old, phase) -> {
+            if (phase == null) {
+                return;
+            }
+            if (phase.phase() == YearPhase.RESOLVING) {
+                status.setText(texts.text("map.year_resolving"));
+            } else if (phase.phase() == YearPhase.ORDERS && phase.turn() > current[0]) {
+                current[0] = phase.turn();
+                sent[0] = false;
+                year.setText(yearText(texts, phase.turn()));
+                status.setText(texts.text("map.year_started", WorldState.year(phase.turn())));
+            }
+            refreshReady.run();
+        };
+        ChangeListener<List<PlayerInfo>> roster = (property, old, list) -> {
+            players.getChildren().clear();
+            for (PlayerInfo player : list) {
+                Label label = new Label(PlayerLabels.game(texts, player));
+                label.setWrapText(true);
+                if (game.isMe(player)) {
+                    label.getStyleClass().add("text-bold");
                 }
-            });
+                players.getChildren().add(label);
+            }
+            String waiting = PlayerLabels.waitingFor(list);
+            if (sent[0] && !waiting.isEmpty()) {
+                status.setText(texts.text("map.waiting", waiting));
+            }
+            refreshReady.run();
+        };
+        ChangeListener<Boolean> link = (property, old, connected) -> {
+            reconnect.setVisible(!connected);
+            reconnect.setManaged(!connected);
+            if (!connected) {
+                status.setText(texts.text("app.error.connection_lost"));
+            }
+            refreshReady.run();
+        };
+        session.phase().addListener(new WeakChangeListener<>(phases));
+        session.players().addListener(new WeakChangeListener<>(roster));
+        session.connected().addListener(new WeakChangeListener<>(link));
+        session.setOnError(error -> {
+            sent[0] = false;
+            status.setText(texts.error(error.code(), error.details()));
+            refreshReady.run();
+        });
+        roster.changed(session.players(), null, session.players().get());
+        link.changed(session.connected(), null, session.connected().get());
+
+        reconnect.setOnAction(event -> {
+            reconnect.setDisable(true);
+            UiFutures.onUi(
+                    game.reconnect(),
+                    texts,
+                    // Карту заново покаже застосунок, коли сервер її надішле.
+                    joined -> {
+                        canvas.dispose();
+                        status.setText(texts.text("map.reconnected"));
+                    },
+                    message -> {
+                        reconnect.setDisable(false);
+                        status.setText(message);
+                    });
         });
 
         canvas.setOnHover(cell -> status.setText(
@@ -132,6 +198,8 @@ public final class MapScreen {
         root.setTop(toolbar);
         root.setRight(panel);
         root.setBottom(status);
+        // Слабкі слухачі живуть, доки живе екран.
+        root.getProperties().put(MapScreen.class, List.of(phases, roster, link));
         canvas.requestFocus();
         return root;
     }

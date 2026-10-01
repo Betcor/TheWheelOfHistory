@@ -3,6 +3,8 @@ package kolo.server.session;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
@@ -30,20 +32,45 @@ class BundledSessionIntegrationTest {
     @Test
     void yearsAreSavedAndReadBackIdentically() throws Exception {
         Sessions sessions = new Sessions(new WorldDirectory(worlds));
-        RecordingPeer host = new RecordingPeer();
         SessionActor session = sessions.create(TestServers.CONTENT);
-        session.generate(host, 1970, 4, NpcShare.NORMAL);
-        host.map();
-        host.expectOrders(0);
+        List<RecordingPeer> players = new ArrayList<>();
+        for (int n = 0; n < 4; n++) {
+            RecordingPeer player = new RecordingPeer();
+            if (n == 0) {
+                session.open(player, "Хост", 1970, NpcShare.NORMAL);
+            } else {
+                session.join(player, "Гравець " + n);
+            }
+            player.joined();
+            players.add(player);
+        }
+        session.start(players.getFirst());
+        for (int n = 0; n < players.size(); n++) {
+            RecordingPeer player = players.get(n);
+            // Стан лобі після кожного приєднання, починаючи з власного.
+            for (int lobby = n; lobby < players.size(); lobby++) {
+                player.lobby();
+            }
+            assertThat(player.map()).isEqualTo(TestServers.map(1970, 4, NpcShare.NORMAL));
+            player.expectOrders(0);
+        }
 
         for (int turn = 0; turn < 5; turn++) {
-            session.ready(host, turn);
-            host.expectYear(turn);
+            for (RecordingPeer player : players) {
+                session.ready(player, turn);
+            }
+            for (RecordingPeer player : players) {
+                for (int ready = 1; ready < players.size(); ready++) {
+                    player.players();
+                }
+                player.expectYear(turn);
+            }
         }
-        session.leave(host);
+        players.forEach(session::leave);
         assertThat(session.awaitClosed(30, TimeUnit.SECONDS)).isTrue();
 
         try (WorldStore store = WorldStore.open(worlds.resolve("world-1970" + WorldStore.EXTENSION))) {
+            assertThat(store.players()).hasSize(4);
             assertThat(store.turns()).extracting(SavedTurn::turn).containsExactly(0, 1, 2, 3, 4, 5);
             // Реплей: рік N із файлу + рушій → той самий хеш, що записаний для року N + 1.
             for (int turn = 0; turn < 5; turn++) {

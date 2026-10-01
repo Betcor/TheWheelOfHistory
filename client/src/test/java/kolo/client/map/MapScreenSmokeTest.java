@@ -2,10 +2,13 @@ package kolo.client.map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javafx.application.Platform;
@@ -17,12 +20,21 @@ import javafx.scene.layout.BorderPane;
 import kolo.client.TestWorlds;
 import kolo.client.app.Navigator;
 import kolo.client.i18n.Texts;
+import kolo.client.net.GameClient;
+import kolo.client.net.GameStart;
+import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.LobbyScreen;
 import kolo.client.screen.MainMenuScreen;
 import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
+import kolo.client.screen.ScreenContext;
+import kolo.client.state.SessionModel;
+import kolo.protocol.message.YearPhase;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Смок із JavaFX: екрани будуються, карта малює кадри растром і векторно. Вікно не показується — сцена рендериться в
@@ -42,11 +54,36 @@ class MapScreenSmokeTest {
         public void showNewWorld() {}
 
         @Override
-        public void showMap(MapLayers layers, int turn) {}
+        public void showConnect() {}
+
+        @Override
+        public void showLobby() {}
+
+        @Override
+        public void showMap(MapLayers layers, GameStart start) {}
 
         @Override
         public void exit() {}
     };
+
+    private static final Executor BACKGROUND = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "smoke-background");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    @TempDir
+    static Path worlds;
+
+    private static GameClient game;
+    private static SessionModel session;
+
+    @AfterAll
+    static void stopGame() {
+        if (game != null) {
+            game.close();
+        }
+    }
 
     @BeforeAll
     static void startToolkit() throws InterruptedException {
@@ -60,6 +97,12 @@ class MapScreenSmokeTest {
         }
         assertThat(started.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
         Platform.setImplicitExit(false);
+        session = new SessionModel(Platform::runLater);
+        game = GameClient.start(worlds, 0, session, BACKGROUND);
+    }
+
+    private static ScreenContext context() {
+        return new ScreenContext(NAVIGATOR, Texts.ukrainian(), game, session, Runnable::run);
     }
 
     @Test
@@ -67,7 +110,9 @@ class MapScreenSmokeTest {
         Texts texts = Texts.ukrainian();
         onFx(() -> {
             new Scene(MainMenuScreen.create(NAVIGATOR, texts), WIDTH, HEIGHT);
-            new Scene(NewWorldScreen.create(NAVIGATOR, texts, TestWorlds.GAME, Runnable::run), WIDTH, HEIGHT);
+            new Scene(NewWorldScreen.create(context()), WIDTH, HEIGHT);
+            new Scene(ConnectScreen.create(context()), WIDTH, HEIGHT);
+            new Scene(LobbyScreen.create(context()), WIDTH, HEIGHT);
             return null;
         });
     }
@@ -77,7 +122,8 @@ class MapScreenSmokeTest {
         MapLayers layers = MapLayers.build(TestWorlds.DEFAULT);
         Texts texts = Texts.ukrainian();
         // Растеризація режиму — одразу в потоці виклику: плитки з'являються наступним runLater.
-        Parent screen = onFx(() -> MapScreen.create(NAVIGATOR, texts, layers, 0, TestWorlds.GAME, Runnable::run));
+        Parent screen =
+                onFx(() -> MapScreen.create(context(), layers, new GameStart(TestWorlds.DEFAULT, 0, YearPhase.ORDERS)));
         Scene scene = onFx(() -> {
             Scene result = new Scene(screen, WIDTH, HEIGHT);
             screen.applyCss();

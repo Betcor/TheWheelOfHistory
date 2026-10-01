@@ -81,6 +81,12 @@ public enum ErrorCode {
     UNAUTHORIZED(UnauthorizedException.class),
     FORBIDDEN(ForbiddenException.class),
     CONFLICT(ConflictException.class),
+    /** Гру сесії вже почато або сесію закрито: до лобі не приєднатися й гру не почати вдруге. */
+    LOBBY_CLOSED(ConflictException.class),
+    /** У лобі вже найбільша кількість гравців. Подробиці: {@code max}. */
+    LOBBY_FULL(ConflictException.class, "max"),
+    /** Нікнейм уже зайнятий у цій сесії (без огляду на регістр). Подробиці: {@code nickname}. */
+    NICKNAME_TAKEN(ConflictException.class, "nickname"),
     /**
      * Повідомлення протоколу пошкоджене або прийшло не в тому порядку. Подробиці: {@code location} (шлях усередині
      * повідомлення, {@code cells[3].site}) і {@code problem} (опис для розробника, не для гравця) або {@code cause}
@@ -108,7 +114,7 @@ public enum ErrorCode {
     CONTENT_MALFORMED(ContentException.class),
     /**
      * Файл світу не вдалося створити, відкрити, записати чи прочитати. Подробиці: {@code file} (ім'я файлу), {@code
-     * operation} ({@code create}, {@code open}, {@code save_turn}, {@code load}, {@code close}) і {@code problem}
+     * operation} ({@code create}, {@code open}, {@code save_turn}, {@code save_player}, {@code load}, {@code close}) і {@code problem}
      * ({@code file_exists}, {@code file_missing}, {@code io_error}) або {@code sqlite_code}.
      */
     SAVE_FILE_ERROR(SaveFileException.class),

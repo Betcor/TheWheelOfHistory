@@ -6,7 +6,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import kolo.engine.state.NpcShare;
-import kolo.protocol.message.ClientMessage;
 import kolo.server.persistence.WorldStore;
 import kolo.server.transport.GameServer;
 import org.junit.jupiter.api.Test;
@@ -26,9 +25,7 @@ class DedicatedServerSmokeTest {
                 DedicatedServerMain.start(TestServers.CONTENT, new DedicatedServerMain.Options(0, worlds))) {
             InetSocketAddress address = server.bindTcp(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
             try (TestClient client = TestClient.welcomed(address, TestServers.CONTENT.hash())) {
-                client.send(new ClientMessage.CreateWorld(1970, 1, NpcShare.NORMAL));
-
-                assertThat(client.world().cells()).isNotEmpty();
+                assertThat(client.solo(1970, NpcShare.NORMAL).cells()).isNotEmpty();
                 client.endYear(0);
             }
         }

@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import kolo.engine.state.NpcShare;
 import kolo.engine.view.MapView;
-import kolo.protocol.message.ClientMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,8 +23,7 @@ class EmbeddedServerSmokeTest {
     void generatesDefaultWorld() throws Exception {
         try (EmbeddedServer server = EmbeddedServer.startWithBundledContent(worlds);
                 TestClient client = TestClient.welcomed(server.address(), server.contentHash())) {
-            client.send(new ClientMessage.CreateWorld(1970, 1, NpcShare.NORMAL));
-            MapView map = client.world();
+            MapView map = client.solo(1970, NpcShare.NORMAL);
             client.endYear(0);
 
             assertThat(map.cells()).isNotEmpty();

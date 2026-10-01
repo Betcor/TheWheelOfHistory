@@ -14,10 +14,15 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.TreeSet;
 import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.SaveFileException;
 import kolo.engine.error.SaveVersionException;
+import kolo.engine.error.ValidationException;
+import kolo.engine.state.ControlType;
+import kolo.engine.state.Country;
+import kolo.engine.state.CountryId;
 import kolo.engine.state.WorldState;
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteOpenMode;
@@ -63,16 +68,39 @@ public final class WorldStore implements AutoCloseable {
      * @throws SaveFileException з {@link ErrorCode#SAVE_FILE_ERROR}, якщо файл уже є або запис не вдався
      */
     public static WorldStore create(Path file, String name, MapSnapshot map, StateSnapshot initial) {
-        return create(file, name, map, initial, Clock.systemUTC(), Migrator.bundled());
+        return create(file, name, map, initial, List.of());
+    }
+
+    /**
+     * Те саме з гравцями світу — вони з'являються у файлі разом зі світом.
+     *
+     * @throws IllegalArgumentException якщо номери чи держави гравців повторюються, держава не гравця або хостів
+     *     більше одного
+     */
+    public static WorldStore create(
+            Path file, String name, MapSnapshot map, StateSnapshot initial, List<PlayerRecord> players) {
+        return create(file, name, map, initial, players, Clock.systemUTC(), Migrator.bundled());
     }
 
     static WorldStore create(
             Path file, String name, MapSnapshot map, StateSnapshot initial, Clock clock, Migrator migrator) {
+        return create(file, name, map, initial, List.of(), clock, migrator);
+    }
+
+    static WorldStore create(
+            Path file,
+            String name,
+            MapSnapshot map,
+            StateSnapshot initial,
+            List<PlayerRecord> players,
+            Clock clock,
+            Migrator migrator) {
         Checks.notBlank("name", name);
         WorldState state = initial.state();
         if (state.map() != map.map() && !state.map().equals(map.map())) {
             throw new IllegalArgumentException("initial state is on another map");
         }
+        checkPlayers(state, players);
         if (Files.exists(file)) {
             throw SaveErrors.file(file, "create", "file_exists");
         }
@@ -94,6 +122,9 @@ public final class WorldStore implements AutoCloseable {
                     insert.executeUpdate();
                 }
                 insertTurn(connection, initial, now);
+                for (PlayerRecord player : players) {
+                    insertPlayer(connection, player, now);
+                }
                 connection.commit();
             }
             Files.move(temporary, file);
@@ -203,6 +234,53 @@ public final class WorldStore implements AutoCloseable {
             throw SaveErrors.sql(file, "save_turn", e);
         }
         lastTurn = state.turn();
+    }
+
+    /** Гравці світу за номером. */
+    public List<SavedPlayer> players() {
+        ensureOpen();
+        List<SavedPlayer> players = new ArrayList<>();
+        try (Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery("SELECT id, nickname, token_hash, country, is_host,"
+                        + " last_seen_at FROM players ORDER BY id")) {
+            while (rows.next()) {
+                int number = rows.getInt(1);
+                String location = "players[" + number + "]";
+                PlayerRecord player;
+                try {
+                    player = new PlayerRecord(
+                            number, rows.getString(2), rows.getString(3), rows.getInt(4), rows.getInt(5) == 1);
+                } catch (ValidationException | NullPointerException e) {
+                    throw SaveErrors.malformed("file", location, "bad_player", e);
+                }
+                players.add(new SavedPlayer(player, instant(rows.getString(6), location)));
+            }
+        } catch (SQLException e) {
+            throw SaveErrors.sql(file, "load", e);
+        }
+        return List.copyOf(players);
+    }
+
+    /**
+     * Позначає, що гравець щойно був на зв'язку.
+     *
+     * @throws IllegalArgumentException якщо такого гравця у світі немає
+     * @throws SaveFileException з {@link ErrorCode#SAVE_FILE_ERROR}, якщо запис не вдався
+     */
+    public void markSeen(int player) {
+        ensureOpen();
+        int updated;
+        try (PreparedStatement update =
+                connection.prepareStatement("UPDATE players SET last_seen_at = ? WHERE id = ?")) {
+            update.setString(1, clock.instant().toString());
+            update.setInt(2, player);
+            updated = update.executeUpdate();
+        } catch (SQLException e) {
+            throw SaveErrors.sql(file, "save_player", e);
+        }
+        if (updated == 0) {
+            throw new IllegalArgumentException("no player " + player);
+        }
     }
 
     /** Збережені роки за зростанням. */
@@ -376,6 +454,38 @@ public final class WorldStore implements AutoCloseable {
             insert.setString(3, meta.contentHash());
             insert.setString(4, meta.mapHash());
             insert.setString(5, meta.createdAt().toString());
+            insert.executeUpdate();
+        }
+    }
+
+    private static void checkPlayers(WorldState state, List<PlayerRecord> players) {
+        TreeSet<Integer> numbers = new TreeSet<>();
+        TreeSet<Integer> countries = new TreeSet<>();
+        int hosts = 0;
+        for (PlayerRecord player : players) {
+            if (!numbers.add(player.number()) || !countries.add(player.country())) {
+                throw new IllegalArgumentException("players repeat a number or a country: " + players);
+            }
+            Country country = state.countries().get(CountryId.of(player.country()));
+            if (country == null || country.control() != ControlType.PLAYER) {
+                throw new IllegalArgumentException("country " + player.country() + " is not a player country");
+            }
+            hosts += player.host() ? 1 : 0;
+        }
+        if (hosts > 1) {
+            throw new IllegalArgumentException("more than one host: " + players);
+        }
+    }
+
+    private static void insertPlayer(Connection connection, PlayerRecord player, Instant now) throws SQLException {
+        try (PreparedStatement insert = connection.prepareStatement("INSERT INTO players"
+                + " (id, nickname, token_hash, country, is_host, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)")) {
+            insert.setInt(1, player.number());
+            insert.setString(2, player.nickname());
+            insert.setString(3, player.tokenHash());
+            insert.setInt(4, player.country());
+            insert.setInt(5, player.host() ? 1 : 0);
+            insert.setString(6, now.toString());
             insert.executeUpdate();
         }
     }

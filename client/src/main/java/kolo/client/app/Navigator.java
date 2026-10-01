@@ -1,6 +1,7 @@
 package kolo.client.app;
 
 import kolo.client.map.MapLayers;
+import kolo.client.net.GameStart;
 
 /** Перехід між екранами клієнта. Викликається лише з потоку JavaFX. */
 public interface Navigator {
@@ -9,10 +10,15 @@ public interface Navigator {
 
     void showNewWorld();
 
+    void showConnect();
+
+    /** Лобі поточної сесії. */
+    void showLobby();
+
     /**
-     * @param turn поточний рік світу (хід)
+     * @param start світ, у який клієнт увійшов: рік і фаза
      */
-    void showMap(MapLayers layers, int turn);
+    void showMap(MapLayers layers, GameStart start);
 
     void exit();
 }

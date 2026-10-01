@@ -11,28 +11,36 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapLayers;
-import kolo.client.net.EmbeddedGame;
+import kolo.client.net.GameClient;
+import kolo.client.net.GameStart;
+import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.LobbyScreen;
 import kolo.client.screen.MainMenuScreen;
 import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
+import kolo.client.screen.ScreenContext;
+import kolo.client.state.SessionModel;
 
 /**
- * JavaFX-застосунок клієнта: головне меню → параметри нового світу → карта з роками.
+ * JavaFX-застосунок клієнта: головне меню → новий світ або підключення → лобі → карта з роками.
  *
- * <p>Світ живе на вбудованому сервері ({@link EmbeddedGame}): клієнт говорить із ним повідомленнями протоколу. Важка
- * робота (очікування сервера, растеризація карти) — в одному фоновому потоці, UI змінюється лише в потоці JavaFX.
+ * <p>Світ живе на сервері — вбудованому ({@link GameClient}: одиночна гра й LAN-хост) чи віддаленому: клієнт говорить
+ * із ним повідомленнями протоколу. Коли гра почалася (чи клієнт повернувся в неї), застосунок готує шари карти у
+ * фоновому потоці й показує карту. UI змінюється лише в потоці JavaFX.
  */
 public final class KoloApp extends Application implements Navigator {
     private static final double INITIAL_WIDTH = 1280;
     private static final double INITIAL_HEIGHT = 800;
 
     private final Texts texts = Texts.ukrainian();
-    private final EmbeddedGame game = EmbeddedGame.start();
     private final ExecutorService background = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "kolo-background");
         thread.setDaemon(true);
         return thread;
     });
+    private final SessionModel session = new SessionModel(Platform::runLater);
+    private final GameClient game = GameClient.start(session, background);
+    private final ScreenContext context = new ScreenContext(this, texts, game, session, background);
     private final StackPane root = new StackPane();
     private Stage stage;
 
@@ -46,6 +54,7 @@ public final class KoloApp extends Application implements Navigator {
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
         stage.setTitle(texts.text("app.title"));
         stage.setScene(new Scene(root, INITIAL_WIDTH, INITIAL_HEIGHT));
+        session.setOnGameStarted(this::gameStarted);
         showMainMenu();
         stage.show();
     }
@@ -63,17 +72,34 @@ public final class KoloApp extends Application implements Navigator {
 
     @Override
     public void showNewWorld() {
-        show(NewWorldScreen.create(this, texts, game, background));
+        show(NewWorldScreen.create(context));
     }
 
     @Override
-    public void showMap(MapLayers layers, int turn) {
-        show(MapScreen.create(this, texts, layers, turn, game, background));
+    public void showConnect() {
+        show(ConnectScreen.create(context));
+    }
+
+    @Override
+    public void showLobby() {
+        show(LobbyScreen.create(context));
+    }
+
+    @Override
+    public void showMap(MapLayers layers, GameStart start) {
+        show(MapScreen.create(context, layers, start));
     }
 
     @Override
     public void exit() {
         Platform.exit();
+    }
+
+    private void gameStarted(GameStart start) {
+        background.execute(() -> {
+            MapLayers layers = MapLayers.build(start.map());
+            Platform.runLater(() -> showMap(layers, start));
+        });
     }
 
     private void show(Parent screen) {

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.NpcShare;
+import kolo.protocol.message.LobbyInfo;
 import kolo.server.TestServers;
 import kolo.server.persistence.WorldDirectory;
 import kolo.server.persistence.WorldStore;
@@ -34,6 +35,25 @@ class SessionsTest {
     }
 
     @Test
+    void openLobbiesAreFoundAndListed() throws Exception {
+        Sessions sessions = new Sessions(new WorldDirectory(worlds));
+        SessionActor empty = sessions.create(TestServers.CONTENT);
+        SessionActor open = sessions.create(TestServers.CONTENT);
+        RecordingPeer host = new RecordingPeer();
+        open.open(host, "Оля", 4, NpcShare.MANY);
+        host.joined();
+        host.lobby();
+
+        assertThat(sessions.find(open.id())).contains(open);
+        assertThat(sessions.find(99)).isEmpty();
+        // Сесія без відкритого лобі в списку не з'являється.
+        assertThat(sessions.lobbies()).containsExactly(new LobbyInfo(open.id(), "Оля", 1, NpcShare.MANY));
+        assertThat(empty.lobby()).isEmpty();
+        sessions.closeAll(30, TimeUnit.SECONDS);
+        assertThat(sessions.lobbies()).isEmpty();
+    }
+
+    @Test
     void closedSessionLeavesTheRegistry() throws Exception {
         Sessions sessions = new Sessions(new WorldDirectory(worlds));
         SessionActor session = sessions.create(TestServers.CONTENT);
@@ -49,7 +69,10 @@ class SessionsTest {
         Sessions sessions = new Sessions(new WorldDirectory(worlds));
         RecordingPeer host = new RecordingPeer();
         SessionActor session = sessions.create(TestServers.CONTENT);
-        session.generate(host, 4, 1, NpcShare.FEW);
+        session.open(host, "Оля", 4, NpcShare.FEW);
+        host.joined();
+        host.lobby();
+        session.start(host);
         host.map();
         host.expectOrders(0);
 
