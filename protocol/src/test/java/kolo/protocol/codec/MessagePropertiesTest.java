@@ -154,6 +154,13 @@ class MessagePropertiesTest {
         assertThat(MessageJson.readServer(MessageJson.write(orders))).isEqualTo(orders);
     }
 
+    @Property(tries = 100)
+    void anyCardRoundTrips(@ForAll @IntRange(min = 0, max = 1000) int number, @ForAll int seed) {
+        ServerMessage message = new ServerMessage.OwnCountry(TestMessages.card(number, seed));
+
+        assertThat(MessageJson.readServer(MessageJson.write(message))).isEqualTo(message);
+    }
+
     @Provide
     Arbitrary<Map<String, Object>> details() {
         Arbitrary<Object> value = Arbitraries.oneOf(

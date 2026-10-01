@@ -31,6 +31,7 @@ import kolo.engine.state.TurnTimer;
 import kolo.engine.state.WorldLimits;
 import kolo.engine.state.WorldState;
 import kolo.engine.turn.TurnPipeline;
+import kolo.engine.view.CountryCards;
 import kolo.engine.view.MapViews;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.LobbySetup;
@@ -59,8 +60,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Стани — {@link SessionState}. Хост відкриває лобі ({@code LOBBY}), інші приєднуються з нікнеймами, кожен отримує
  * номер і токен. Хост починає гру: гравці — усі, хто в лобі, у порядку приєднання, {@code n}-й отримує державу {@code
- * n}; сесія генерує світ і створює файл світу з гравцями ({@code GENERATING}), надсилає карту й живе роками ({@code
- * RUNNING}). Рік — фази {@link YearPhase}: {@code START_OF_YEAR → ORDERS}; коли «Готово» натиснули всі гравці на
+ * n}; сесія генерує світ і створює файл світу з гравцями ({@code GENERATING}), надсилає карту, кожному гравцеві —
+ * картку його держави, і живе роками ({@code RUNNING}). Новий світ спершу у фазі {@link YearPhase#GENERATION}: гравці
+ * переглядають генерацію своїх держав, а перший рік (і таймер ходу) починається, коли «Готово» натиснули всі на
+ * зв'язку. Рік — фази {@link YearPhase}: {@code START_OF_YEAR → ORDERS}; коли «Готово» натиснули всі гравці на
  * зв'язку, хост завершив рік ({@link #endYear}) або вийшов час таймера ходу — {@code RESOLVING} (рушій розв'язує рік,
  * рік пишеться у файл однією транзакцією) → {@code REPORT} → наступний рік. Якщо рік не вдалося розв'язати чи зберегти
  * — {@code PAUSED}: стан і файл лишаються на попередньому році, гравці отримують помилку й фазу паузи, доки хост не
@@ -526,7 +529,15 @@ public final class SessionActor {
         }
         state = SessionState.RUNNING;
         broadcast(MapChunks.split(MapViews.of(world)));
-        startYear();
+        for (Member member : connected()) {
+            member.peer.send(List.of(ownCountry(member)), false);
+        }
+        if (setup instanceof LobbySetup.NewWorld) {
+            playersChanged();
+            phase(world.turn(), YearPhase.GENERATION);
+        } else {
+            startYear();
+        }
     }
 
     /** @return чи світ згенеровано й файл створено */
@@ -605,6 +616,7 @@ public final class SessionActor {
             return;
         }
         List<ServerMessage> messages = new ArrayList<>(MapChunks.split(MapViews.of(world)));
+        messages.add(ownCountry(member));
         messages.add(phaseMessage(world.turn(), phase));
         if (state == SessionState.PAUSED) {
             messages.add(pauseError);
@@ -615,7 +627,8 @@ public final class SessionActor {
 
     private void doReady(Peer peer, int turn) {
         Member member = member(peer);
-        if (member == null || state != SessionState.RUNNING || phase != YearPhase.ORDERS || turn != world.turn()) {
+        boolean open = phase == YearPhase.ORDERS || phase == YearPhase.GENERATION;
+        if (member == null || state != SessionState.RUNNING || !open || turn != world.turn()) {
             peer.send(ServerMessage.Error.of(new PhaseClosedException(ErrorDetails.of("turn", turn))));
             return;
         }
@@ -718,11 +731,20 @@ public final class SessionActor {
         }
     }
 
-    /** @return чи рік розв'язано */
+    /** @return чи рік розв'язано або генерацію завершено — гравці вже отримали новий список */
     private boolean resolveIfAllReady() {
         boolean allReady = members.stream().filter(m -> m.peer != null).allMatch(m -> m.ready);
-        if (state == SessionState.RUNNING && phase == YearPhase.ORDERS && allReady) {
+        if (state != SessionState.RUNNING || !allReady) {
+            return false;
+        }
+        if (phase == YearPhase.ORDERS) {
             resolveYear();
+            return true;
+        }
+        if (phase == YearPhase.GENERATION) {
+            // Генерацію переглянули всі на зв'язку: перший рік починається, і таймер ходу — з ним.
+            members.forEach(m -> m.ready = false);
+            startYear();
             return true;
         }
         return false;
@@ -809,6 +831,11 @@ public final class SessionActor {
             alarm = null;
         }
         deadline = null;
+    }
+
+    /** Картка держави гравця — лише йому. */
+    private ServerMessage.OwnCountry ownCountry(Member member) {
+        return new ServerMessage.OwnCountry(CountryCards.of(world, member.country));
     }
 
     private void phase(int turn, YearPhase next) {

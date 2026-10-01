@@ -123,6 +123,9 @@ class ClientSessionTest {
         session.handle(new ClientMessage.StartGame());
 
         assertThat(peer.map()).isEqualTo(TestServers.map(42, 1, NpcShare.NORMAL));
+        peer.card();
+        peer.expectGeneration();
+        session.handle(new ClientMessage.Ready(0));
         peer.expectOrders(0);
         assertThat(session.session()).isPresent();
         assertThat(peer.closed()).isFalse();
@@ -147,8 +150,16 @@ class ClientSessionTest {
         assertThat(peer.lobby().players()).hasSize(2);
         session.handle(new ClientMessage.StartGame());
         peer.map();
-        peer.expectOrders(0);
+        peer.card();
+        peer.expectGeneration();
         otherPeer.map();
+        otherPeer.card();
+        otherPeer.expectGeneration();
+        session.handle(new ClientMessage.Ready(0));
+        peer.players();
+        otherPeer.players();
+        other.handle(new ClientMessage.Ready(0));
+        peer.expectOrders(0);
         otherPeer.expectOrders(0);
         session.handle(new ClientMessage.Ready(0));
         peer.players();
@@ -218,6 +229,12 @@ class ClientSessionTest {
         assertThat(peer.lobby().setup().timer()).isEqualTo(live);
         session.handle(new ClientMessage.StartGame());
         peer.map();
+        peer.card();
+        peer.expectGeneration();
+        // Генерацію хост не завершує за всіх: «Завершити рік» — лише для наказів.
+        session.handle(new ClientMessage.EndYear(0));
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+        session.handle(new ClientMessage.Ready(0));
         peer.players();
         peer.expectPhase(0, YearPhase.START_OF_YEAR);
         assertThat(peer.phase().timeLeftMillis()).isPresent();
@@ -280,8 +297,10 @@ class ClientSessionTest {
         peer.lobby();
         session.handle(new ClientMessage.StartGame());
         peer.map();
-        peer.expectOrders(0);
+        peer.card();
+        peer.expectGeneration();
         other.disconnected();
+        // Того, хто від'єднався, не чекають і в генерації.
         peer.players();
         RecordingPeer backPeer = new RecordingPeer();
         ClientSession back = welcomed(backPeer);
@@ -290,6 +309,8 @@ class ClientSessionTest {
 
         assertThat(backPeer.joined()).isEqualTo(joined);
         assertThat(backPeer.map()).isEqualTo(TestServers.map(3, 2, NpcShare.FEW));
+        assertThat(backPeer.card().number()).isEqualTo(1);
+        backPeer.expectPhase(0, YearPhase.GENERATION);
         assertThat(back.session()).isPresent();
     }
 
@@ -406,6 +427,9 @@ class ClientSessionTest {
         peer.lobby();
         session.handle(new ClientMessage.StartGame());
         peer.map();
+        peer.card();
+        peer.expectGeneration();
+        session.handle(new ClientMessage.Ready(0));
         peer.expectOrders(0);
     }
 }

@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import kolo.engine.content.ContentPack;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.error.VersionMismatchException;
 import kolo.engine.state.NpcShare;
@@ -178,6 +179,15 @@ public final class GameClient implements AutoCloseable {
      */
     public CompletableFuture<LanLobbies> findLanLobbies() {
         return findLanLobbies(new LanSearch(lanPorts.discovery(), LanSearch.WAIT));
+    }
+
+    /**
+     * Контент гри — той, чий хеш звірено з сервером при з'єднанні, тож id з повідомлень (картка держави, сектори коліс)
+     * він підписує так само, як сервер. Перше звернення завантажує контент — викликати не з потоку UI; далі —
+     * миттєво.
+     */
+    public ContentPack content() {
+        return server.content();
     }
 
     /** Те саме з заданим пошуком. */
@@ -763,7 +773,7 @@ public final class GameClient implements AutoCloseable {
         void replay() {
             target.players(players);
             if (start != null) {
-                target.gameStarted(new GameStart(start.map(), phase));
+                target.gameStarted(new GameStart(start.map(), start.card(), phase));
             }
         }
 

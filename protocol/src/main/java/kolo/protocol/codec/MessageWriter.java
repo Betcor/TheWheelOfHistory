@@ -193,6 +193,11 @@ final class MessageWriter {
                         json.writeNull();
                     }
                 }
+                case ServerMessage.OwnCountry own -> {
+                    json.writeStringField("type", MessageTypes.OWN_COUNTRY);
+                    json.writeFieldName("card");
+                    CardWriter.card(json, own.card());
+                }
                 case ServerMessage.Worlds worlds -> {
                     json.writeStringField("type", MessageTypes.WORLDS);
                     json.writeArrayFieldStart("worlds");
@@ -313,7 +318,7 @@ final class MessageWriter {
         json.writeEndObject();
     }
 
-    private static void name(JsonGenerator json, LocalizedName name) throws IOException {
+    static void name(JsonGenerator json, LocalizedName name) throws IOException {
         json.writeStartObject();
         json.writeFieldName("full");
         noun(json, name.fullName());
@@ -322,7 +327,7 @@ final class MessageWriter {
         json.writeEndObject();
     }
 
-    private static void noun(JsonGenerator json, NounPhrase noun) throws IOException {
+    static void noun(JsonGenerator json, NounPhrase noun) throws IOException {
         json.writeStartObject();
         json.writeStringField("gender", key(noun.gender()));
         json.writeArrayFieldStart("forms");
@@ -352,7 +357,7 @@ final class MessageWriter {
         }
     }
 
-    private static void optionalKey(JsonGenerator json, String field, String value) throws IOException {
+    static void optionalKey(JsonGenerator json, String field, String value) throws IOException {
         json.writeFieldName(field);
         if (value != null) {
             json.writeString(value);

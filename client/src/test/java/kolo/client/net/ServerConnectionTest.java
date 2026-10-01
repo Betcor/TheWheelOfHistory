@@ -61,6 +61,8 @@ class ServerConnectionTest {
             GameStart start = TestWorlds.started(events);
             assertThat(start.turn()).isZero();
             assertThat(start.map().seed()).isEqualTo(5);
+            assertThat(start.phase().phase()).isEqualTo(YearPhase.GENERATION);
+            connection.ready(0);
             events.awaitOrders(0);
             connection.ready(0);
             events.awaitOrders(1);
@@ -94,6 +96,7 @@ class ServerConnectionTest {
                     .isEqualTo(live);
             connection.startGame();
             TestWorlds.started(events);
+            connection.ready(0);
             ServerMessage.Phase orders = events.awaitOrders(0);
             assertThat(orders.timeLeftMillis().orElseThrow()).isBetween(1L, 300_000L);
             // Сесія не на паузі — відновлювати нічого.
@@ -182,7 +185,9 @@ class ServerConnectionTest {
                 assertThat(await(back.rejoin(joined))).isEqualTo(joined);
 
                 GameStart start = TestWorlds.started(backEvents);
-                assertThat(start.phase().phase()).isEqualTo(YearPhase.ORDERS);
+                // Хост ще не переглянув генерацію — гість повертається в неї ж, зі своєю карткою.
+                assertThat(start.phase().phase()).isEqualTo(YearPhase.GENERATION);
+                assertThat(start.card().number()).isEqualTo(1);
                 assertThat(start.map().seed()).isEqualTo(8);
             }
         }

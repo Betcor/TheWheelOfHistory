@@ -11,9 +11,12 @@ import javafx.animation.Timeline;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -24,7 +27,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 import javafx.util.Duration;
+import kolo.client.generation.CountryCardSections;
+import kolo.client.generation.CountryCardView;
+import kolo.client.generation.GenerationLabels;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapCanvas;
 import kolo.client.map.MapLayers;
@@ -76,6 +83,8 @@ public final class MapScreen {
         }
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button country = new Button(texts.text("map.my_country"));
+        country.setOnAction(event -> showCard(context, layers, start, country));
         Button fit = new Button(texts.text("map.fit"));
         fit.setOnAction(event -> canvas.fit());
         Button menu = new Button(texts.text("map.main_menu"));
@@ -111,6 +120,7 @@ public final class MapScreen {
                         resume,
                         reconnect,
                         new Separator(),
+                        country,
                         fit,
                         menu);
 
@@ -128,6 +138,9 @@ public final class MapScreen {
 
         Label status = new Label(texts.text("map.status.hint"));
         status.setPadding(new Insets(4, 8, 4, 8));
+        if (start.phase().phase() == YearPhase.GENERATION) {
+            status.setText(texts.text("map.generation"));
+        }
 
         // Поточний рік і чи вже натиснуто «Готово» — лише в потоці JavaFX.
         int[] current = {start.turn()};
@@ -137,10 +150,12 @@ public final class MapScreen {
         Runnable refreshReady = () -> {
             ServerMessage.Phase phase = session.phase().get();
             boolean orders = phase != null && phase.phase() == YearPhase.ORDERS && phase.turn() == current[0];
+            // Генерацію поки лише підтверджують «Готово» з карти; екран генерації — окремо (GD §4.12).
+            boolean generation = phase != null && phase.phase() == YearPhase.GENERATION && phase.turn() == current[0];
             boolean pause = phase != null && phase.phase() == YearPhase.PAUSED && phase.turn() == current[0];
             boolean meReady = session.players().get().stream().anyMatch(p -> game.isMe(p) && p.ready());
             boolean connected = session.connected().get();
-            endYear.setDisable(!orders || sent[0] || meReady || !connected);
+            endYear.setDisable(!(orders || generation) || sent[0] || meReady || !connected);
             boolean host = session.players().get().stream().anyMatch(p -> game.isMe(p) && p.host());
             finish.setVisible(host);
             finish.setManaged(host);
@@ -216,7 +231,10 @@ public final class MapScreen {
                 sent[0] = false;
                 finished[0] = false;
                 status.setText(texts.text("map.year_resumed", WorldState.year(phase.turn())));
-            } else if (phase.phase() == YearPhase.ORDERS && phase.turn() > current[0]) {
+            } else if (phase.phase() == YearPhase.GENERATION) {
+                status.setText(texts.text("map.generation"));
+            } else if (phase.phase() == YearPhase.ORDERS
+                    && (phase.turn() > current[0] || (old != null && old.phase() == YearPhase.GENERATION))) {
                 current[0] = phase.turn();
                 sent[0] = false;
                 finished[0] = false;
@@ -308,6 +326,27 @@ public final class MapScreen {
         });
         canvas.requestFocus();
         return root;
+    }
+
+    /** Картка держави гравця (GD §4.12) — окремим вікном поверх карти. */
+    private static void showCard(ScreenContext context, MapLayers layers, GameStart start, Node owner) {
+        Texts texts = context.texts();
+        GenerationLabels labels = new GenerationLabels(
+                context.game().content(),
+                texts,
+                start.card(),
+                number -> layers.view().countries().stream()
+                        .filter(c -> c.number() == number)
+                        .map(c -> c.name())
+                        .findFirst());
+        ScrollPane content = new ScrollPane(CountryCardView.create(
+                start.card().name().fullName().nominative(), CountryCardSections.of(labels, texts)));
+        content.setFitToWidth(true);
+        Stage window = new Stage();
+        window.initOwner(owner.getScene().getWindow());
+        window.setTitle(texts.text("map.my_country"));
+        window.setScene(new Scene(content, 720, 640));
+        window.show();
     }
 
     private static String yearText(Texts texts, int turn) {

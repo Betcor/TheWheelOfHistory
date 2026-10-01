@@ -106,6 +106,16 @@ public final class EmbeddedServer implements AutoCloseable {
         return content.get().hash();
     }
 
+    /**
+     * Контент сервера — той самий, з яким клієнт вітається ({@link #contentHash()}): клієнт підписує ним id з
+     * повідомлень (лад, родовища, сектори коліс). Перше звернення завантажує контент: викликати не з потоку UI.
+     *
+     * @throws kolo.engine.error.ContentException якщо вбудований контент невалідний
+     */
+    public ContentPack content() {
+        return content.get();
+    }
+
     /** Зупиняє сервер і закриває всі з'єднання. */
     @Override
     public void close() {

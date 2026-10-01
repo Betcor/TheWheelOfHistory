@@ -26,6 +26,7 @@ import kolo.engine.state.Relief;
 import kolo.engine.state.Terrain;
 import kolo.engine.state.TurnTimer;
 import kolo.engine.view.CellView;
+import kolo.engine.view.CountryCard;
 import kolo.engine.view.CountryView;
 import kolo.protocol.ProtocolErrors;
 import kolo.protocol.message.ClientMessage;
@@ -163,6 +164,10 @@ final class MessageReader {
                 OptionalLong timeLeft =
                         left.isPresent() ? OptionalLong.of(left.get().longValue()) : OptionalLong.empty();
                 yield root.build(() -> new ServerMessage.Phase(turn, phase, timeLeft));
+            }
+            case MessageTypes.OWN_COUNTRY -> {
+                CountryCard card = CardReader.card(root.field("card"));
+                yield new ServerMessage.OwnCountry(card);
             }
             case MessageTypes.WORLDS -> {
                 List<WorldInfo> worlds = root.field("worlds").list(MessageReader::world);
@@ -325,14 +330,14 @@ final class MessageReader {
                 country));
     }
 
-    private static LocalizedName name(MessageNode node) {
+    static LocalizedName name(MessageNode node) {
         NounPhrase full = noun(node.field("full"));
         NounPhrase shortName = noun(node.field("short"));
         node.end();
         return node.build(() -> new LocalizedName(full, shortName));
     }
 
-    private static NounPhrase noun(MessageNode node) {
+    static NounPhrase noun(MessageNode node) {
         GrammaticalGender gender = node.field("gender").enumValue(GrammaticalGender.class);
         List<String> forms = node.field("forms").texts();
         node.end();

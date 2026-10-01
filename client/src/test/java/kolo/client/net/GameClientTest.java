@@ -28,6 +28,7 @@ import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.WorldInfo;
+import kolo.protocol.message.YearPhase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -59,7 +60,13 @@ class GameClientTest {
                     events.next(RecordingListener.Lobby.class).lobby().players().getFirst();
             assertThat(game.isMe(me)).isTrue();
             game.startGame();
-            assertThat(TestWorlds.started(events).map().seed()).isEqualTo(11);
+            GameStart start = TestWorlds.started(events);
+            assertThat(start.map().seed()).isEqualTo(11);
+            // Новий світ починається генерацією; «Готово» — переглянув, і настає рік 0.
+            assertThat(start.phase().phase()).isEqualTo(YearPhase.GENERATION);
+            assertThat(start.card().number()).isZero();
+            game.ready(0);
+            events.awaitOrders(0);
             game.ready(0);
             events.awaitOrders(1);
 
@@ -85,7 +92,15 @@ class GameClientTest {
             host.startGame();
 
             GameStart hostStart = TestWorlds.started(hostEvents);
-            assertThat(TestWorlds.started(guestEvents).map()).isEqualTo(hostStart.map());
+            GameStart guestStart = TestWorlds.started(guestEvents);
+            assertThat(guestStart.map()).isEqualTo(hostStart.map());
+            // Кожен отримав картку своєї держави.
+            assertThat(hostStart.card().number()).isZero();
+            assertThat(guestStart.card().number()).isEqualTo(1);
+            host.ready(0);
+            guest.ready(0);
+            hostEvents.awaitOrders(0);
+            guestEvents.awaitOrders(0);
             host.ready(0);
             guest.ready(0);
             hostEvents.awaitOrders(1);
@@ -284,6 +299,22 @@ class GameClientTest {
 
             game.startGame();
             assertThat(TestWorlds.started(events).turn()).isZero();
+            // Генерацію переглядають по черзі, як і рік.
+            game.ready(0);
+            assertThat(game.handoffAfterReady()).hasValue(ihor.player());
+            assertThat(game.showPlayer(ihor.player())).isTrue();
+            assertThat(events.next(RecordingListener.Started.class)
+                            .start()
+                            .card()
+                            .number())
+                    .isEqualTo(1);
+            game.ready(0);
+            events.awaitOrders(0);
+            assertThat(game.handoffAtYearStart()).hasValue(olia.player());
+            assertThat(game.showPlayer(olia.player())).isTrue();
+            if (events.next(RecordingListener.Started.class).start().phase().phase() != YearPhase.ORDERS) {
+                events.awaitOrders(0);
+            }
             assertThat(game.handoffAtYearStart()).isEmpty();
             game.ready(0);
             assertThat(game.handoffAfterReady()).hasValue(ihor.player());
@@ -382,6 +413,8 @@ class GameClientTest {
         ServerMessage.Joined joined = await(game.hostLobby("Оля", seed, NpcShare.FEW, false));
         game.startGame();
         TestWorlds.started(events);
+        game.ready(0);
+        events.awaitOrders(0);
         game.ready(0);
         events.awaitOrders(1);
         game.leave();

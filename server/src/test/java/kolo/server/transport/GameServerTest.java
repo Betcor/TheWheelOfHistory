@@ -157,6 +157,7 @@ class GameServerTest {
             for (TestClient player : players) {
                 assertThat(player.world()).isEqualTo(map);
             }
+            TestClient.passGeneration(host, second, third);
             for (int turn = 0; turn < 4; turn++) {
                 for (TestClient player : players) {
                     player.send(new ClientMessage.Ready(turn));
@@ -195,6 +196,7 @@ class GameServerTest {
                 host.world();
                 guest.next(ServerMessage.Lobby.class);
                 guest.world();
+                TestClient.passGeneration(host, guest);
             }
             // Гість обірвав з'єднання — хост бачить його не на зв'язку.
             assertThat(host.next(ServerMessage.Players.class).players())
@@ -206,6 +208,7 @@ class GameServerTest {
 
                 assertThat(back.next(ServerMessage.Joined.class)).isEqualTo(joined);
                 assertThat(back.map()).isEqualTo(TestServers.map(31, 2, NpcShare.FEW));
+                assertThat(back.card().number()).isEqualTo(1);
                 assertThat(back.phase()).isEqualTo(new ServerMessage.Phase(0, YearPhase.ORDERS));
                 back.next(ServerMessage.Players.class);
                 host.next(ServerMessage.Players.class);
@@ -233,6 +236,7 @@ class GameServerTest {
             host.send(new ClientMessage.StartGame());
             host.world();
             guest.world();
+            TestClient.passGeneration(host, guest);
             host.send(new ClientMessage.Ready(0));
             guest.send(new ClientMessage.Ready(0));
             for (TestClient player : List.of(host, guest)) {
@@ -275,6 +279,8 @@ class GameServerTest {
 
                 for (TestClient player : List.of(host, guest)) {
                     assertThat(player.map()).isEqualTo(TestServers.map(40, 2, NpcShare.FEW));
+                    // Завантажений світ — без генерації: картка й одразу рік.
+                    player.card();
                     player.next(ServerMessage.Players.class);
                     assertThat(player.phase()).isEqualTo(new ServerMessage.Phase(1, YearPhase.START_OF_YEAR));
                     assertThat(player.phase()).isEqualTo(new ServerMessage.Phase(1, YearPhase.ORDERS));

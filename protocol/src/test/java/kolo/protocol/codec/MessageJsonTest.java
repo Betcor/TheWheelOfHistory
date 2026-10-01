@@ -167,6 +167,41 @@ class MessageJsonTest {
     }
 
     @Test
+    void generationPhaseFormatIsFixed() {
+        assertThat(json(MessageJson.write(new ServerMessage.Phase(0, YearPhase.GENERATION))))
+                .isEqualTo("{\"type\":\"phase\",\"turn\":0,\"phase\":\"generation\",\"time_left_millis\":null}");
+    }
+
+    @Test
+    void ownCountryFormatIsFixed() {
+        String full = json(MessageJson.write(new ServerMessage.OwnCountry(TestMessages.card(0, 7))));
+        String secular = json(MessageJson.write(new ServerMessage.OwnCountry(TestMessages.card(1, 7))));
+
+        assertThat(full)
+                .startsWith("{\"type\":\"own_country\",\"card\":{\"number\":0,\"name\":{")
+                .contains(
+                        "\"capital\":794,\"provinces\":87,\"population_k\":6007,"
+                                + "\"ideology\":\"theocracy\",\"sub_ideology\":\"temple_state\",\"religion\":{\"id\":\"rel_3\",")
+                .contains(
+                        "\"holy_center\":391},\"world_religions\":[{\"gender\":\"feminine\",\"forms\":[\"Рід Батая\",")
+                .contains("\"development\":{\"economy\":2,\"military\":0,\"society\":-1,\"energy_science\":1}")
+                .contains("\"nuclear\":\"arsenal\",\"warheads\":12,\"fate_tokens\":0,"
+                        + "\"deposits\":[{\"province\":794,\"resource\":\"fertile_land\"},")
+                .contains("\"backstory_neighbor\":4,\"streaks\":[{\"kind\":\"golden_age\",\"reward\":\"fate_token\"}]")
+                .contains("{\"id\":\"ideology:theocracy:0\",\"source_kind\":\"ideology\",\"source_ref\":\"theocracy\","
+                        + "\"target\":\"stat:stability\",\"value\":10,\"expires_at_turn\":null,"
+                        + "\"description_key\":\"ideology.theocracy\"}")
+                .contains("\"target\":\"wheel:generation_hdi\",\"value\":-3,\"expires_at_turn\":9,")
+                .contains("{\"kind\":\"generation_area\",\"sectors\":[{\"id\":\"small\",\"weight_bp\":2500,"
+                        + "\"tier\":\"partial\",\"quality\":30},")
+                .contains("\"result\":\"large\",\"roll\":7,\"turn\":0,\"season\":\"winter\"}")
+                .endsWith("\"season\":null}]}}");
+        assertThat(secular)
+                .contains("\"religion\":null,")
+                .contains("\"backstory\":[],\"backstory_neighbor\":null,\"streaks\":[],");
+    }
+
+    @Test
     void errorFormatKeepsDetailTypes() {
         ServerMessage.Error error = new ServerMessage.Error(
                 ErrorCode.VALUE_OUT_OF_RANGE, ErrorDetails.of("field", "players", "value", 17, "flag", true));
@@ -242,6 +277,8 @@ class MessageJsonTest {
         }
         messages.add(new ServerMessage.Phase(Integer.MAX_VALUE, YearPhase.ORDERS, OptionalLong.of(Long.MAX_VALUE)));
         messages.add(new ServerMessage.Phase(0, YearPhase.ORDERS, OptionalLong.of(0)));
+        messages.add(new ServerMessage.OwnCountry(TestMessages.card(0, 7)));
+        messages.add(new ServerMessage.OwnCountry(TestMessages.card(1, -7)));
         messages.add(new ServerMessage.Error(
                 ErrorCode.VERSION_MISMATCH,
                 ErrorDetails.of("part", "content", "client", "a'б", "server", Long.MIN_VALUE)));
@@ -421,6 +458,38 @@ class MessageJsonTest {
                 () -> MessageJson.readServer(bytes(json.replaceFirst("\"river\":true", "\"river\":1"))),
                 "cells[0].river",
                 "expected_boolean");
+    }
+
+    @Test
+    void cardIsReadStrictly() {
+        String json = json(MessageJson.write(new ServerMessage.OwnCountry(TestMessages.card(0, 7))));
+
+        assertProblem(
+                () -> MessageJson.readServer(bytes(json.replace("\"stat:stability\"", "\"stat:luck\""))),
+                "card.modifiers[0].target",
+                "unknown_value");
+        assertProblem(
+                () -> MessageJson.readServer(bytes(json.replace("\"economy\":2", "\"magic\":2"))),
+                "card.development.magic",
+                "unknown_value");
+        assertProblem(
+                () -> MessageJson.readServer(bytes(json.replace("\"tier\":\"partial\"", "\"tier\":\"meh\""))),
+                "card.rolls[0].sectors[0].tier",
+                "unknown_value");
+        assertProblem(
+                () -> MessageJson.readServer(
+                        bytes(json.replace("\"holy_center\":391}", "\"holy_center\":391,\"x\":1}"))),
+                "card.religion.x",
+                "unknown_field");
+        // Сектор, що випав, мусить бути серед секторів колеса.
+        assertThat(catchProtocol(() -> MessageJson.readServer(
+                                bytes(json.replace("\"result\":\"large\"", "\"result\":\"huge\""))))
+                        .details())
+                .containsEntry("location", "card.rolls[0]")
+                .containsEntry("cause", "unknown_reference");
+        assertThat(catchProtocol(() -> MessageJson.readServer(bytes(json.replace("\"id\":\"rel_3\"", "\"id\":\"3\""))))
+                        .details())
+                .containsEntry("location", "card.religion.id");
     }
 
     @Test

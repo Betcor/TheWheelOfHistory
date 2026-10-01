@@ -18,6 +18,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.NpcShare;
+import kolo.engine.view.CountryCard;
 import kolo.engine.view.MapView;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
@@ -119,11 +120,35 @@ public final class TestClient implements AutoCloseable {
         return joined;
     }
 
-    /** Одиночна гра: лобі, старт і карта до прийому наказів року 0. */
+    /** Одиночна гра: лобі, старт, карта й генерація до прийому наказів року 0. */
     public MapView solo(long seed, NpcShare npcShare) throws InterruptedException {
         createLobby("Хост", seed, npcShare);
         send(new ClientMessage.StartGame());
-        return world();
+        MapView map = world();
+        passGeneration(this);
+        return map;
+    }
+
+    /** Картка своєї держави — після карти. */
+    public CountryCard card() throws InterruptedException {
+        return next(ServerMessage.OwnCountry.class).card();
+    }
+
+    /**
+     * Гравці нового світу у фазі генерації ({@link #world()}) натискають «Готово» й чекають прийому наказів року 0:
+     * кожен бачить список гравців після «Готово» кожного, крім останнього, потім — початок року.
+     */
+    public static void passGeneration(TestClient... players) throws InterruptedException {
+        for (TestClient player : players) {
+            player.send(new ClientMessage.Ready(0));
+        }
+        for (TestClient player : players) {
+            for (int i = 0; i < players.length; i++) {
+                player.next(ServerMessage.Players.class);
+            }
+            player.expectPhase(0, YearPhase.START_OF_YEAR);
+            player.expectPhase(0, YearPhase.ORDERS);
+        }
     }
 
     /** Наступне повідомлення — фаза року. */
@@ -135,12 +160,12 @@ public final class TestClient implements AutoCloseable {
         return phase;
     }
 
-    /** Карта нового світу, гравці й фази його першого року — до прийому наказів. */
+    /** Карта нового світу, картка своєї держави, гравці й фаза генерації ({@link #passGeneration}). */
     public MapView world() throws InterruptedException {
         MapView map = map();
+        card();
         next(ServerMessage.Players.class);
-        expectPhase(0, YearPhase.START_OF_YEAR);
-        expectPhase(0, YearPhase.ORDERS);
+        expectPhase(0, YearPhase.GENERATION);
         return map;
     }
 

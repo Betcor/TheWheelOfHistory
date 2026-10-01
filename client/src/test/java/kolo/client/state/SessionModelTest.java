@@ -11,6 +11,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import kolo.client.map.TestMaps;
 import kolo.client.net.GameStart;
+import kolo.client.net.TestCards;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.TurnTimer;
@@ -42,7 +43,7 @@ class SessionModelTest {
         List<GameStart> started = new ArrayList<>();
         model.setOnGameStarted(started::add);
         model.lobby(lobby());
-        GameStart start = new GameStart(TestMaps.MAP, new ServerMessage.Phase(3, YearPhase.ORDERS));
+        GameStart start = new GameStart(TestMaps.MAP, TestCards.CARD, new ServerMessage.Phase(3, YearPhase.ORDERS));
 
         model.gameStarted(start);
         runQueued();
@@ -73,8 +74,8 @@ class SessionModelTest {
 
     @Test
     void ordersDeadlineCountsFromReceiving() {
-        model.gameStarted(
-                new GameStart(TestMaps.MAP, new ServerMessage.Phase(2, YearPhase.ORDERS, OptionalLong.of(90_000))));
+        model.gameStarted(new GameStart(
+                TestMaps.MAP, TestCards.CARD, new ServerMessage.Phase(2, YearPhase.ORDERS, OptionalLong.of(90_000))));
         runQueued();
 
         assertThat(model.ordersDeadline().get()).isEqualTo(NOW.plusSeconds(90));

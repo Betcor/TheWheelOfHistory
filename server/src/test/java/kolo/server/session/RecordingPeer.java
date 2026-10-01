@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import kolo.engine.view.CountryCard;
 import kolo.engine.view.MapView;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.ServerMessage;
@@ -73,6 +74,45 @@ final class RecordingPeer implements Peer {
             map = assembler.add((ServerMessage.MapCells) next());
         }
         return map.orElseThrow();
+    }
+
+    /** Картка своєї держави — після карти. */
+    CountryCard card() throws InterruptedException {
+        return next(ServerMessage.OwnCountry.class).card();
+    }
+
+    /** Новий світ: список гравців і фаза генерації року 0. */
+    void expectGeneration() throws InterruptedException {
+        players();
+        expectPhase(0, YearPhase.GENERATION);
+    }
+
+    /**
+     * Гравці нового світу, що щойно отримали карту, картку й фазу генерації, переглядають її: кожен натискає «Готово»,
+     * і починається рік 0.
+     */
+    static void passGeneration(SessionActor session, RecordingPeer... peers) throws InterruptedException {
+        for (int i = 0; i < peers.length; i++) {
+            session.ready(peers[i], 0);
+            if (i + 1 < peers.length) {
+                for (RecordingPeer peer : peers) {
+                    peer.players();
+                }
+            }
+        }
+        for (RecordingPeer peer : peers) {
+            peer.expectOrders(0);
+        }
+    }
+
+    /** Початок нового світу для всіх гравців: карта, картка, генерація, рік 0. */
+    static void enterNewWorld(SessionActor session, RecordingPeer... peers) throws InterruptedException {
+        for (RecordingPeer peer : peers) {
+            peer.map();
+            peer.card();
+            peer.expectGeneration();
+        }
+        passGeneration(session, peers);
     }
 
     ServerMessage.Phase phase() throws InterruptedException {

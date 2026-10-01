@@ -63,10 +63,7 @@ class SessionActorLoadTest {
         guest.lobby();
         host.lobby();
         session.start(host);
-        for (RecordingPeer peer : List.of(host, guest)) {
-            peer.map();
-            peer.expectOrders(0);
-        }
+        RecordingPeer.enterNewWorld(session, host, guest);
         session.leave(guest);
         host.players();
         for (int turn = 0; turn < 2; turn++) {
@@ -102,6 +99,8 @@ class SessionActorLoadTest {
         session.start(host);
 
         assertThat(host.map()).isEqualTo(TestServers.map(11, 2, NpcShare.FEW));
+
+        host.card();
         host.expectOrders(2);
         session.ready(host, 2);
         host.expectYear(2);
@@ -140,6 +139,7 @@ class SessionActorLoadTest {
 
         session.start(host);
         host.map();
+        host.card();
         host.expectOrders(2);
         leaveAndAwait(session, host);
         try (WorldStore store = WorldStore.open(dir.resolve(WORLD + WorldStore.EXTENSION))) {
@@ -236,6 +236,7 @@ class SessionActorLoadTest {
         guest.lobby();
         session.start(host);
         guest.map();
+        guest.card();
         guest.expectOrders(2);
         session.close();
     }
@@ -306,6 +307,7 @@ class SessionActorLoadTest {
                         new PlayerInfo(2, "Ігор", true, true, false, OptionalInt.of(1)));
         session.start(guest);
         guest.map();
+        guest.card();
         guest.expectOrders(2);
         leaveAndAwait(session, guest);
     }
@@ -318,8 +320,7 @@ class SessionActorLoadTest {
         host.joined();
         host.lobby();
         session.start(host);
-        host.map();
-        host.expectOrders(0);
+        RecordingPeer.enterNewWorld(session, host);
         Path file = dir.resolve("world-12" + WorldStore.EXTENSION);
 
         assertThat(worlds.inUse(file)).isTrue();

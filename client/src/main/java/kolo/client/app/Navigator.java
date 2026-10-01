@@ -24,6 +24,13 @@ public interface Navigator {
     void showMap(MapLayers layers, GameStart start);
 
     /**
+     * Генерація держави гравця (GD §4.12) — новий світ у фазі генерації; після «Готово» — карта.
+     *
+     * @param start вхід у гру: картка держави й фаза генерації
+     */
+    void showGeneration(MapLayers layers, GameStart start);
+
+    /**
      * Hot-seat: карту сховано, комп'ютер передають наступному гравцеві.
      *
      * @param player номер гравця, якому передають комп'ютер

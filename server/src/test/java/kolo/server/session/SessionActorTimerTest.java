@@ -169,6 +169,7 @@ class SessionActorTimerTest {
 
         back.joined();
         back.map();
+        back.card();
         assertThat(back.phase()).isEqualTo(orders(0, Duration.ofSeconds(70)));
         session.close();
     }
@@ -224,6 +225,7 @@ class SessionActorTimerTest {
         assertThat(back.lobby().setup().timer()).isEqualTo(LIVE_2);
         loaded.start(back);
         back.map();
+        back.card();
         back.players();
         back.expectPhase(0, YearPhase.START_OF_YEAR);
 
@@ -249,6 +251,7 @@ class SessionActorTimerTest {
         back.lobby();
         loaded.start(back);
         back.map();
+        back.card();
         back.players();
         back.expectPhase(0, YearPhase.START_OF_YEAR);
 
@@ -296,6 +299,16 @@ class SessionActorTimerTest {
         session.start(host);
         for (RecordingPeer peer : List.of(host, guest)) {
             peer.map();
+            peer.card();
+            peer.expectGeneration();
+        }
+        // Поки гравці дивляться генерацію, час року не йде: межа — від початку року.
+        clock.advance(Duration.ofMinutes(10));
+        session.ready(host, 0);
+        host.players();
+        guest.players();
+        session.ready(guest, 0);
+        for (RecordingPeer peer : List.of(host, guest)) {
             peer.players();
             peer.expectPhase(0, YearPhase.START_OF_YEAR);
             ServerMessage.Phase orders = peer.phase();

@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
+import kolo.engine.state.WorldState;
+import kolo.engine.view.CountryCards;
 import kolo.engine.view.MapView;
 import kolo.protocol.Protocol;
 import kolo.protocol.codec.MessageJson;
@@ -17,6 +19,7 @@ import kolo.protocol.message.Handshake;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.ServerMessage;
+import kolo.server.session.NewWorlds;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +51,22 @@ class ProtocolMapIntegrationTest {
 
         // Запас учетверо: форма комірок і довші назви не мусять упертися в межу фрейму.
         assertThat(largest).isLessThan(Protocol.MAX_FRAME_BYTES / 4);
+    }
+
+    @Test
+    void everyPlayerCardOfARealWorldCrossesTheWire() {
+        for (long seed = 0; seed < 4; seed++) {
+            int players = 1 + (int) (seed * 3 % WorldLimits.MAX_PLAYERS);
+            WorldState world = NewWorlds.generate(TestServers.CONTENT, seed, players, NpcShare.NORMAL);
+            for (int number = 0; number < players; number++) {
+                ServerMessage message = new ServerMessage.OwnCountry(CountryCards.of(world, number));
+                byte[] json = MessageJson.write(message);
+
+                assertThat(MessageJson.readServer(json)).isEqualTo(message);
+                // Картка — одним фреймом, із великим запасом.
+                assertThat(json.length).isLessThan(Protocol.MAX_FRAME_BYTES / 16);
+            }
+        }
     }
 
     @Test

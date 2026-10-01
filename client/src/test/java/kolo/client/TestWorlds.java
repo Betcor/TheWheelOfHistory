@@ -33,6 +33,11 @@ public final class TestWorlds {
 
     /** Світ із {@code players} гравцями, як його отримує хост. */
     public static MapView world(long seed, int players, NpcShare share) {
+        return start(seed, players, share).map();
+    }
+
+    /** Вхід хоста в новий світ із {@code players} гравцями: карта, картка його держави, фаза генерації. */
+    public static GameStart start(long seed, int players, NpcShare share) {
         List<ServerConnection> connections = new ArrayList<>();
         try {
             RecordingListener host = new RecordingListener();
@@ -46,7 +51,7 @@ public final class TestWorlds {
                 await(guest.joinLobby(session, "Гравець " + n));
             }
             hostConnection.startGame();
-            return host.next(RecordingListener.Started.class).start().map();
+            return host.next(RecordingListener.Started.class).start();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
