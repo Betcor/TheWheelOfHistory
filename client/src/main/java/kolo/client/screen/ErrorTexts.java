@@ -4,6 +4,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import kolo.client.i18n.Texts;
 import kolo.client.net.ConnectionClosedException;
+import kolo.client.net.LanSearchUnavailableException;
 import kolo.client.net.LanUnavailableException;
 import kolo.client.net.ServerErrorException;
 import kolo.engine.error.GameException;
@@ -14,7 +15,7 @@ public final class ErrorTexts {
     private ErrorTexts() {}
 
     /**
-     * @return текст помилки сервера чи гри за кодом; розрив — «зв'язок втрачено»; зайнятий порт LAN — про порт; інше —
+     * @return текст помилки сервера чи гри за кодом; розрив — «зв'язок втрачено»; зайнятий порт LAN — про порт; недоступний пошук у мережі — про адресу; інше —
      *     неочікувана помилка (баг клієнта, її треба ще й записати в лог)
      */
     public static String of(Texts texts, Throwable error) {
@@ -24,6 +25,7 @@ public final class ErrorTexts {
             case GameException game -> texts.error(game.code(), game.details());
             case ConnectionClosedException closed -> texts.text("app.error.connection_lost");
             case LanUnavailableException lan -> texts.text("app.error.lan_unavailable", lan.port());
+            case LanSearchUnavailableException search -> texts.text("app.error.lan_search_unavailable");
             default -> texts.text("app.error.unexpected");
         };
     }
@@ -34,7 +36,8 @@ public final class ErrorTexts {
         return cause instanceof ServerErrorException
                 || cause instanceof GameException
                 || cause instanceof ConnectionClosedException
-                || cause instanceof LanUnavailableException;
+                || cause instanceof LanUnavailableException
+                || cause instanceof LanSearchUnavailableException;
     }
 
     /** Справжня причина без обгорток {@code CompletableFuture}. */

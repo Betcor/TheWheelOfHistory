@@ -23,5 +23,11 @@ public final class Protocol {
      */
     public static final int DEFAULT_PORT = 19_700;
 
+    /**
+     * UDP-порт пошуку гри в локальній мережі ({@link kolo.protocol.discovery.DiscoveryPacket}): сталий, бо клієнт
+     * питає, ще не знаючи жодного сервера. TCP-порт гри сервер називає у відповіді.
+     */
+    public static final int DISCOVERY_PORT = 19_700;
+
     private Protocol() {}
 }

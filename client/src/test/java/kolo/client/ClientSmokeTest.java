@@ -11,6 +11,7 @@ import kolo.client.map.MapLayers;
 import kolo.client.map.MapMode;
 import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
+import kolo.client.net.LanPorts;
 import kolo.client.net.RecordingListener;
 import kolo.client.screen.ProvinceDescription;
 import kolo.engine.state.NpcShare;
@@ -36,7 +37,7 @@ class ClientSmokeTest {
         RecordingListener events = new RecordingListener();
         ExecutorService background = Executors.newSingleThreadExecutor();
         MapView view;
-        try (GameClient game = GameClient.start(worlds, 0, events, background)) {
+        try (GameClient game = GameClient.start(worlds, LanPorts.ANY, events, background)) {
             await(game.hostLobby(texts.text("new_world.nickname_default"), 42, NpcShare.NORMAL, false));
             game.startGame();
             GameStart start = TestWorlds.started(events);

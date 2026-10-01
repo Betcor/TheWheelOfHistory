@@ -16,6 +16,8 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import kolo.client.i18n.Texts;
+import kolo.client.net.LanLobbies;
+import kolo.client.net.RemoteLobby;
 import kolo.client.net.ServerAddress;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.LobbyInfo;
@@ -23,9 +25,9 @@ import kolo.protocol.message.Nicknames;
 import kolo.protocol.message.WorldInfo;
 
 /**
- * Підключення до гри в локальній мережі чи на окремому сервері (GD §21): адреса, нікнейм, список відкритих лобі й
- * приєднання до обраного (зі збереженим токеном цього світу — на своє місце), а також світи з теки сервера: обраний
- * завантажується в нове лобі, якщо на диску є токен місця в ньому.
+ * Підключення до гри в локальній мережі чи на окремому сервері (GD §21): пошук відкритих лобі в мережі або за адресою,
+ * нікнейм і приєднання до обраного лобі (зі збереженим токеном цього світу — на своє місце), а також світи з теки
+ * сервера за адресою: обраний завантажується в нове лобі, якщо на диску є токен місця в ньому.
  */
 public final class ConnectScreen {
 
@@ -40,9 +42,11 @@ public final class ConnectScreen {
         form.addRow(0, new Label(texts.text("connect.address")), address);
         form.addRow(1, new Label(texts.text("connect.nickname")), nickname);
 
-        ListView<LobbyInfo> lobbies = new ListView<>();
+        ListView<RemoteLobby> lobbies = new ListView<>();
         lobbies.setPrefHeight(200);
-        lobbies.setPlaceholder(new Label(texts.text("connect.none")));
+        Label noLobbies = new Label();
+        noLobbies.setWrapText(true);
+        lobbies.setPlaceholder(noLobbies);
         lobbies.setCellFactory(list -> new LobbyCell(texts));
         lobbies.setVisible(false);
         ListView<WorldInfo> worlds = new ListView<>();
@@ -53,6 +57,9 @@ public final class ConnectScreen {
         Label worldsTitle = new Label(texts.text("connect.worlds"));
         worldsTitle.visibleProperty().bind(worlds.visibleProperty());
 
+        Label note = new Label();
+        note.getStyleClass().add("text-muted");
+        note.setWrapText(true);
         Label error = new Label();
         error.getStyleClass().add("danger");
         error.setWrapText(true);
@@ -63,8 +70,9 @@ public final class ConnectScreen {
         Button back = new Button(texts.text("connect.back"));
         back.setCancelButton(true);
         back.setOnAction(event -> context.navigator().showMainMenu());
+        Button searchLan = new Button(texts.text("connect.search_lan"));
+        searchLan.setDefaultButton(true);
         Button find = new Button(texts.text("connect.find"));
-        find.setDefaultButton(true);
         Button join = new Button(texts.text("connect.join"));
         join.disableProperty()
                 .bind(lobbies.getSelectionModel().selectedItemProperty().isNull());
@@ -81,7 +89,9 @@ public final class ConnectScreen {
                 return;
             }
             error.setText("");
+            note.setText("");
             find.setDisable(true);
+            searchLan.setDisable(true);
             progress.setVisible(true);
             UiFutures.onUi(
                     context.game()
@@ -90,16 +100,51 @@ public final class ConnectScreen {
                                     context.game().findWorlds(target).thenApply(saved -> new Found(found, saved))),
                     texts,
                     found -> {
-                        lobbies.getItems().setAll(found.lobbies());
+                        noLobbies.setText(texts.text("connect.none"));
+                        lobbies.getItems()
+                                .setAll(found.lobbies().stream()
+                                        .map(lobby -> new RemoteLobby(target, lobby))
+                                        .toList());
                         lobbies.setVisible(true);
                         worlds.getItems().setAll(found.worlds());
                         worlds.setVisible(true);
                         find.setDisable(false);
+                        searchLan.setDisable(false);
                         progress.setVisible(false);
                     },
                     message -> {
                         error.setText(message);
                         find.setDisable(false);
+                        searchLan.setDisable(false);
+                        progress.setVisible(false);
+                    });
+        });
+
+        searchLan.setOnAction(event -> {
+            error.setText("");
+            note.setText("");
+            find.setDisable(true);
+            searchLan.setDisable(true);
+            progress.setVisible(true);
+            UiFutures.onUi(
+                    context.game().findLanLobbies(),
+                    texts,
+                    found -> {
+                        noLobbies.setText(texts.text("connect.lan_none"));
+                        lobbies.getItems().setAll(found.lobbies());
+                        lobbies.setVisible(true);
+                        // Світи з теки — лише в сервера за адресою: у мережі їх може бути кілька.
+                        worlds.getItems().clear();
+                        worlds.setVisible(false);
+                        note.setText(incompatible(texts, found));
+                        find.setDisable(false);
+                        searchLan.setDisable(false);
+                        progress.setVisible(false);
+                    },
+                    message -> {
+                        error.setText(message);
+                        find.setDisable(false);
+                        searchLan.setDisable(false);
                         progress.setVisible(false);
                     });
         });
@@ -110,7 +155,7 @@ public final class ConnectScreen {
                 error.setText(texts.text("new_world.nickname_invalid", Nicknames.MAX_LENGTH));
                 return;
             }
-            LobbyInfo chosen = lobbies.getSelectionModel().getSelectedItem();
+            RemoteLobby chosen = lobbies.getSelectionModel().getSelectedItem();
             error.setText("");
             context.session().reset();
             progress.setVisible(true);
@@ -144,17 +189,22 @@ public final class ConnectScreen {
                     });
         });
 
-        HBox buttons = new HBox(10, back, find, join, load, progress);
+        HBox buttons = new HBox(10, back, searchLan, find, join, load, progress);
         buttons.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(texts.text("connect.title"));
         title.getStyleClass().add("title-2");
-        VBox box = new VBox(18, title, form, lobbies, worldsTitle, worlds, buttons, error);
+        VBox box = new VBox(18, title, form, lobbies, note, worldsTitle, worlds, buttons, error);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(24));
         box.setMaxWidth(560);
         VBox outer = new VBox(box);
         outer.setAlignment(Pos.CENTER);
         return outer;
+    }
+
+    /** Примітка про знайдені ігри іншої версії; порожньо, якщо таких немає. */
+    private static String incompatible(Texts texts, LanLobbies found) {
+        return found.incompatible() == 0 ? "" : texts.text("connect.lan_incompatible", found.incompatible());
     }
 
     /** Що знайшлося на сервері. */
@@ -174,7 +224,7 @@ public final class ConnectScreen {
         }
     }
 
-    private static final class LobbyCell extends ListCell<LobbyInfo> {
+    private static final class LobbyCell extends ListCell<RemoteLobby> {
         private final Texts texts;
 
         LobbyCell(Texts texts) {
@@ -182,16 +232,9 @@ public final class ConnectScreen {
         }
 
         @Override
-        protected void updateItem(LobbyInfo item, boolean empty) {
+        protected void updateItem(RemoteLobby item, boolean empty) {
             super.updateItem(item, empty);
-            setText(
-                    empty || item == null
-                            ? null
-                            : texts.text(
-                                    "connect.lobby",
-                                    item.host(),
-                                    item.players(),
-                                    LobbyLabels.setup(texts, item.setup())));
+            setText(empty || item == null ? null : LobbyLabels.remote(texts, item));
         }
     }
 }

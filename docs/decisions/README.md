@@ -53,3 +53,4 @@
 | [0047](0047-zavantazhennia-svitu.md) | Завантаження світу, місця гравців | `WorldDirectory`, `TokenStore`, `LoadScreen` |
 | [0048](0048-taimery-khodu.md) | Таймери ходу, «Завершити рік», автопілот | `TurnTimer`, `SessionActor`, `SessionClock`, `WorldStore.timer` |
 | [0049](0049-vidnovlennia-z-pauzy.md) | Відновлення сесії з паузи хостом | `SessionActor.resume`, `YearPhase.PAUSED`, `MapScreen` |
+| [0050](0050-poshuk-u-lokalnii-merezhi.md) | Пошук гри в локальній мережі (UDP) | `DiscoveryPackets`, `DiscoveryResponder`, `LanSearch`, `GameClient.findLanLobbies` |

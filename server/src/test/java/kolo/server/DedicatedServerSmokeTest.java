@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
+import java.util.OptionalInt;
 import kolo.engine.state.NpcShare;
 import kolo.server.persistence.WorldStore;
 import kolo.server.transport.GameServer;
@@ -21,8 +22,8 @@ class DedicatedServerSmokeTest {
     @Test
     @Timeout(60)
     void servesWorldOverTcp() throws Exception {
-        try (GameServer server =
-                DedicatedServerMain.start(TestServers.CONTENT, new DedicatedServerMain.Options(0, worlds))) {
+        try (GameServer server = DedicatedServerMain.start(
+                TestServers.CONTENT, new DedicatedServerMain.Options(0, worlds, OptionalInt.empty()))) {
             InetSocketAddress address = server.bindTcp(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
             try (TestClient client = TestClient.welcomed(address, TestServers.CONTENT.hash())) {
                 assertThat(client.solo(1970, NpcShare.NORMAL).cells()).isNotEmpty();

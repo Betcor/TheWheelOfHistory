@@ -3,12 +3,15 @@ package kolo.client.net;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import kolo.engine.error.ErrorCode;
+import kolo.engine.error.VersionMismatchException;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.TurnTimer;
 import kolo.protocol.Protocol;
@@ -34,7 +37,7 @@ public final class GameClient implements AutoCloseable {
     private static final String WORLDS = "worlds";
 
     private final EmbeddedServer server;
-    private final int lanPort;
+    private final LanPorts lanPorts;
     private final TokenStore tokens;
     private final SessionListener listener;
     private final Executor background;
@@ -42,31 +45,38 @@ public final class GameClient implements AutoCloseable {
     private SocketAddress address;
     private CurrentListener current;
     private ServerMessage.Joined credentials;
-    private InetSocketAddress lan;
+    private LanAddresses lan;
 
     private GameClient(
-            EmbeddedServer server, int lanPort, TokenStore tokens, SessionListener listener, Executor background) {
+            EmbeddedServer server,
+            LanPorts lanPorts,
+            TokenStore tokens,
+            SessionListener listener,
+            Executor background) {
         this.server = server;
-        this.lanPort = lanPort;
+        this.lanPorts = Objects.requireNonNull(lanPorts, "lanPorts");
         this.tokens = Objects.requireNonNull(tokens, "tokens");
         this.listener = Objects.requireNonNull(listener, "listener");
         this.background = Objects.requireNonNull(background, "background");
     }
 
-    /** Гра з типовою домашньою текою ({@link EmbeddedServer#defaultHome()}); LAN — на порту {@value Protocol#DEFAULT_PORT}. */
+    /**
+     * Гра з типовою домашньою текою ({@link EmbeddedServer#defaultHome()}); LAN — на порту {@value
+     * Protocol#DEFAULT_PORT}, пошук — на UDP-порту {@value Protocol#DISCOVERY_PORT}.
+     */
     public static GameClient start(SessionListener listener, Executor background) {
-        return start(EmbeddedServer.defaultHome(), Protocol.DEFAULT_PORT, listener, background);
+        return start(EmbeddedServer.defaultHome(), LanPorts.DEFAULT, listener, background);
     }
 
     /**
      * @param home домашня тека гри: у ній тека світів вбудованого сервера ({@code worlds}) і токени гравця ({@link
      *     TokenStore#FILE_NAME})
-     * @param lanPort порт гри для локальної мережі; 0 — будь-який вільний
+     * @param lanPorts порти гри й пошуку в локальній мережі
      */
-    public static GameClient start(Path home, int lanPort, SessionListener listener, Executor background) {
+    public static GameClient start(Path home, LanPorts lanPorts, SessionListener listener, Executor background) {
         TokenStore tokens = new TokenStore(home.resolve(TokenStore.FILE_NAME));
         return new GameClient(
-                EmbeddedServer.startWithBundledContent(home.resolve(WORLDS)), lanPort, tokens, listener, background);
+                EmbeddedServer.startWithBundledContent(home.resolve(WORLDS)), lanPorts, tokens, listener, background);
     }
 
     /**
@@ -136,6 +146,75 @@ public final class GameClient implements AutoCloseable {
         return connection(address).thenCompose(ServerConnection::lobbies);
     }
 
+    /**
+     * Шукає ігри в локальній мережі ({@link LanSearch} на порту пошуку цього клієнта) і збирає їхні відкриті лобі:
+     * з кожною сумісною грою — коротке окреме з'єднання лише заради списку, поточне з'єднання не змінюється. Гра, що
+     * відповіла на пошук, але не на з'єднання (вже закрилася), пропускається.
+     *
+     * @throws LanSearchUnavailableException (у future) якщо пошук неможливий
+     */
+    public CompletableFuture<LanLobbies> findLanLobbies() {
+        return findLanLobbies(new LanSearch(lanPorts.discovery(), LanSearch.WAIT));
+    }
+
+    /** Те саме з заданим пошуком. */
+    CompletableFuture<LanLobbies> findLanLobbies(LanSearch search) {
+        CompletableFuture<List<LanHost>> hosts = CompletableFuture.supplyAsync(search::find, background);
+        CompletableFuture<String> hash = CompletableFuture.supplyAsync(server::contentHash, background);
+        return hosts.thenCombine(hash, Found::new).thenCompose(found -> {
+            List<CompletableFuture<HostLobbies>> asked = new ArrayList<>();
+            for (LanHost host : found.hosts()) {
+                asked.add(
+                        host.version() == Protocol.VERSION
+                                ? lobbiesOf(host.server(), found.hash())
+                                : CompletableFuture.completedFuture(HostLobbies.INCOMPATIBLE));
+            }
+            return CompletableFuture.allOf(asked.toArray(CompletableFuture[]::new))
+                    .thenApply(done -> {
+                        List<RemoteLobby> lobbies = new ArrayList<>();
+                        int incompatible = 0;
+                        for (CompletableFuture<HostLobbies> one : asked) {
+                            HostLobbies result = one.join();
+                            lobbies.addAll(result.lobbies());
+                            incompatible += result.incompatible() ? 1 : 0;
+                        }
+                        return new LanLobbies(lobbies, incompatible);
+                    });
+        });
+    }
+
+    /** Лобі однієї гри через окреме з'єднання, яке одразу закривається. */
+    private static CompletableFuture<HostLobbies> lobbiesOf(InetSocketAddress address, String hash) {
+        return ServerConnection.connect(address, hash, SessionListener.NONE)
+                .thenCompose(connection -> connection.lobbies().whenComplete((lobbies, error) -> connection.close()))
+                .thenApply(lobbies -> new HostLobbies(
+                        lobbies.stream()
+                                .map(lobby -> new RemoteLobby(address, lobby))
+                                .toList(),
+                        false))
+                .exceptionally(error -> incompatible(error) ? HostLobbies.INCOMPATIBLE : HostLobbies.NONE);
+    }
+
+    /** Чи з'єднання не вдалося через іншу версію протоколу чи контенту — на боці клієнта чи сервера. */
+    private static boolean incompatible(Throwable error) {
+        Throwable cause = error;
+        while (cause instanceof CompletionException && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause instanceof VersionMismatchException
+                || (cause instanceof ServerErrorException server
+                        && server.error().code() == ErrorCode.VERSION_MISMATCH);
+    }
+
+    /**
+     * Входить у лобі на сервері за його адресою (зі списку {@link #findLobbies} чи {@link #findLanLobbies}): з
+     * поточним з'єднанням, якщо воно з тим самим сервером, інакше — з новим. Далі — як {@link #joinLobby(LobbyInfo,
+     * String)}.
+     */
+    public CompletableFuture<ServerMessage.Joined> joinLobby(RemoteLobby lobby, String nickname) {
+        return connection(lobby.server()).thenCompose(open -> join(open, lobby.lobby(), nickname));
+    }
+
     /** Приєднується до лобі на сервері поточного з'єднання ({@link #findLobbies}). */
     public CompletableFuture<ServerMessage.Joined> joinLobby(long session, String nickname) {
         ServerConnection open = open();
@@ -154,6 +233,10 @@ public final class GameClient implements AutoCloseable {
         if (open == null) {
             return CompletableFuture.failedFuture(new ConnectionClosedException("немає з'єднання з сервером"));
         }
+        return join(open, lobby, nickname);
+    }
+
+    private CompletableFuture<ServerMessage.Joined> join(ServerConnection open, LobbyInfo lobby, String nickname) {
         Optional<PlayerToken> seat = tokens.find(lobby.world());
         if (seat.isEmpty()) {
             return joinLobby(lobby.session(), nickname);
@@ -251,8 +334,8 @@ public final class GameClient implements AutoCloseable {
         return credentials().map(joined -> joined.player() == player.number()).orElse(false);
     }
 
-    /** Адреса гри в локальній мережі, якщо її відкрито. */
-    public synchronized Optional<InetSocketAddress> lanAddress() {
+    /** Адреси гри в локальній мережі, якщо її відкрито. */
+    public synchronized Optional<LanAddresses> lanAddress() {
         return Optional.ofNullable(lan);
     }
 
@@ -281,12 +364,13 @@ public final class GameClient implements AutoCloseable {
                 return;
             }
         }
-        InetSocketAddress bound;
+        LanAddresses bound;
         try {
-            bound = server.openLan(new InetSocketAddress(lanPort));
+            InetSocketAddress game = server.openLan(new InetSocketAddress(lanPorts.game()), lanPorts.discovery());
+            bound = new LanAddresses(game, server.discoveryAddress());
         } catch (Exception e) {
             // Netty кидає й перевірювані винятки без оголошення (BindException — порт зайнятий).
-            throw new LanUnavailableException(lanPort, e);
+            throw new LanUnavailableException(lanPorts.game(), e);
         }
         synchronized (this) {
             lan = bound;
@@ -357,6 +441,15 @@ public final class GameClient implements AutoCloseable {
 
     private synchronized ServerConnection open() {
         return connection != null && connection.isOpen() ? connection : null;
+    }
+
+    /** Що знайшов пошук і хеш контенту клієнта для привітання. */
+    private record Found(List<LanHost> hosts, String hash) {}
+
+    /** Лобі однієї гри з пошуку. */
+    private record HostLobbies(List<RemoteLobby> lobbies, boolean incompatible) {
+        static final HostLobbies NONE = new HostLobbies(List.of(), false);
+        static final HostLobbies INCOMPATIBLE = new HostLobbies(List.of(), true);
     }
 
     /** Слухач одного з'єднання: передає події, доки це з'єднання поточне. */

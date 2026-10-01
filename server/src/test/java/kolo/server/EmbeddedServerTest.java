@@ -8,6 +8,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import kolo.engine.state.NpcShare;
+import kolo.protocol.Protocol;
+import kolo.protocol.discovery.DiscoveryPacket;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.ServerMessage;
 import kolo.server.persistence.WorldDirectory;
@@ -49,7 +51,7 @@ class EmbeddedServerTest {
     @Test
     void lanGameIsReachableOverTcp() throws Exception {
         try (EmbeddedServer server = EmbeddedServer.startWithBundledContent(worlds)) {
-            InetSocketAddress lan = server.openLan(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+            InetSocketAddress lan = server.openLan(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             try (TestClient host = TestClient.welcomed(server.address(), server.contentHash());
                     TestClient guest = TestClient.welcomed(lan, server.contentHash())) {
                 long session = host.createLobby("Оля", 43, NpcShare.FEW).session();
@@ -58,6 +60,36 @@ class EmbeddedServerTest {
 
                 assertThat(guest.next(ServerMessage.Joined.class).session()).isEqualTo(session);
                 assertThat(guest.next(ServerMessage.Lobby.class).players()).hasSize(2);
+            }
+        }
+    }
+
+    @Test
+    void lanGameAnswersDiscovery() throws Exception {
+        try (EmbeddedServer server = EmbeddedServer.startWithBundledContent(worlds)) {
+            assertThat(server.discoveryAddress()).isEmpty();
+
+            InetSocketAddress lan = server.openLan(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+
+            assertThat(TestDiscovery.ask(server.discoveryAddress().orElseThrow(), Protocol.VERSION))
+                    .contains(new DiscoveryPacket.Reply(Protocol.VERSION, lan.getPort()));
+        }
+    }
+
+    @Test
+    void lanGameOpensWithoutDiscoveryWhenItsPortIsTaken() throws Exception {
+        try (EmbeddedServer first = EmbeddedServer.startWithBundledContent(worlds);
+                EmbeddedServer second = EmbeddedServer.startWithBundledContent(worlds)) {
+            InetSocketAddress loopback = new InetSocketAddress(InetAddress.getLoopbackAddress(), 0);
+            first.openLan(loopback, 0);
+            int taken = first.discoveryAddress().orElseThrow().getPort();
+
+            InetSocketAddress lan = second.openLan(loopback, taken);
+
+            assertThat(second.discoveryAddress()).isEmpty();
+            try (TestClient guest = TestClient.welcomed(lan, second.contentHash())) {
+                guest.send(new ClientMessage.ListLobbies());
+                assertThat(guest.next(ServerMessage.Lobbies.class).lobbies()).isEmpty();
             }
         }
     }

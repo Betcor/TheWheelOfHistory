@@ -4,12 +4,15 @@ import io.netty.channel.local.LocalAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.function.Supplier;
 import kolo.content.loader.ContentLoader;
 import kolo.engine.content.ContentPack;
 import kolo.server.persistence.WorldDirectory;
 import kolo.server.session.LazyContent;
 import kolo.server.transport.GameServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Вбудований сервер для одиночної гри, hot-seat і LAN-хоста: той самий {@link GameServer}, що й окремий, але
@@ -21,9 +24,12 @@ import kolo.server.transport.GameServer;
  */
 public final class EmbeddedServer implements AutoCloseable {
 
+    private static final Logger LOG = LoggerFactory.getLogger(EmbeddedServer.class);
+
     private final Supplier<ContentPack> content;
     private final GameServer server;
     private final LocalAddress address;
+    private InetSocketAddress discovery;
 
     private EmbeddedServer(Supplier<ContentPack> content, Path worlds) {
         this.content = new LazyContent(content);
@@ -59,15 +65,35 @@ public final class EmbeddedServer implements AutoCloseable {
     }
 
     /**
-     * Відкриває гру для локальної мережі (LAN-хост): сервер слухає ще й TCP. Повторний виклик відкриває ще одну адресу.
+     * Відкриває гру для локальної мережі (LAN-хост): сервер слухає ще й TCP і відповідає на UDP-пошук ({@link
+     * #discoveryAddress()}). Порт пошуку недоступний (зайнятий іншою грою на цьому комп'ютері) — не помилка: гра
+     * відкрита, до неї підключаються за адресою. Повторний виклик відкриває ще одну адресу.
      *
-     * @param address адреса й порт; порт 0 — будь-який вільний
-     * @return справжня адреса, зокрема обраний порт
-     * @throws Exception (Netty кидає без оголошення, зокрема {@link java.net.BindException}) якщо порт зайнятий чи
+     * @param address адреса й порт гри; порт 0 — будь-який вільний
+     * @param discoveryPort UDP-порт пошуку ({@link kolo.protocol.Protocol#DISCOVERY_PORT}); 0 — будь-який вільний
+     * @return справжня адреса гри, зокрема обраний порт
+     * @throws Exception (Netty кидає без оголошення, зокрема {@link java.net.BindException}) якщо порт гри зайнятий чи
      *     недоступний
      */
-    public InetSocketAddress openLan(InetSocketAddress address) {
-        return server.bindTcp(address);
+    public InetSocketAddress openLan(InetSocketAddress address, int discoveryPort) {
+        InetSocketAddress game = server.bindTcp(address);
+        try {
+            InetSocketAddress bound = server.bindDiscovery(new InetSocketAddress(discoveryPort), game.getPort());
+            synchronized (this) {
+                if (discovery == null) {
+                    discovery = bound;
+                }
+            }
+        } catch (Exception e) {
+            // Netty кидає й перевірювані винятки без оголошення (BindException — порт зайнятий).
+            LOG.warn("Пошук у локальній мережі недоступний: UDP-порт {} — {}", discoveryPort, e.toString());
+        }
+        return game;
+    }
+
+    /** UDP-адреса відповідей на пошук у локальній мережі; порожньо, якщо гру не відкрито для мережі чи порт недоступний. */
+    public synchronized Optional<InetSocketAddress> discoveryAddress() {
+        return Optional.ofNullable(discovery);
     }
 
     /**

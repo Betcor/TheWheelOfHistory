@@ -43,7 +43,9 @@ public final class LobbyScreen {
         lan.getStyleClass().add("text-muted");
         game.lanAddress()
                 .ifPresentOrElse(
-                        address -> lan.setText(texts.text("lobby.lan", address.getPort())),
+                        address -> lan.setText(texts.text(
+                                address.discovery().isPresent() ? "lobby.lan" : "lobby.lan_no_search",
+                                address.game().getPort())),
                         () -> lan.setManaged(false));
         Label count = new Label();
         ListView<PlayerInfo> players = new ListView<>();
