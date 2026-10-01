@@ -9,8 +9,9 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Properties;
 import kolo.engine.error.ValidationException;
 import kolo.protocol.message.PlayerToken;
@@ -18,11 +19,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Токени гравця на диску клієнта: ключ світу → номер гравця й токен. З ними гравець повертається до своєї держави в
- * завантаженому світі — на вбудованому сервері, в LAN чи на окремому сервері, куди перенесли файл світу. Один світ —
- * один токен: новий запис замінює старий.
+ * Токени гравців на диску клієнта: ключ світу → місця (номер гравця й токен), які цей клієнт тримає в світі. З ними
+ * гравець повертається до своєї держави в завантаженому світі — на вбудованому сервері, в LAN чи на окремому сервері,
+ * куди перенесли файл світу. Зазвичай місце одне; у hot-seat — по одному на кожного гравця за цим комп'ютером, і
+ * першим — місце того, хто відкриває світ. Новий запис замінює всі місця світу.
  *
- * <p>Файл — {@code tokens.properties} у домашній теці гри, рядок {@code <ключ світу>=<номер>:<токен>}. Токен — секрет
+ * <p>Файл — {@code tokens.properties} у домашній теці гри, рядок {@code <ключ світу>=<номер>:<токен>[,<номер>:<токен>…]}
+ * (токен — шістнадцятковий, коми в ньому немає). Токен — секрет
  * гравця: у POSIX файл читає лише власник. Збій читання чи запису — не привід зупиняти гру: токен лише не
  * запам'ятається (запис у лог). Потокобезпечний.
  */
@@ -44,28 +47,40 @@ public final class TokenStore {
         return file;
     }
 
-    /** Токен гравця для світу з цим ключем. */
-    public synchronized Optional<PlayerToken> find(String world) {
+    /** Місця клієнта у світі з цим ключем, першим — того, хто відкриває світ; пошкоджений запис — порожньо. */
+    public synchronized List<PlayerToken> find(String world) {
         String value = load().getProperty(world);
         if (value == null) {
-            return Optional.empty();
+            return List.of();
         }
-        int colon = value.indexOf(':');
-        try {
-            return Optional.of(
-                    new PlayerToken(Integer.parseInt(value.substring(0, colon)), value.substring(colon + 1)));
-        } catch (IndexOutOfBoundsException | NumberFormatException | ValidationException e) {
-            LOG.warn("Пошкоджений токен світу {} у {}", world, file);
-            return Optional.empty();
+        List<PlayerToken> seats = new ArrayList<>();
+        for (String seat : value.split(",", -1)) {
+            int colon = seat.indexOf(':');
+            try {
+                seats.add(new PlayerToken(Integer.parseInt(seat.substring(0, colon)), seat.substring(colon + 1)));
+            } catch (IndexOutOfBoundsException | NumberFormatException | ValidationException e) {
+                LOG.warn("Пошкоджений токен світу {} у {}", world, file);
+                return List.of();
+            }
         }
+        return List.copyOf(seats);
     }
 
-    /** Запам'ятовує токен гравця для світу; попередній токен цього світу забувається. */
-    public synchronized void save(String world, PlayerToken token) {
+    /** Запам'ятовує місця клієнта у світі замість попередніх; порожній список забуває світ. */
+    public synchronized void save(String world, List<PlayerToken> seats) {
         Objects.requireNonNull(world, "world");
-        Objects.requireNonNull(token, "token");
         Properties tokens = load();
-        tokens.setProperty(world, token.player() + ":" + token.token());
+        if (seats.isEmpty()) {
+            tokens.remove(world);
+        } else {
+            tokens.setProperty(
+                    world,
+                    String.join(
+                            ",",
+                            seats.stream()
+                                    .map(seat -> seat.player() + ":" + seat.token())
+                                    .toList()));
+        }
         try {
             Path directory = file.toAbsolutePath().getParent();
             Files.createDirectories(directory);

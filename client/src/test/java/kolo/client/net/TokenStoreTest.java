@@ -6,6 +6,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.List;
 import java.util.stream.Stream;
 import kolo.protocol.message.PlayerToken;
 import org.junit.jupiter.api.Test;
@@ -23,22 +24,36 @@ class TokenStoreTest {
     void savedTokenIsFoundAfterRestart() {
         TokenStore store = new TokenStore(home.resolve("a").resolve(TokenStore.FILE_NAME));
 
-        store.save(WORLD, new PlayerToken(2, "t".repeat(64)));
+        store.save(WORLD, List.of(new PlayerToken(2, "t".repeat(64))));
 
-        assertThat(new TokenStore(store.file()).find(WORLD)).contains(new PlayerToken(2, "t".repeat(64)));
+        assertThat(new TokenStore(store.file()).find(WORLD)).containsExactly(new PlayerToken(2, "t".repeat(64)));
         assertThat(store.find(OTHER)).isEmpty();
     }
 
     @Test
     void newTokenReplacesTheOldOneOfTheSameWorldOnly() {
         TokenStore store = new TokenStore(home.resolve(TokenStore.FILE_NAME));
-        store.save(WORLD, new PlayerToken(1, "a"));
-        store.save(OTHER, new PlayerToken(3, "b"));
+        store.save(WORLD, List.of(new PlayerToken(1, "a")));
+        store.save(OTHER, List.of(new PlayerToken(3, "b")));
 
-        store.save(WORLD, new PlayerToken(1, "c"));
+        store.save(WORLD, List.of(new PlayerToken(1, "c")));
 
-        assertThat(store.find(WORLD)).contains(new PlayerToken(1, "c"));
-        assertThat(store.find(OTHER)).contains(new PlayerToken(3, "b"));
+        assertThat(store.find(WORLD)).containsExactly(new PlayerToken(1, "c"));
+        assertThat(store.find(OTHER)).containsExactly(new PlayerToken(3, "b"));
+    }
+
+    @Test
+    void hotSeatWorldKeepsEverySeatInOrder() {
+        TokenStore store = new TokenStore(home.resolve(TokenStore.FILE_NAME));
+        List<PlayerToken> seats = List.of(new PlayerToken(2, "a"), new PlayerToken(1, "b"), new PlayerToken(3, "c"));
+
+        store.save(WORLD, seats);
+
+        assertThat(new TokenStore(store.file()).find(WORLD)).isEqualTo(seats);
+        store.save(WORLD, List.of(new PlayerToken(2, "a")));
+        assertThat(store.find(WORLD)).containsExactly(new PlayerToken(2, "a"));
+        store.save(WORLD, List.of());
+        assertThat(store.find(WORLD)).isEmpty();
     }
 
     @Test
@@ -47,18 +62,20 @@ class TokenStoreTest {
         TokenStore store = new TokenStore(file);
         assertThat(store.find(WORLD)).isEmpty();
 
-        Files.writeString(file, WORLD + "=без-двокрапки\n" + OTHER + "=0:t\nx=1:\n");
+        Files.writeString(file, WORLD + "=без-двокрапки\n" + OTHER + "=0:t\nx=1:\ny=1:a,2\n");
 
         assertThat(store.find(WORLD)).isEmpty();
         assertThat(store.find(OTHER)).isEmpty();
         assertThat(store.find("x")).isEmpty();
+        // Пошкоджене одне місце — пошкоджений увесь запис світу.
+        assertThat(store.find("y")).isEmpty();
     }
 
     @Test
     void fileIsReadableOnlyByItsOwner() throws Exception {
         TokenStore store = new TokenStore(home.resolve(TokenStore.FILE_NAME));
 
-        store.save(WORLD, new PlayerToken(1, "a"));
+        store.save(WORLD, List.of(new PlayerToken(1, "a")));
 
         if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
             assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(store.file())))
@@ -75,7 +92,7 @@ class TokenStoreTest {
         Path directory = Files.createDirectory(home.resolve(TokenStore.FILE_NAME));
         TokenStore store = new TokenStore(directory);
 
-        store.save(WORLD, new PlayerToken(1, "a"));
+        store.save(WORLD, List.of(new PlayerToken(1, "a")));
 
         assertThat(store.find(WORLD)).isEmpty();
     }

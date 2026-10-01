@@ -23,5 +23,12 @@ public interface Navigator {
      */
     void showMap(MapLayers layers, GameStart start);
 
+    /**
+     * Hot-seat: карту сховано, комп'ютер передають наступному гравцеві.
+     *
+     * @param player номер гравця, якому передають комп'ютер
+     */
+    void showHandoff(int player, String nickname);
+
     void exit();
 }

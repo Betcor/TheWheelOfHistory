@@ -14,6 +14,7 @@ import kolo.client.map.MapLayers;
 import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
 import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.HandoffScreen;
 import kolo.client.screen.LoadScreen;
 import kolo.client.screen.LobbyScreen;
 import kolo.client.screen.MainMenuScreen;
@@ -94,6 +95,11 @@ public final class KoloApp extends Application implements Navigator {
     @Override
     public void showMap(MapLayers layers, GameStart start) {
         show(MapScreen.create(context, layers, start));
+    }
+
+    @Override
+    public void showHandoff(int player, String nickname) {
+        show(HandoffScreen.create(context, player, nickname));
     }
 
     @Override

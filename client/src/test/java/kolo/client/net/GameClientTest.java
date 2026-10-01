@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Гра клієнта: лобі на вбудованому сервері, LAN-хост і гість через TCP, повернення після розриву. */
+/** Гра клієнта: лобі на вбудованому сервері, LAN-хост і гість через TCP, повернення після розриву, hot-seat. */
 @Timeout(90)
 class GameClientTest {
 
@@ -251,6 +251,128 @@ class GameClientTest {
 
             assertThat(back.player()).isEqualTo(ihor.player());
             assertThat(back.token()).isEqualTo(ihor.token());
+        }
+    }
+
+    @Test
+    void hotSeatPlayersTakeTurnsOnOneComputer() throws Exception {
+        RecordingListener events = new RecordingListener();
+        try (GameClient game = GameClient.start(worlds, LanPorts.ANY, events, background)) {
+            ServerMessage.Joined olia = await(game.hostLobby("Оля", 19, NpcShare.FEW, false));
+            ServerMessage.Lobby lobby =
+                    events.next(RecordingListener.Lobby.class).lobby();
+            TurnTimer timed =
+                    lobby.timers().stream().filter(TurnTimer::timed).findFirst().orElseThrow();
+            game.setTimer(timed);
+            awaitLobby(events, l -> l.setup().timer().equals(timed));
+            assertThat(game.canAddLocalPlayers()).isTrue();
+            assertThat(game.hotSeat()).isFalse();
+
+            ServerMessage.Joined ihor = await(game.addLocalPlayer("Ігор"));
+
+            assertThat(ihor.session()).isEqualTo(olia.session());
+            assertThat(game.hotSeat()).isTrue();
+            assertThat(game.localPlayers()).containsExactly(olia.player(), ihor.player());
+            // Hot-seat — без таймера: гра клієнта скинула таймер хоста.
+            ServerMessage.Lobby both = awaitLobby(
+                    events, l -> l.players().size() == 2 && !l.setup().timer().timed());
+            assertThat(both.players()).allMatch(game::isLocal);
+            assertThat(game.credentials()).contains(olia);
+            assertThat(new TokenStore(worlds.resolve(TokenStore.FILE_NAME)).find(olia.world()))
+                    .containsExactly(
+                            new PlayerToken(olia.player(), olia.token()), new PlayerToken(ihor.player(), ihor.token()));
+
+            game.startGame();
+            assertThat(TestWorlds.started(events).turn()).isZero();
+            assertThat(game.handoffAtYearStart()).isEmpty();
+            game.ready(0);
+            assertThat(game.handoffAfterReady()).hasValue(ihor.player());
+
+            // Комп'ютер передали Ігореві: слухач бачить його місце, рік ще не розв'язано.
+            assertThat(game.showPlayer(ihor.player())).isTrue();
+            assertThat(events.next(RecordingListener.Started.class).start().turn())
+                    .isZero();
+            assertThat(game.credentials()).contains(ihor);
+            assertThat(game.handoffAfterReady()).isEmpty();
+            game.ready(0);
+            events.awaitOrders(1);
+
+            // Новий рік — знову першому в черзі.
+            assertThat(game.handoffAtYearStart()).hasValue(olia.player());
+            assertThat(game.showPlayer(olia.player())).isTrue();
+            GameStart back = events.next(RecordingListener.Started.class).start();
+            if (back.turn() < 1) {
+                // Місце Олі ще не отримало нового року — отримає слідом.
+                events.awaitOrders(1);
+            }
+            assertThat(game.credentials()).contains(olia);
+            assertThat(game.handoffAtYearStart()).isEmpty();
+
+            game.leave();
+            assertThat(game.hotSeat()).isFalse();
+            assertThat(game.localPlayers()).isEmpty();
+            assertThat(game.showPlayer(ihor.player())).isFalse();
+        }
+    }
+
+    @Test
+    void savedHotSeatWorldSeatsEveryPlayerOfThisComputer() throws Exception {
+        RecordingListener events = new RecordingListener();
+        try (GameClient game = GameClient.start(worlds, LanPorts.ANY, events, background)) {
+            ServerMessage.Joined olia = await(game.hostLobby("Оля", 20, NpcShare.FEW, false));
+            ServerMessage.Joined ihor = await(game.addLocalPlayer("Ігор"));
+            game.startGame();
+            TestWorlds.started(events);
+            game.leave();
+            WorldInfo world = savedWorld(game);
+
+            ServerMessage.Joined back = await(game.loadLocalWorld(world, "Хтось", false));
+
+            assertThat(back.player()).isEqualTo(olia.player());
+            assertThat(game.localPlayers()).containsExactly(olia.player(), ihor.player());
+            ServerMessage.Lobby lobby =
+                    awaitLobby(events, l -> l.players().stream().allMatch(PlayerInfo::connected));
+            assertThat(lobby.players()).extracting(PlayerInfo::nickname).containsExactlyInAnyOrder("Оля", "Ігор");
+            game.startGame();
+            assertThat(TestWorlds.started(events).turn()).isZero();
+            game.leave();
+
+            // Відкрита для мережі гра — кожен за своїм комп'ютером: сідає лише перший, інші місця вільні.
+            await(game.loadLocalWorld(savedWorld(game), "Хтось", true));
+            assertThat(game.localPlayers()).containsExactly(olia.player());
+            assertThat(game.canAddLocalPlayers()).isFalse();
+            assertThatThrownBy(() -> await(game.addLocalPlayer("Марко"))).isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    @Test
+    void hostRemovesAPlayerOfThisComputerFromTheLobby() throws Exception {
+        RecordingListener events = new RecordingListener();
+        try (GameClient game = GameClient.start(worlds, LanPorts.ANY, events, background)) {
+            ServerMessage.Joined olia = await(game.hostLobby("Оля", 21, NpcShare.FEW, false));
+            ServerMessage.Joined ihor = await(game.addLocalPlayer("Ігор"));
+            awaitLobby(events, l -> l.players().size() == 2);
+
+            game.removeLocalPlayer(ihor.player());
+
+            assertThat(game.hotSeat()).isFalse();
+            assertThat(game.localPlayers()).containsExactly(olia.player());
+            awaitLobby(events, l -> l.players().size() == 1);
+            assertThat(new TokenStore(worlds.resolve(TokenStore.FILE_NAME)).find(olia.world()))
+                    .containsExactly(new PlayerToken(olia.player(), olia.token()));
+        }
+    }
+
+    /** Пропускає стани лобі, доки не прийде такий. */
+    private static ServerMessage.Lobby awaitLobby(
+            RecordingListener events, java.util.function.Predicate<ServerMessage.Lobby> wanted)
+            throws InterruptedException {
+        while (true) {
+            ServerMessage.Lobby lobby =
+                    events.next(RecordingListener.Lobby.class).lobby();
+            if (wanted.test(lobby)) {
+                return lobby;
+            }
         }
     }
 

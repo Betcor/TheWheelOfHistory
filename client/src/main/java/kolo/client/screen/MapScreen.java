@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.OptionalInt;
+import java.util.function.IntConsumer;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -42,6 +43,9 @@ import kolo.protocol.message.YearPhase;
  * готовий, хто не на зв'язку) і рядок стану. Поки систем немає, роки «порожні»: рік розв'язується, коли «Готово»
  * натиснули всі гравці на зв'язку, коли хост натиснув «Завершити рік» або коли вийшов час таймера ходу (тоді видно
  * відлік). Зв'язок втрачено — кнопка «Перепідключитися» повертає гравця до його держави.
+ *
+ * <p>Hot-seat (GD §21): після «Готово» карта ховається й комп'ютер передають наступному гравцеві в черзі; останній
+ * дочікується року, і на початку нового комп'ютер знову передають першому.
  */
 public final class MapScreen {
 
@@ -147,10 +151,21 @@ public final class MapScreen {
             resume.setManaged(pause && host);
             resume.setDisable(resumed[0] || !connected);
         };
+        // Hot-seat: сховати карту й передати комп'ютер гравцеві.
+        IntConsumer handOff = player -> {
+            String nickname = session.players().get().stream()
+                    .filter(p -> p.number() == player)
+                    .map(PlayerInfo::nickname)
+                    .findFirst()
+                    .orElse("");
+            canvas.dispose();
+            context.navigator().showHandoff(player, nickname);
+        };
         endYear.setOnAction(event -> {
             sent[0] = true;
             refreshReady.run();
             game.ready(current[0]);
+            game.handoffAfterReady().ifPresent(handOff);
         });
         finish.setOnAction(event -> {
             finished[0] = true;
@@ -207,6 +222,12 @@ public final class MapScreen {
                 finished[0] = false;
                 year.setText(yearText(texts, phase.turn()));
                 status.setText(texts.text("map.year_started", WorldState.year(phase.turn())));
+                // Слабкий слухач прибраного екрана ще може спрацювати — передає комп'ютер лише екран на сцені.
+                OptionalInt first = game.handoffAtYearStart();
+                if (first.isPresent() && canvas.getScene() != null) {
+                    handOff.accept(first.getAsInt());
+                    return;
+                }
             }
             refreshReady.run();
             refreshClock.run();
