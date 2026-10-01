@@ -89,7 +89,9 @@ class MessagePropertiesTest {
                 new ClientMessage.ListWorlds(),
                 new ClientMessage.LoadWorld(hash, nickname, Optional.empty()),
                 new ClientMessage.LoadWorld(hash, nickname, Optional.of(new PlayerToken(player, hash))),
-                new ClientMessage.AssignSeat(player, player))) {
+                new ClientMessage.AssignSeat(player, player),
+                new ClientMessage.EndYear(turn),
+                new ClientMessage.Resume(turn))) {
             assertThat(MessageJson.readClient(MessageJson.write(message))).isEqualTo(message);
         }
     }

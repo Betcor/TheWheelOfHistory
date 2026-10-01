@@ -193,12 +193,14 @@ class ClientSessionTest {
     }
 
     @Test
-    void timerAndEndYearWithoutSessionAreErrors() throws Exception {
+    void timerEndYearAndResumeWithoutSessionAreErrors() throws Exception {
         welcome();
 
         session.handle(new ClientMessage.SetTimer(TurnTimer.MANUAL));
         assertThat(peer.error().code()).isEqualTo(ErrorCode.FORBIDDEN);
         session.handle(new ClientMessage.EndYear(0));
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
+        session.handle(new ClientMessage.Resume(0));
         assertThat(peer.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
         assertThat(peer.closed()).isFalse();
     }
@@ -219,6 +221,9 @@ class ClientSessionTest {
         peer.players();
         peer.expectPhase(0, YearPhase.START_OF_YEAR);
         assertThat(peer.phase().timeLeftMillis()).isPresent();
+        // Сесія не на паузі: відновлювати нічого — відповідає вже актор сесії.
+        session.handle(new ClientMessage.Resume(0));
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.PHASE_CLOSED);
         session.handle(new ClientMessage.EndYear(0));
         peer.expectPhase(0, YearPhase.RESOLVING);
     }

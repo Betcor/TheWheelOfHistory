@@ -26,7 +26,8 @@ public sealed interface ClientMessage
                 ClientMessage.LoadWorld,
                 ClientMessage.AssignSeat,
                 ClientMessage.SetTimer,
-                ClientMessage.EndYear {
+                ClientMessage.EndYear,
+                ClientMessage.Resume {
 
     /** Найдовший токен гравця, символів. */
     int MAX_TOKEN_LENGTH = 128;
@@ -191,6 +192,20 @@ public sealed interface ClientMessage
     record EndYear(int turn) implements ClientMessage {
 
         public EndYear {
+            Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
+        }
+    }
+
+    /**
+     * Хост відновлює сесію, призупинену через помилку року ({@link YearPhase#PAUSED}): той самий рік знову у фазі
+     * наказів, «Готово» скинуто, таймер ходу (якщо є) рахує повний час від цієї миті. Не хост — {@code FORBIDDEN},
+     * сесія не на паузі або не той рік — {@code PHASE_CLOSED}.
+     *
+     * @param turn рік на паузі (хід, не календарний рік)
+     */
+    record Resume(int turn) implements ClientMessage {
+
+        public Resume {
             Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
         }
     }

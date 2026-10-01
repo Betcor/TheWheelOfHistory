@@ -63,7 +63,8 @@ import org.slf4j.LoggerFactory;
  * RUNNING}). Рік — фази {@link YearPhase}: {@code START_OF_YEAR → ORDERS}; коли «Готово» натиснули всі гравці на
  * зв'язку, хост завершив рік ({@link #endYear}) або вийшов час таймера ходу — {@code RESOLVING} (рушій розв'язує рік,
  * рік пишеться у файл однією транзакцією) → {@code REPORT} → наступний рік. Якщо рік не вдалося розв'язати чи зберегти
- * — {@code PAUSED}: стан і файл лишаються на попередньому році, гравці отримують помилку.
+ * — {@code PAUSED}: стан і файл лишаються на попередньому році, гравці отримують помилку й фазу паузи, доки хост не
+ * відновить сесію ({@link #resume}) — тоді той самий рік знову у фазі наказів.
  *
  * <p>Таймер ходу (GD §6.1) хост обирає в лобі ({@link #setTimer}) з варіантів контенту; він зберігається у файлі світу.
  * З таймером фаза наказів має межу: гравці отримують, скільки часу лишилося, а межа року пишеться у файл — завантажений
@@ -257,6 +258,16 @@ public final class SessionActor {
     public void endYear(Peer host, int turn) {
         Objects.requireNonNull(host, "host");
         post(() -> doEndYear(host, turn));
+    }
+
+    /**
+     * Хост відновлює сесію з паузи: рік {@code turn} знову у фазі наказів, «Готово» скинуто, таймер ходу — повний час
+     * від цієї миті. Не хост — {@code FORBIDDEN}, сесія не на паузі чи не той рік — {@code PHASE_CLOSED}; помилка —
+     * лише хостові.
+     */
+    public void resume(Peer host, int turn) {
+        Objects.requireNonNull(host, "host");
+        post(() -> doResume(host, turn));
     }
 
     /** Гравець полишив сесію (вийшов, закрив з'єднання чи перейшов в іншу сесію). */
@@ -634,6 +645,29 @@ public final class SessionActor {
         resolveYear();
     }
 
+    private void doResume(Peer peer, int turn) {
+        Member member = member(peer);
+        try {
+            if (member == null || !member.host) {
+                throw new ForbiddenException(ErrorDetails.of("action", "resume"));
+            }
+            if (state != SessionState.PAUSED || turn != world.turn()) {
+                throw new PhaseClosedException(ErrorDetails.of("turn", turn));
+            }
+        } catch (GameException e) {
+            peer.send(ServerMessage.Error.of(e));
+            return;
+        }
+        LOG.info("Сесія {}: хост відновив рік {}", id, turn);
+        state = SessionState.RUNNING;
+        pauseError = null;
+        // Межа з файлу — від року до паузи; після паузи таймер рахує повний час заново.
+        savedDeadline = null;
+        startTimer();
+        playersChanged();
+        phase(turn, YearPhase.ORDERS);
+    }
+
     /** Вийшов час фази наказів року {@code turn}; якщо рік уже розв'язано — нічого. */
     private void deadlineReached(int turn) {
         if (acceptsOrders(turn)) {
@@ -716,6 +750,9 @@ public final class SessionActor {
             state = SessionState.PAUSED;
             members.forEach(m -> m.ready = false);
             pauseError = ServerMessage.Error.of(e);
+            forgetDeadline(turn);
+            playersChanged();
+            phase(turn, YearPhase.PAUSED);
             broadcast(List.of(pauseError));
             return;
         }
@@ -749,6 +786,21 @@ public final class SessionActor {
             LOG.warn("Сесія {}: не записано межу року {}", id, turn, e);
         }
         alarm = clock.schedule(Duration.between(now, deadline), () -> post(() -> deadlineReached(turn)));
+    }
+
+    /**
+     * Межа року на паузі вже не діє: відновлений рік отримає повний час, тож і світ, завантажений з паузи, — теж (а
+     * не розв'язання одразу після старту за минулою межею).
+     */
+    private void forgetDeadline(int turn) {
+        if (!setup.timer().timed()) {
+            return;
+        }
+        try {
+            store.saveDeadline(Optional.empty());
+        } catch (GameException e) {
+            LOG.warn("Сесія {}: не стерто межу року {} на паузі", id, turn, e);
+        }
     }
 
     private void stopTimer() {

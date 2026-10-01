@@ -16,6 +16,7 @@ final class MessageTypes {
     static final String ASSIGN_SEAT = "assign_seat";
     static final String SET_TIMER = "set_timer";
     static final String END_YEAR = "end_year";
+    static final String RESUME = "resume";
     static final String WELCOME = "welcome";
     static final String ERROR = "error";
     static final String LOBBIES = "lobbies";

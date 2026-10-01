@@ -100,6 +100,14 @@ final class RecordingPeer implements Peer {
         expectOrders(turn + 1);
     }
 
+    /** Рік {@code turn} не розв'язано: розв'язання, гравці без «Готово», пауза й її причина. */
+    ServerMessage.Error expectPause(int turn) throws InterruptedException {
+        expectPhase(turn, YearPhase.RESOLVING);
+        players();
+        expectPhase(turn, YearPhase.PAUSED);
+        return error();
+    }
+
     /** Чи нічого не прийшло за коротку паузу. */
     boolean quiet() throws InterruptedException {
         return received.poll(200, TimeUnit.MILLISECONDS) == null;

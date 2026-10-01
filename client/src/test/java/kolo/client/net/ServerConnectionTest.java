@@ -96,6 +96,10 @@ class ServerConnectionTest {
             TestWorlds.started(events);
             ServerMessage.Phase orders = events.awaitOrders(0);
             assertThat(orders.timeLeftMillis().orElseThrow()).isBetween(1L, 300_000L);
+            // Сесія не на паузі — відновлювати нічого.
+            connection.resume(0);
+            assertThat(events.next(RecordingListener.Error.class).error().code())
+                    .isEqualTo(ErrorCode.PHASE_CLOSED);
             connection.endYear(0);
             assertThat(events.awaitOrders(1).timeLeftMillis()).isPresent();
         }

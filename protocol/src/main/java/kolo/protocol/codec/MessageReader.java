@@ -100,6 +100,10 @@ final class MessageReader {
                 int turn = root.field("turn").intValue();
                 yield root.build(() -> new ClientMessage.EndYear(turn));
             }
+            case MessageTypes.RESUME -> {
+                int turn = root.field("turn").intValue();
+                yield root.build(() -> new ClientMessage.Resume(turn));
+            }
             default -> throw type.malformed("unknown_type");
         };
         root.end();
