@@ -24,6 +24,13 @@ class CountryCardSectionsTest {
     }
 
     @Test
+    void ageIsCountedFromTheCurrentYear() {
+        assertThat(CountryCardSections.age(-40, 0)).isEqualTo(40);
+        assertThat(CountryCardSections.age(-40, 5)).isEqualTo(45);
+        assertThat(CountryCardSections.age(3, 21)).isEqualTo(18);
+    }
+
+    @Test
     void longBackstoryIsShortenedOnTheWheel() {
         String text = "а".repeat(GenerationLabels.MAX_FRAGMENT + 10);
 
