@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import kolo.engine.content.ContentPack;
@@ -16,7 +17,9 @@ import kolo.protocol.Protocol;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.WorldInfo;
 import kolo.server.TestServers;
 import kolo.server.persistence.WorldDirectory;
 import org.junit.jupiter.api.AfterEach;
@@ -108,8 +111,8 @@ class ClientSessionTest {
         assertThat(peer.lobby().session()).isEqualTo(joined.session());
         session.handle(new ClientMessage.ListLobbies());
         assertThat(peer.next())
-                .isEqualTo(
-                        new ServerMessage.Lobbies(List.of(new LobbyInfo(joined.session(), "Оля", 1, NpcShare.NORMAL))));
+                .isEqualTo(new ServerMessage.Lobbies(List.of(new LobbyInfo(
+                        joined.session(), joined.world(), "Оля", 1, new LobbySetup.NewWorld(42, NpcShare.NORMAL)))));
 
         session.handle(new ClientMessage.StartGame());
 
@@ -283,6 +286,63 @@ class ClientSessionTest {
 
         assertThatThrownBy(() -> new ClientSession(buggy, sessions, peer).handle(Handshake.hello(HASH)))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void savedWorldsAreListedAndATrustedClientLoadsOneAsAGuest() throws Exception {
+        welcome();
+        soloGame(42);
+        session.handle(new ClientMessage.Leave());
+        awaitNoSessions();
+        RecordingPeer local = new RecordingPeer();
+        ClientSession trusted = new ClientSession(() -> TestServers.CONTENT, sessions, local, true);
+        trusted.handle(Handshake.hello(HASH));
+        local.next();
+
+        trusted.handle(new ClientMessage.ListWorlds());
+
+        List<WorldInfo> worlds = local.next(ServerMessage.Worlds.class).worlds();
+        assertThat(worlds).hasSize(1);
+        WorldInfo world = worlds.getFirst();
+        assertThat(world.name()).isEqualTo("world-42");
+        assertThat(world.seed()).isEqualTo(42);
+        assertThat(world.turn()).isZero();
+        assertThat(world.players()).containsExactly("Оля");
+        assertThat(world.key()).isPresent();
+
+        trusted.handle(new ClientMessage.LoadWorld("world-42", "Марко", Optional.empty()));
+
+        assertThat(local.joined().player()).isEqualTo(2);
+        assertThat(local.lobby().setup()).isEqualTo(new LobbySetup.SavedWorld("world-42", 42, 0));
+        trusted.handle(new ClientMessage.AssignSeat(2, 1));
+        ServerMessage.Joined seated = local.joined();
+        assertThat(seated.player()).isEqualTo(1);
+        assertThat(seated.world()).isEqualTo(world.key().orElseThrow());
+        // Відкритого світу вже немає в списку.
+        trusted.handle(new ClientMessage.ListWorlds());
+        assertThat(local.next()).isInstanceOf(ServerMessage.Lobby.class);
+        assertThat(local.next(ServerMessage.Worlds.class).worlds()).isEmpty();
+    }
+
+    @Test
+    void clientFromTheNetworkNeedsASeatTokenToLoad() throws Exception {
+        welcome();
+        session.handle(new ClientMessage.AssignSeat(1, 1));
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.FORBIDDEN);
+        soloGame(43);
+        session.handle(new ClientMessage.Leave());
+        awaitNoSessions();
+
+        session.handle(new ClientMessage.LoadWorld("world-43", "Марко", Optional.empty()));
+
+        assertThat(peer.error().code()).isEqualTo(ErrorCode.UNAUTHORIZED);
+        assertThat(peer.closed()).isFalse();
+    }
+
+    private void awaitNoSessions() throws InterruptedException {
+        for (SessionActor open : sessions.active()) {
+            assertThat(open.awaitClosed(30, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     private void welcome() throws InterruptedException {

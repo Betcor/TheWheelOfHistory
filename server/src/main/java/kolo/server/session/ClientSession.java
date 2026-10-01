@@ -1,5 +1,6 @@
 package kolo.server.session;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,10 +13,15 @@ import kolo.engine.error.GameException;
 import kolo.engine.error.NotFoundException;
 import kolo.engine.error.PhaseClosedException;
 import kolo.engine.error.ProtocolException;
+import kolo.engine.error.ValidationException;
 import kolo.protocol.ProtocolErrors;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.WorldInfo;
+import kolo.server.persistence.WorldSummary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Розмова сервера з одним клієнтом без мережі: рукостискання, список лобі й передача запитів у {@link SessionActor}
@@ -27,7 +33,12 @@ import kolo.protocol.message.ServerMessage;
  * можна вірити. Після нього помилка запиту (рік уже закрито, лобі повне) — лише {@link ServerMessage.Error}; порушення
  * порядку розмови (повторне привітання) — знову помилка й закриття.
  *
- * <p>Клієнт буває щонайбільше в одній сесії: створення лобі, приєднання й повернення спершу полишають попередню, як і
+ * <p>Світи з теки сервера: список ({@code ListWorlds}) і завантаження в нову сесію ({@code LoadWorld}). Без токена
+ * місця світ завантажує лише довірений клієнт — того самого процесу, що й сервер (вбудований сервер через {@code
+ * LocalChannel}): з мережі чужий світ не відкрити й чужих місць не роздати.
+ *
+ * <p>Клієнт буває щонайбільше в одній сесії: створення лобі, приєднання, повернення й завантаження спершу полишають
+ * попередню, як і
  * {@code Leave} та закрите з'єднання ({@link #disconnected()}). Кожна сесія пише клієнтові через власного
  * співрозмовника-посередника, що замовкає при виході: повідомлення сесії, яку клієнт уже полишив, до нього не дійдуть
  * і не змішаються з повідомленнями нової.
@@ -39,17 +50,27 @@ public final class ClientSession {
     /** Місце помилок порядку розмови. */
     static final String HANDSHAKE = "handshake";
 
+    private static final Logger LOG = LoggerFactory.getLogger(ClientSession.class);
+
     private final Supplier<ContentPack> content;
     private final Sessions sessions;
     private final Peer peer;
+    private final boolean trusted;
     private boolean welcomed;
     private SessionActor session;
     private ScopedPeer scoped;
 
+    /** Розмова з клієнтом з мережі. */
     public ClientSession(Supplier<ContentPack> content, Sessions sessions, Peer peer) {
+        this(content, sessions, peer, false);
+    }
+
+    /** @param trusted чи клієнт у тому самому процесі, що й сервер: він завантажує світи й без токена місця */
+    public ClientSession(Supplier<ContentPack> content, Sessions sessions, Peer peer, boolean trusted) {
         this.content = Objects.requireNonNull(content, "content");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.peer = Objects.requireNonNull(peer, "peer");
+        this.trusted = trusted;
     }
 
     /** Чи пройдено рукостискання. */
@@ -80,6 +101,9 @@ public final class ClientSession {
                     leave();
                 }
                 case ClientMessage.Ready ready -> ready(ready);
+                case ClientMessage.ListWorlds list -> listWorlds();
+                case ClientMessage.LoadWorld load -> loadWorld(load);
+                case ClientMessage.AssignSeat assign -> assignSeat(assign);
             }
         } catch (GameException e) {
             ServerMessage.Error error = ServerMessage.Error.of(e);
@@ -126,6 +150,34 @@ public final class ClientSession {
         SessionActor target = find(rejoin.session());
         leave();
         enter(target).rejoin(scoped, rejoin.player(), rejoin.token());
+    }
+
+    private void listWorlds() {
+        requireWelcomed();
+        List<WorldInfo> worlds = new ArrayList<>();
+        for (WorldSummary world : sessions.worlds().list()) {
+            try {
+                worlds.add(new WorldInfo(world.name(), world.key(), world.seed(), world.lastTurn(), world.players()));
+            } catch (ValidationException e) {
+                // Ім'я файлу чи ключ, яких не передати протоколом, — світ не з цієї гри або пошкоджений.
+                LOG.warn("Світ {} пропущено в списку: {} {}", world.file().getFileName(), e.code(), e.details());
+            }
+        }
+        peer.send(new ServerMessage.Worlds(worlds));
+    }
+
+    private void loadWorld(ClientMessage.LoadWorld load) {
+        requireWelcomed();
+        ContentPack pack = content.get();
+        leave();
+        enter(sessions.create(pack)).load(scoped, load.world(), load.nickname(), load.seat(), trusted);
+    }
+
+    private void assignSeat(ClientMessage.AssignSeat assign) {
+        requireWelcomed();
+        SessionActor current =
+                session().orElseThrow(() -> new ForbiddenException(ErrorDetails.of("action", "assign_seat")));
+        current.assign(scoped, assign.guest(), assign.seat());
     }
 
     private void startGame() {

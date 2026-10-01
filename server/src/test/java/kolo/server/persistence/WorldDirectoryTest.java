@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import kolo.engine.error.ConflictException;
 import kolo.engine.error.ErrorCode;
+import kolo.engine.error.NotFoundException;
 import kolo.engine.error.SaveFileException;
 import kolo.engine.state.WorldState;
 import org.junit.jupiter.api.Test;
@@ -78,6 +80,91 @@ class WorldDirectoryTest {
                     assertThat(e.code()).isEqualTo(ErrorCode.SAVE_FILE_ERROR);
                     assertThat(e.details()).containsEntry("operation", "create_directory");
                 });
+    }
+
+    @Test
+    void homeHoldsTheWorldsDirectory() {
+        assertThat(WorldDirectory.home(null, "Linux", null, "/home/a")).isEqualTo(Path.of("/home/a", ".kolo"));
+        assertThat(WorldDirectory.defaultLocation())
+                .isEqualTo(WorldDirectory.home().resolve("worlds"));
+    }
+
+    @Test
+    void nameIsTheFileNameWithoutTheExtension() {
+        assertThat(WorldDirectory.name(Path.of("a", "world-5" + WorldStore.EXTENSION)))
+                .isEqualTo("world-5");
+        assertThat(WorldDirectory.name(Path.of("readme.txt"))).isEqualTo("readme.txt");
+    }
+
+    @Test
+    void createdFileIsInUseUntilReleased() {
+        WorldDirectory worlds = new WorldDirectory(root);
+        Path file;
+        try (WorldStore store = create(worlds)) {
+            file = store.file();
+            assertThat(worlds.inUse(file)).isTrue();
+            assertThat(worlds.list()).isEmpty();
+        }
+        worlds.release(file);
+
+        assertThat(worlds.inUse(file)).isFalse();
+        assertThat(worlds.list()).extracting(WorldSummary::name).containsExactly("world-1");
+    }
+
+    @Test
+    void listSkipsBrokenAndTemporaryFilesAndSortsByName() throws Exception {
+        WorldDirectory worlds = new WorldDirectory(root);
+        release(worlds, create(worlds));
+        release(worlds, create(worlds));
+        Files.writeString(root.resolve("broken" + WorldStore.EXTENSION), "не світ");
+        Files.writeString(root.resolve(".world-9" + WorldStore.EXTENSION + ".creating"), "x");
+        Files.writeString(root.resolve(".hidden" + WorldStore.EXTENSION), "x");
+        Files.writeString(root.resolve("notes.txt"), "x");
+
+        assertThat(worlds.list()).extracting(WorldSummary::name).containsExactly("world-1", "world-1-2");
+    }
+
+    @Test
+    void missingDirectoryHasNoWorlds() {
+        assertThat(new WorldDirectory(root.resolve("none")).list()).isEmpty();
+    }
+
+    @Test
+    void openClaimsTheFileOnce() {
+        WorldDirectory worlds = new WorldDirectory(root);
+        release(worlds, create(worlds));
+
+        Path file = worlds.open("world-1");
+
+        assertThat(file)
+                .isEqualTo(root.resolve("world-1" + WorldStore.EXTENSION).toAbsolutePath());
+        assertThatThrownBy(() -> worlds.open("world-1")).isInstanceOfSatisfying(ConflictException.class, e -> {
+            assertThat(e.code()).isEqualTo(ErrorCode.WORLD_IN_USE);
+            assertThat(e.details()).containsEntry("world", "world-1");
+        });
+        worlds.release(file);
+        assertThat(worlds.open("world-1")).isEqualTo(file);
+    }
+
+    @Test
+    void openFindsOnlyWorldsOfThisDirectory() throws Exception {
+        WorldDirectory worlds = new WorldDirectory(root.resolve("worlds"));
+        release(worlds, create(worlds));
+        Files.writeString(root.resolve("outside" + WorldStore.EXTENSION), "x");
+
+        for (String name : new String[] {"none", "../outside", "world-1" + WorldStore.EXTENSION, ""}) {
+            assertThatThrownBy(() -> worlds.open(name))
+                    .isInstanceOfSatisfying(
+                            NotFoundException.class,
+                            e -> assertThat(e.details())
+                                    .containsEntry("what", "world")
+                                    .containsEntry("id", name));
+        }
+    }
+
+    private static void release(WorldDirectory worlds, WorldStore store) {
+        store.close();
+        worlds.release(store.file());
     }
 
     private static WorldStore create(WorldDirectory worlds) {

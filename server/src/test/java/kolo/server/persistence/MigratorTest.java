@@ -38,7 +38,7 @@ class MigratorTest {
         try (Connection connection = connect(file)) {
             Migrator migrator = Migrator.bundled();
 
-            assertThat(migrator.migrate(connection, file, CLOCK)).containsExactly(1, 2);
+            assertThat(migrator.migrate(connection, file, CLOCK)).containsExactly(1, 2, 3);
             assertThat(tables(connection))
                     .containsExactly("players", "schema_migrations", "snapshots", "turns", "world_map", "world_meta");
             assertThat(migrator.version(connection)).isEqualTo(migrator.latest());

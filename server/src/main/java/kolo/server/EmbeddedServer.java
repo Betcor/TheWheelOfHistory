@@ -31,6 +31,14 @@ public final class EmbeddedServer implements AutoCloseable {
         this.address = server.bindLocal();
     }
 
+    /**
+     * Домашня тека гри ({@link WorldDirectory#home()}): у ній тека світів вбудованого сервера ({@code worlds}) і файли
+     * клієнта.
+     */
+    public static Path defaultHome() {
+        return WorldDirectory.home();
+    }
+
     /** Запускає сервер із вбудованим контентом гри й типовою текою світів. */
     public static EmbeddedServer startWithBundledContent() {
         return startWithBundledContent(WorldDirectory.defaultLocation());

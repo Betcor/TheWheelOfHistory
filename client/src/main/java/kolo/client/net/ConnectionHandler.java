@@ -16,8 +16,9 @@ import kolo.protocol.message.ServerMessage;
 /**
  * Клієнтський бік розмови. Працює лише в event loop свого каналу, тож стан без блокувань.
  *
- * <p>Запити з відповіддю — список лобі ({@link ServerMessage.Lobbies}) і вхід у сесію ({@link ServerMessage.Joined});
- * одночасно — щонайбільше один. Решта повідомлень — події сесії для {@link SessionListener}: стан лобі, гравці, карта
+ * <p>Запити з відповіддю — списки лобі ({@link ServerMessage.Lobbies}) і світів ({@link ServerMessage.Worlds}) та вхід
+ * у сесію ({@link ServerMessage.Joined}); одночасно — щонайбільше один. {@link ServerMessage.Joined} без запиту — хост
+ * віддав цьому гостеві місце: подія {@link SessionListener#joined}. Решта повідомлень — події сесії для {@link SessionListener}: стан лобі, гравці, карта
  * (коли зібрано карту й прийшла перша фаза — {@link SessionListener#gameStarted}), фази року.
  *
  * <p>Помилка сервера ({@link ServerMessage.Error}) завершує запит, що чекає, {@link ServerErrorException}, а без
@@ -92,7 +93,13 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
                 }
             }
             case ServerMessage.Lobbies lobbies -> reply(lobbies);
+            case ServerMessage.Worlds worlds -> reply(worlds);
             case ServerMessage.Joined joined -> {
+                if (pending == null || !pending.type().isInstance(joined)) {
+                    // Без запиту — хост лобі віддав гостеві місце гравця: та сама сесія, новий номер і токен.
+                    listener.joined(joined);
+                    return;
+                }
                 // Нова сесія: що було з попередньою, вже не важить.
                 inGame = false;
                 assembler = null;

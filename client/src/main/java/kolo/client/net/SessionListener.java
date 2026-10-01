@@ -14,6 +14,11 @@ public interface SessionListener {
     /** Слухач, що нічого не робить. */
     SessionListener NONE = new SessionListener() {};
 
+    /**
+     * Хост лобі завантаженого світу віддав цьому гостеві місце гравця: новий номер і токен у тій самій сесії.
+     */
+    default void joined(ServerMessage.Joined joined) {}
+
     /** Стан лобі змінився. */
     default void lobby(ServerMessage.Lobby lobby) {}
 

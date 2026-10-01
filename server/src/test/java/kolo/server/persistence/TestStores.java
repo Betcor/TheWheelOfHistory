@@ -25,6 +25,20 @@ final class TestStores {
         return WorldStore.open(file, CLOCK, Migrator.bundled());
     }
 
+    /**
+     * Файл світу старішої версії гри: новий файл без таблиць і стовпців пізніших міграцій. Версія 2 — без ключа світу,
+     * версія 1 — ще й без гравців.
+     */
+    static void downgrade(Path file, int version) {
+        if (version < 3) {
+            sql(file, "ALTER TABLE world_meta DROP COLUMN world_key");
+        }
+        if (version < 2) {
+            sql(file, "DROP TABLE players");
+        }
+        sql(file, "DELETE FROM schema_migrations WHERE version > ?", version);
+    }
+
     /** Виконує оператор над закритим файлом світу; параметри — рядки, числа або байти. */
     static void sql(Path file, String sql, Object... parameters) {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file);

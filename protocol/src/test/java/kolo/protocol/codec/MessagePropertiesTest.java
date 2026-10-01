@@ -14,11 +14,14 @@ import kolo.engine.view.MapView;
 import kolo.protocol.TestMessages;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.Nicknames;
 import kolo.protocol.message.PlayerInfo;
+import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.WorldInfo;
 import kolo.protocol.message.YearPhase;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
@@ -80,7 +83,11 @@ class MessagePropertiesTest {
                 new ClientMessage.StartGame(),
                 new ClientMessage.Rejoin(session, player, hash),
                 new ClientMessage.Leave(),
-                new ClientMessage.Ready(turn))) {
+                new ClientMessage.Ready(turn),
+                new ClientMessage.ListWorlds(),
+                new ClientMessage.LoadWorld(hash, nickname, Optional.empty()),
+                new ClientMessage.LoadWorld(hash, nickname, Optional.of(new PlayerToken(player, hash))),
+                new ClientMessage.AssignSeat(player, player))) {
             assertThat(MessageJson.readClient(MessageJson.write(message))).isEqualTo(message);
         }
     }
@@ -90,19 +97,30 @@ class MessagePropertiesTest {
             @ForAll @LongRange(min = 1) long session,
             @ForAll long seed,
             @ForAll NpcShare share,
+            @ForAll @IntRange(min = 0) int turn,
             @ForAll("players") List<PlayerInfo> players,
             @ForAll("text") String token) {
+        LobbySetup setup =
+                turn % 2 == 0 ? new LobbySetup.NewWorld(seed, share) : new LobbySetup.SavedWorld(token, seed, turn);
         List<PlayerInfo> withHost = new ArrayList<>();
         for (int i = 0; i < players.size(); i++) {
             PlayerInfo p = players.get(i);
             withHost.add(new PlayerInfo(p.number(), p.nickname(), i == 0, p.connected(), p.ready(), p.country()));
         }
         for (ServerMessage message : List.of(
-                new ServerMessage.Lobby(session, seed, share, withHost),
+                new ServerMessage.Lobby(session, token, setup, withHost),
                 new ServerMessage.Players(players),
-                new ServerMessage.Joined(session, players.getFirst().number(), token),
+                new ServerMessage.Joined(session, token, players.getFirst().number(), token),
                 new ServerMessage.Lobbies(withHost.stream()
-                        .map(p -> new LobbyInfo(p.number(), p.nickname(), withHost.size(), share))
+                        .map(p -> new LobbyInfo(p.number(), token, p.nickname(), withHost.size(), setup))
+                        .toList()),
+                new ServerMessage.Worlds(withHost.stream()
+                        .map(p -> new WorldInfo(
+                                p.nickname(),
+                                p.ready() ? Optional.of(token) : Optional.empty(),
+                                seed,
+                                turn,
+                                List.of(p.nickname(), token)))
                         .toList()))) {
             assertThat(MessageJson.readServer(MessageJson.write(message))).isEqualTo(message);
         }

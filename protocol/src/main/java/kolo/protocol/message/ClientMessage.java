@@ -1,6 +1,7 @@
 package kolo.protocol.message;
 
 import java.util.Objects;
+import java.util.Optional;
 import kolo.engine.error.Checks;
 import kolo.engine.state.NpcShare;
 
@@ -8,7 +9,7 @@ import kolo.engine.state.NpcShare;
  * Повідомлення клієнта серверу.
  *
  * <p>Клієнт буває щонайбільше в одній сесії: запит, що приводить в іншу ({@link CreateLobby}, {@link JoinLobby},
- * {@link Rejoin}), спершу полишає попередню, як і {@link Leave}. Після виходу повідомлень попередньої сесії клієнт
+ * {@link Rejoin}, {@link LoadWorld}), спершу полишає попередню, як і {@link Leave}. Після виходу повідомлень попередньої сесії клієнт
  * більше не отримує.
  */
 public sealed interface ClientMessage
@@ -19,7 +20,10 @@ public sealed interface ClientMessage
                 ClientMessage.StartGame,
                 ClientMessage.Rejoin,
                 ClientMessage.Leave,
-                ClientMessage.Ready {
+                ClientMessage.Ready,
+                ClientMessage.ListWorlds,
+                ClientMessage.LoadWorld,
+                ClientMessage.AssignSeat {
 
     /** Найдовший токен гравця, символів. */
     int MAX_TOKEN_LENGTH = 128;
@@ -81,9 +85,9 @@ public sealed interface ClientMessage
     record StartGame() implements ClientMessage {}
 
     /**
-     * Повернутися до своєї держави в сесії, що вже йде (після розриву з'єднання). Відповідь — {@link
-     * ServerMessage.Joined}, карта, {@link ServerMessage.Players} і поточна фаза; невірний гравець чи токен —
-     * {@code UNAUTHORIZED}, сесії немає — {@code NOT_FOUND}.
+     * Повернутися до своєї держави в сесії, що вже йде (після розриву з'єднання), або на своє місце в лобі. Відповідь —
+     * {@link ServerMessage.Joined}, далі в грі — карта, {@link ServerMessage.Players} і поточна фаза, у лобі — {@link
+     * ServerMessage.Lobby}; невірний гравець чи токен — {@code UNAUTHORIZED}, сесії немає — {@code NOT_FOUND}.
      *
      * @param session номер сесії з {@link ServerMessage.Joined}
      * @param player номер гравця з {@link ServerMessage.Joined}
@@ -115,6 +119,50 @@ public sealed interface ClientMessage
 
         public Ready {
             Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
+        }
+    }
+
+    /** Збережені світи в теці сервера; відповідь — {@link ServerMessage.Worlds}. */
+    record ListWorlds() implements ClientMessage {}
+
+    /**
+     * Завантажити світ із теки сервера в нову сесію з цим клієнтом-хостом. Гра продовжиться з останнього збереженого
+     * року, коли хост почне її ({@link StartGame}). Відповідь — {@link ServerMessage.Joined}, потім {@link
+     * ServerMessage.Lobby}; або {@link ServerMessage.Error}: світу немає ({@code NOT_FOUND}), його вже відкрито ({@code
+     * WORLD_IN_USE}), файл не прочитати, світ іншого контенту ({@code SAVE_CONTENT_MISMATCH}), токен не цього світу
+     * ({@code UNAUTHORIZED}).
+     *
+     * <p>З токеном свого місця ({@code seat}) хост одразу сідає на нього; без токена — заходить гостем під нікнеймом і
+     * віддає місце собі сам ({@link AssignSeat}). Без токена світ завантажує лише клієнт того самого процесу, що й
+     * сервер (вбудований сервер): з мережі чужий світ не відкрити.
+     *
+     * @param world ім'я світу з {@link WorldInfo}
+     * @param nickname нікнейм — якщо клієнт зайде гостем
+     * @param seat місце в цьому світі, якщо клієнт зберіг його токен
+     */
+    record LoadWorld(String world, String nickname, Optional<PlayerToken> seat) implements ClientMessage {
+
+        public LoadWorld {
+            WorldInfo.checkName(world);
+            Nicknames.check("nickname", nickname);
+            Objects.requireNonNull(seat, "seat");
+        }
+    }
+
+    /**
+     * Хост віддає гостеві лобі завантаженого світу вільне місце гравця. Гість отримує {@link ServerMessage.Joined} з
+     * номером місця й новим токеном, усі — {@link ServerMessage.Lobby}. Не хост — {@code FORBIDDEN}, гостя чи місця немає
+     * — {@code NOT_FOUND}, місце зайняте — {@code SEAT_TAKEN}, нікнейм гостя вже має інший гравець світу — {@code
+     * NICKNAME_TAKEN}.
+     *
+     * @param guest номер гостя з {@link ServerMessage.Lobby}
+     * @param seat номер гравця світу, чиє місце вільне
+     */
+    record AssignSeat(int guest, int seat) implements ClientMessage {
+
+        public AssignSeat {
+            Checks.inRange("guest", guest, 1, Integer.MAX_VALUE);
+            Checks.inRange("seat", seat, 1, Integer.MAX_VALUE);
         }
     }
 }

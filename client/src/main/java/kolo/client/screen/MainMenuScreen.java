@@ -8,7 +8,7 @@ import javafx.scene.layout.VBox;
 import kolo.client.app.Navigator;
 import kolo.client.i18n.Texts;
 
-/** Головне меню (GD §22.2). Завантаження й налаштування — неактивні, доки їх немає. */
+/** Головне меню (GD §22.2). Налаштування — неактивні, доки їх немає. */
 public final class MainMenuScreen {
 
     private static final double BUTTON_WIDTH = 260;
@@ -22,7 +22,8 @@ public final class MainMenuScreen {
         Button newGame = button(texts.text("menu.new_game"));
         newGame.setDefaultButton(true);
         newGame.setOnAction(event -> navigator.showNewWorld());
-        Button load = unavailable(texts.text("menu.load"), texts);
+        Button load = button(texts.text("menu.load"));
+        load.setOnAction(event -> navigator.showLoad());
         Button connect = button(texts.text("menu.connect"));
         connect.setOnAction(event -> navigator.showConnect());
         Button settings = unavailable(texts.text("menu.settings"), texts);

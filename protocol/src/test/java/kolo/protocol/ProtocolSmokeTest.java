@@ -22,6 +22,7 @@ import kolo.engine.view.MapView;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.MapAssembler;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.PlayerInfo;
@@ -105,11 +106,11 @@ class ProtocolSmokeTest {
             switch (message) {
                 case ClientMessage.Hello hello -> ctx.writeAndFlush(Handshake.accept(hello, TestMessages.HASH));
                 case ClientMessage.CreateLobby create -> {
-                    ctx.write(new ServerMessage.Joined(1, 1, "token"));
+                    ctx.write(new ServerMessage.Joined(1, TestMessages.WORLD, 1, "token"));
                     ctx.writeAndFlush(new ServerMessage.Lobby(
                             1,
-                            create.seed(),
-                            create.npcShare(),
+                            TestMessages.WORLD,
+                            new LobbySetup.NewWorld(create.seed(), create.npcShare()),
                             List.of(new PlayerInfo(1, create.nickname(), true, true, false, OptionalInt.empty()))));
                 }
                 case ClientMessage.StartGame start -> {
@@ -147,6 +148,7 @@ class ProtocolSmokeTest {
                 case ServerMessage.Lobby lobby -> ctx.writeAndFlush(new ClientMessage.StartGame());
                 case ServerMessage.Joined joined -> {}
                 case ServerMessage.Lobbies lobbies -> {}
+                case ServerMessage.Worlds worlds -> {}
                 case ServerMessage.Players players -> {}
                 case ServerMessage.MapStart start -> assembler.start(start);
                 case ServerMessage.MapCells cells -> assembler.add(cells).ifPresent(done -> map = done);

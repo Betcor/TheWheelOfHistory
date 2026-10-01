@@ -10,7 +10,6 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.GameException;
 import kolo.engine.error.ValidationException;
-import kolo.engine.state.NpcShare;
 import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 
@@ -24,7 +23,8 @@ public sealed interface ServerMessage
                 ServerMessage.Players,
                 ServerMessage.MapStart,
                 ServerMessage.MapCells,
-                ServerMessage.Phase {
+                ServerMessage.Phase,
+                ServerMessage.Worlds {
 
     /**
      * Відповідь на {@link ClientMessage.Hello}: версії збіглися, з'єднання відкрите.
@@ -98,18 +98,21 @@ public sealed interface ServerMessage
     }
 
     /**
-     * Клієнт увійшов у сесію гравцем — відповідь на {@link ClientMessage.CreateLobby}, {@link ClientMessage.JoinLobby}
-     * і {@link ClientMessage.Rejoin}. Токен — лише цьому клієнтові: з ним гравець повертається до своєї держави; сервер
-     * зберігає лише його хеш.
+     * Клієнт увійшов у сесію гравцем — відповідь на {@link ClientMessage.CreateLobby}, {@link ClientMessage.JoinLobby},
+     * {@link ClientMessage.Rejoin} і {@link ClientMessage.LoadWorld}; ще — гостеві, якому хост віддав місце ({@link
+     * ClientMessage.AssignSeat}). Токен — лише цьому клієнтові: з ним гравець повертається до своєї держави, зокрема в
+     * завантаженому світі на іншому сервері; сервер зберігає лише його хеш.
      *
      * @param session номер сесії
+     * @param world ключ світу ({@link WorldKeys}): клієнт зберігає токен за ним
      * @param player номер гравця в сесії
      * @param token токен гравця
      */
-    record Joined(long session, int player, String token) implements ServerMessage {
+    record Joined(long session, String world, int player, String token) implements ServerMessage {
 
         public Joined {
             Checks.inRange("session", session, 1, Long.MAX_VALUE);
+            WorldKeys.check("world", world);
             Checks.inRange("player", player, 1, Integer.MAX_VALUE);
             Checks.notBlank("token", token);
             Checks.inRange("token", token.length(), 1, ClientMessage.MAX_TOKEN_LENGTH);
@@ -117,18 +120,20 @@ public sealed interface ServerMessage
     }
 
     /**
-     * Стан лобі — усім у лобі після кожної зміни (приєднався, пішов, змінився хост).
+     * Стан лобі — усім у лобі після кожної зміни (приєднався, пішов, змінився хост, гість отримав місце).
      *
      * @param session номер сесії
-     * @param seed seed світу
-     * @param npcShare частка NPC-держав
-     * @param players гравці в порядку приєднання; хост — рівно один
+     * @param world ключ світу ({@link WorldKeys})
+     * @param setup новий світ чи завантажений
+     * @param players у лобі нового світу — гравці в порядку приєднання; завантаженого — гравці світу за номером (і ті,
+     *     кого ще немає), потім гості; хост — рівно один
      */
-    record Lobby(long session, long seed, NpcShare npcShare, List<PlayerInfo> players) implements ServerMessage {
+    record Lobby(long session, String world, LobbySetup setup, List<PlayerInfo> players) implements ServerMessage {
 
         public Lobby {
             Checks.inRange("session", session, 1, Long.MAX_VALUE);
-            Objects.requireNonNull(npcShare, "npcShare");
+            WorldKeys.check("world", world);
+            Objects.requireNonNull(setup, "setup");
             players = List.copyOf(players);
             Checks.inRange("players", players.size(), 1, Integer.MAX_VALUE);
             Checks.inRange(
@@ -199,6 +204,19 @@ public sealed interface ServerMessage
         public Phase {
             Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
             Objects.requireNonNull(phase, "phase");
+        }
+    }
+
+    /**
+     * Збережені світи теки сервера — відповідь на {@link ClientMessage.ListWorlds}. Світів, уже відкритих у сесіях, тут
+     * немає.
+     *
+     * @param worlds світи за ім'ям
+     */
+    record Worlds(List<WorldInfo> worlds) implements ServerMessage {
+
+        public Worlds {
+            worlds = List.copyOf(worlds);
         }
     }
 }

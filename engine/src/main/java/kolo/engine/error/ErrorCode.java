@@ -87,6 +87,12 @@ public enum ErrorCode {
     LOBBY_FULL(ConflictException.class, "max"),
     /** Нікнейм уже зайнятий у цій сесії (без огляду на регістр). Подробиці: {@code nickname}. */
     NICKNAME_TAKEN(ConflictException.class, "nickname"),
+    /** Світ уже відкрито в іншій сесії сервера: один файл світу — одна сесія. Подробиці: {@code world}. */
+    WORLD_IN_USE(ConflictException.class, "world"),
+    /** Місце гравця в завантаженому світі вже зайняте. Подробиці: {@code player}. */
+    SEAT_TAKEN(ConflictException.class, "player"),
+    /** У лобі завантаженого світу є гравці без держави: хост має віддати їм вільні місця або дочекатися їхнього виходу. */
+    PLAYERS_UNSEATED(ConflictException.class),
     /**
      * Повідомлення протоколу пошкоджене або прийшло не в тому порядку. Подробиці: {@code location} (шлях усередині
      * повідомлення, {@code cells[3].site}) і {@code problem} (опис для розробника, не для гравця) або {@code cause}
@@ -114,7 +120,7 @@ public enum ErrorCode {
     CONTENT_MALFORMED(ContentException.class),
     /**
      * Файл світу не вдалося створити, відкрити, записати чи прочитати. Подробиці: {@code file} (ім'я файлу), {@code
-     * operation} ({@code create}, {@code open}, {@code save_turn}, {@code save_player}, {@code load}, {@code close}) і {@code problem}
+     * operation} ({@code create}, {@code open}, {@code save_turn}, {@code save_player}, {@code load}, {@code list}, {@code close}) і {@code problem}
      * ({@code file_exists}, {@code file_missing}, {@code io_error}) або {@code sqlite_code}.
      */
     SAVE_FILE_ERROR(SaveFileException.class),
@@ -131,6 +137,11 @@ public enum ErrorCode {
      * {@code part} = {@code file}.
      */
     SAVE_VERSION_TOO_NEW(SaveVersionException.class, "version", "supported"),
+    /**
+     * Світ створено з іншим контентом гри: продовжити його цим контентом не можна. Подробиці: {@code world} (ім'я
+     * файлу світу), {@code saved} і {@code current} — хеші контенту світу й сервера.
+     */
+    SAVE_CONTENT_MISMATCH(SaveFileException.class),
     INVARIANT_VIOLATION(InvariantViolationException.class);
 
     private static final String KEY_PREFIX = "error.";

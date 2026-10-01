@@ -1,11 +1,14 @@
 package kolo.client.screen;
 
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -15,12 +18,15 @@ import javafx.scene.layout.VBox;
 import kolo.client.i18n.Texts;
 import kolo.client.net.GameClient;
 import kolo.engine.state.WorldLimits;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 
 /**
- * Лобі (GD §22.2): параметри світу, гравці в порядку приєднання (у тому ж порядку вони отримають держави) і кнопка
- * «Почати гру» для хоста. Коли гра почнеться, карту покаже застосунок — подія приходить усім гравцям лобі.
+ * Лобі (GD §22.2): параметри світу, гравці й кнопка «Почати гру» для хоста. У лобі нового світу гравці — в порядку
+ * приєднання (у тому ж порядку вони отримають держави). У лобі завантаженого — гравці світу з державами (вільні місця
+ * теж) і гості без держави: хост віддає гостеві вільне місце. Коли гра почнеться, карту покаже застосунок — подія
+ * приходить усім гравцям лобі.
  */
 public final class LobbyScreen {
 
@@ -41,7 +47,27 @@ public final class LobbyScreen {
         Label count = new Label();
         ListView<PlayerInfo> players = new ListView<>();
         players.setPrefHeight(260);
-        players.setCellFactory(list -> new PlayerCell(texts, game));
+        BooleanProperty saved = new SimpleBooleanProperty();
+        players.setCellFactory(list -> new PlayerCell(texts, game, saved));
+
+        // Хост завантаженого світу: обраному в списку гостеві — вільне місце.
+        ComboBox<PlayerInfo> seats = new ComboBox<>();
+        seats.setPromptText(texts.text("lobby.seat_choose"));
+        seats.setCellFactory(list -> new SeatCell(texts));
+        seats.setButtonCell(new SeatCell(texts));
+        Button assign = new Button(texts.text("lobby.assign"));
+        assign.disableProperty()
+                .bind(seats.valueProperty()
+                        .isNull()
+                        .or(players.getSelectionModel().selectedItemProperty().isNull()));
+        assign.setOnAction(event -> {
+            PlayerInfo guest = players.getSelectionModel().getSelectedItem();
+            if (guest != null && PlayerLabels.guest(guest)) {
+                game.assignSeat(guest.number(), seats.getValue().number());
+            }
+        });
+        HBox seating = new HBox(10, seats, assign);
+        seating.setAlignment(Pos.CENTER_LEFT);
 
         Label status = new Label();
         status.setWrapText(true);
@@ -61,7 +87,7 @@ public final class LobbyScreen {
             start.setDisable(true);
             progress.setVisible(true);
             status.getStyleClass().remove("danger");
-            status.setText(texts.text("lobby.generating"));
+            status.setText(texts.text(saved.get() ? "lobby.resuming" : "lobby.generating"));
             game.startGame();
         });
         context.session().setOnError(error -> {
@@ -75,19 +101,29 @@ public final class LobbyScreen {
             if (lobby == null) {
                 return;
             }
-            settings.setText(texts.text(
-                    "lobby.settings",
-                    lobby.seed(),
-                    texts.text("npc_share." + lobby.npcShare().key())));
-            count.setText(texts.text("lobby.players", lobby.players().size(), WorldLimits.MAX_PLAYERS));
+            saved.set(lobby.setup() instanceof LobbySetup.SavedWorld);
+            settings.setText(LobbyLabels.setup(texts, lobby.setup()));
+            long connected =
+                    lobby.players().stream().filter(PlayerInfo::connected).count();
+            count.setText(texts.text("lobby.players", connected, WorldLimits.MAX_PLAYERS));
             players.getItems().setAll(lobby.players());
             boolean host = lobby.players().stream().anyMatch(p -> p.host() && game.isMe(p));
             start.setVisible(host);
             start.setManaged(host);
+            boolean seatingVisible = host && saved.get();
+            seating.setVisible(seatingVisible);
+            seating.setManaged(seatingVisible);
+            seats.getItems()
+                    .setAll(lobby.players().stream()
+                            .filter(PlayerLabels::freeSeat)
+                            .toList());
             if (!host) {
+                status.getStyleClass().remove("danger");
                 status.setText(texts.text("lobby.waiting"));
             } else if (!progress.isVisible()) {
-                status.setText("");
+                boolean guests = lobby.players().stream().anyMatch(PlayerLabels::guest);
+                status.getStyleClass().remove("danger");
+                status.setText(saved.get() && guests ? texts.text("lobby.guests_waiting") : "");
             }
         };
         update.changed(
@@ -96,7 +132,7 @@ public final class LobbyScreen {
 
         HBox buttons = new HBox(10, leave, start, progress);
         buttons.setAlignment(Pos.CENTER_LEFT);
-        VBox box = new VBox(14, title, settings, lan, count, players, buttons, status);
+        VBox box = new VBox(14, title, settings, lan, count, players, seating, buttons, status);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(24));
         box.setMaxWidth(520);
@@ -110,16 +146,44 @@ public final class LobbyScreen {
     private static final class PlayerCell extends ListCell<PlayerInfo> {
         private final Texts texts;
         private final GameClient game;
+        private final BooleanProperty saved;
 
-        PlayerCell(Texts texts, GameClient game) {
+        PlayerCell(Texts texts, GameClient game, BooleanProperty saved) {
             this.texts = texts;
             this.game = game;
+            this.saved = saved;
         }
 
         @Override
         protected void updateItem(PlayerInfo item, boolean empty) {
             super.updateItem(item, empty);
-            setText(empty || item == null ? null : PlayerLabels.lobby(texts, item, game.isMe(item)));
+            if (empty || item == null) {
+                setText(null);
+            } else if (saved.get()) {
+                setText(PlayerLabels.savedLobby(texts, item, game.isMe(item)));
+            } else {
+                setText(PlayerLabels.lobby(texts, item, game.isMe(item)));
+            }
+        }
+    }
+
+    private static final class SeatCell extends ListCell<PlayerInfo> {
+        private final Texts texts;
+
+        SeatCell(Texts texts) {
+            this.texts = texts;
+        }
+
+        @Override
+        protected void updateItem(PlayerInfo item, boolean empty) {
+            super.updateItem(item, empty);
+            setText(
+                    empty || item == null
+                            ? null
+                            : texts.text(
+                                    "lobby.seat_option",
+                                    item.nickname(),
+                                    item.country().orElse(0) + 1));
         }
     }
 }

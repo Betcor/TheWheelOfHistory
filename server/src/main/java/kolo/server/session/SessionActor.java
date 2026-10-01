@@ -1,5 +1,6 @@
 package kolo.server.session;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -17,7 +18,9 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.ForbiddenException;
 import kolo.engine.error.GameException;
+import kolo.engine.error.NotFoundException;
 import kolo.engine.error.PhaseClosedException;
+import kolo.engine.error.SaveFileException;
 import kolo.engine.error.UnauthorizedException;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
@@ -25,16 +28,20 @@ import kolo.engine.state.WorldState;
 import kolo.engine.turn.TurnPipeline;
 import kolo.engine.view.MapViews;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.Nicknames;
 import kolo.protocol.message.PlayerInfo;
+import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
 import kolo.server.auth.PlayerTokens;
 import kolo.server.persistence.MapSnapshot;
 import kolo.server.persistence.PlayerRecord;
+import kolo.server.persistence.SavedPlayer;
 import kolo.server.persistence.StateSnapshot;
 import kolo.server.persistence.WorldDirectory;
+import kolo.server.persistence.WorldMeta;
 import kolo.server.persistence.WorldStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +61,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>З лобі гравець іде зовсім (пішов хост — хостом стає наступний за порядком); з гри — лише від'єднується: держава
  * лишається його, а з токеном він повертається ({@link #rejoin}). Коли на зв'язку не лишилося нікого, сесія
- * закривається: файл закривається, потік зупиняється; продовжити світ можна, відкривши файл.
+ * закривається: файл закривається, потік зупиняється; продовжити світ можна, завантаживши файл.
+ *
+ * <p>Завантажений світ ({@link #load}) теж починається з лобі, але гравці й держави в ньому вже є — з файлу. Гравець
+ * світу з токеном сідає на своє місце ({@link #rejoin}); хто прийшов без токена (з іншого комп'ютера, з іншого режиму)
+ * — гість лобі під нікнеймом, і хост віддає йому вільне місце ({@link #assign}) з новим токеном. Гру почато — рік
+ * продовжується з останнього збереженого; гравці світу, яких немає, — не на зв'язку, як після від'єднання.
  */
 public final class SessionActor {
 
@@ -73,12 +85,15 @@ public final class SessionActor {
     // Далі — лише в потоці сесії.
     private final List<Member> members = new ArrayList<>();
     private int nextPlayer = 1;
-    private long seed;
-    private NpcShare npcShare;
+    private String worldKey;
+    private LobbySetup setup;
     private YearPhase phase;
     private WorldState world;
     private MapSnapshot map;
     private WorldStore store;
+    /** Файл світу, зайнятий цією сесією в теці; відпускається при закритті. */
+    private Path claimed;
+
     private ServerMessage.Error pauseError;
 
     /**
@@ -133,6 +148,23 @@ public final class SessionActor {
     }
 
     /**
+     * Завантажує світ із теки в лобі з цим хостом. З токеном свого місця ({@code seat}) хост сідає на нього; без нього
+     * — заходить гостем, якщо з'єднання довірене ({@code trusted}: клієнт того самого процесу, що й сервер), інакше —
+     * {@code UNAUTHORIZED}. Світу немає ({@code NOT_FOUND}), його відкрито іншою сесією ({@code WORLD_IN_USE}), файл не
+     * прочитати чи світ іншого контенту ({@code SAVE_CONTENT_MISMATCH}) — помилка хостові й закриття сесії.
+     *
+     * @param world ім'я світу в теці ({@link WorldDirectory#list()})
+     * @param nickname нікнейм хоста, якщо він зайде гостем
+     */
+    public void load(Peer host, String world, String nickname, Optional<PlayerToken> seat, boolean trusted) {
+        Objects.requireNonNull(host, "host");
+        Objects.requireNonNull(world, "world");
+        Nicknames.check("nickname", nickname);
+        Objects.requireNonNull(seat, "seat");
+        post(() -> doLoad(host, world, nickname, seat, trusted));
+    }
+
+    /**
      * Гравець приєднується до лобі. Гру вже почато — {@code LOBBY_CLOSED}, лобі повне — {@code LOBBY_FULL}, нікнейм
      * зайнятий — {@code NICKNAME_TAKEN}; помилка — лише йому.
      */
@@ -143,9 +175,22 @@ public final class SessionActor {
     }
 
     /**
-     * Хост починає гру: світ генерується з гравцями лобі, створюється його файл, гравці отримують карту, список гравців
-     * і фази першого року. Не хост — {@code FORBIDDEN}, гру вже почато — {@code LOBBY_CLOSED}. Невдача генерації
-     * (параметри поза межами, файл не створено) — помилка всім і закриття сесії.
+     * Хост віддає гостеві лобі завантаженого світу вільне місце гравця {@code seat}: гість отримує номер місця й новий
+     * токен. Не хост — {@code FORBIDDEN}, лобі не завантаженого світу чи гру почато — {@code LOBBY_CLOSED}, гостя чи
+     * місця немає — {@code NOT_FOUND}, місце зайняте — {@code SEAT_TAKEN}, той самий нікнейм в іншого гравця світу —
+     * {@code NICKNAME_TAKEN}; помилка — лише хостові.
+     */
+    public void assign(Peer host, int guest, int seat) {
+        Objects.requireNonNull(host, "host");
+        post(() -> doAssign(host, guest, seat));
+    }
+
+    /**
+     * Хост починає гру: новий світ генерується з гравцями лобі, створюється його файл; завантажений — продовжується з
+     * останнього збереженого року, гравці пишуться у файл. Гравці отримують карту, список гравців і фази року. Не хост
+     * — {@code FORBIDDEN}, гру вже почато — {@code LOBBY_CLOSED}, у лобі завантаженого світу є гості без місця — {@code
+     * PLAYERS_UNSEATED}. Невдача генерації чи запису (параметри поза межами, файл не створено) — помилка всім і
+     * закриття сесії.
      */
     public void start(Peer player) {
         Objects.requireNonNull(player, "player");
@@ -226,10 +271,9 @@ public final class SessionActor {
         if (state != SessionState.LOBBY || !members.isEmpty()) {
             throw new IllegalStateException("лобі сесії " + id + " уже відкрито");
         }
-        this.seed = seed;
-        this.npcShare = npcShare;
-        Member member = add(host, nickname);
-        member.host = true;
+        worldKey = WorldStore.newKey();
+        setup = new LobbySetup.NewWorld(seed, npcShare);
+        add(host, nickname, true);
         LOG.info("Сесія {}: лобі відкрито, хост «{}»", id, nickname);
         lobbyChanged();
     }
@@ -239,28 +283,132 @@ public final class SessionActor {
             if (state != SessionState.LOBBY) {
                 throw new ConflictException(ErrorCode.LOBBY_CLOSED, ErrorDetails.of("session", id));
             }
-            if (members.size() >= WorldLimits.MAX_PLAYERS) {
+            if (connected().size() >= WorldLimits.MAX_PLAYERS) {
                 throw new ConflictException(ErrorCode.LOBBY_FULL, ErrorDetails.of("max", WorldLimits.MAX_PLAYERS));
             }
+            // Гравець світу, якого немає, нікнейму не тримає: він міг прийти без токена під тим самим нікнеймом.
             String key = Nicknames.key(nickname);
-            if (members.stream().anyMatch(m -> Nicknames.key(m.nickname).equals(key))) {
+            if (connected().stream().anyMatch(m -> Nicknames.key(m.nickname).equals(key))) {
                 throw new ConflictException(ErrorCode.NICKNAME_TAKEN, ErrorDetails.of("nickname", nickname));
             }
         } catch (GameException e) {
             peer.send(ServerMessage.Error.of(e));
             return;
         }
-        add(peer, nickname);
+        add(peer, nickname, false);
         lobbyChanged();
     }
 
-    private Member add(Peer peer, String nickname) {
+    /** Новий гравець лобі; номер і токен він отримує, коли лобі вже оновилося в списку сервера. */
+    private void add(Peer peer, String nickname, boolean host) {
         String token = tokens.generate();
         Member member = new Member(nextPlayer++, nickname, PlayerTokens.hash(token));
         member.peer = peer;
+        member.host = host;
         members.add(member);
-        peer.send(new ServerMessage.Joined(id, member.number, token));
-        return member;
+        listLobby();
+        peer.send(new ServerMessage.Joined(id, worldKey, member.number, token));
+    }
+
+    private void doLoad(Peer peer, String name, String nickname, Optional<PlayerToken> seat, boolean trusted) {
+        if (state != SessionState.LOBBY || !members.isEmpty()) {
+            throw new IllegalStateException("лобі сесії " + id + " уже відкрито");
+        }
+        Member seated;
+        try {
+            claimed = worlds.open(name);
+            store = WorldStore.open(claimed);
+            WorldMeta meta = store.meta();
+            if (!meta.contentHash().equals(content.hash())) {
+                throw new SaveFileException(
+                        ErrorCode.SAVE_CONTENT_MISMATCH,
+                        ErrorDetails.of("world", name, "saved", meta.contentHash(), "current", content.hash()));
+            }
+            world = store.loadLatest().state();
+            map = store.map();
+            for (SavedPlayer saved : store.players()) {
+                PlayerRecord record = saved.player();
+                Member member = new Member(record.number(), record.nickname(), record.tokenHash());
+                member.country = record.country();
+                members.add(member);
+                nextPlayer = Math.max(nextPlayer, record.number() + 1);
+            }
+            seated = seat.flatMap(this::seat).orElse(null);
+            if (seated == null && (seat.isPresent() || !trusted)) {
+                throw new UnauthorizedException(ErrorDetails.of("world", name));
+            }
+        } catch (GameException e) {
+            peer.send(ServerMessage.Error.of(e));
+            shutdown();
+            return;
+        }
+        worldKey = store.meta().key();
+        setup = new LobbySetup.SavedWorld(name, store.meta().seed(), world.turn());
+        if (seated != null) {
+            seated.peer = peer;
+            seated.host = true;
+            listLobby();
+            peer.send(new ServerMessage.Joined(
+                    id, worldKey, seated.number, seat.orElseThrow().token()));
+        } else {
+            add(peer, nickname, true);
+        }
+        LOG.info("Сесія {}: світ {} завантажено з {}, рік {}", id, name, claimed, world.turn());
+        lobbyChanged();
+    }
+
+    /** Гравець світу з цим номером і токеном. */
+    private Optional<Member> seat(PlayerToken seat) {
+        return members.stream()
+                .filter(m ->
+                        m.country >= 0 && m.number == seat.player() && PlayerTokens.matches(seat.token(), m.tokenHash))
+                .findFirst();
+    }
+
+    private void doAssign(Peer peer, int guestNumber, int seatNumber) {
+        Member host = member(peer);
+        Member guest;
+        Member seat;
+        try {
+            if (host == null || !host.host) {
+                throw new ForbiddenException(ErrorDetails.of("action", "assign_seat"));
+            }
+            if (state != SessionState.LOBBY || !(setup instanceof LobbySetup.SavedWorld)) {
+                throw new ConflictException(ErrorCode.LOBBY_CLOSED, ErrorDetails.of("session", id));
+            }
+            guest = members.stream()
+                    .filter(m -> m.number == guestNumber && m.country < 0 && m.peer != null)
+                    .findFirst()
+                    .orElseThrow(() -> new NotFoundException(
+                            ErrorCode.NOT_FOUND, ErrorDetails.of("what", "player", "id", guestNumber)));
+            seat = members.stream()
+                    .filter(m -> m.number == seatNumber && m.country >= 0)
+                    .findFirst()
+                    .orElseThrow(() -> new NotFoundException(
+                            ErrorCode.NOT_FOUND, ErrorDetails.of("what", "seat", "id", seatNumber)));
+            if (seat.peer != null) {
+                throw new ConflictException(ErrorCode.SEAT_TAKEN, ErrorDetails.of("player", seatNumber));
+            }
+            String key = Nicknames.key(guest.nickname);
+            if (members.stream()
+                    .anyMatch(m -> m != seat
+                            && m.country >= 0
+                            && Nicknames.key(m.nickname).equals(key))) {
+                throw new ConflictException(ErrorCode.NICKNAME_TAKEN, ErrorDetails.of("nickname", guest.nickname));
+            }
+        } catch (GameException e) {
+            peer.send(ServerMessage.Error.of(e));
+            return;
+        }
+        // Місце переходить до гостя разом із новим токеном: старий токен попереднього гравця більше не діє.
+        String token = tokens.generate();
+        seat.nickname = guest.nickname;
+        seat.tokenHash = PlayerTokens.hash(token);
+        seat.peer = guest.peer;
+        seat.host = guest.host;
+        members.remove(guest);
+        seat.peer.send(new ServerMessage.Joined(id, worldKey, seat.number, token));
+        lobbyChanged();
     }
 
     private void doStart(Peer peer) {
@@ -272,12 +420,35 @@ public final class SessionActor {
             if (state != SessionState.LOBBY) {
                 throw new ConflictException(ErrorCode.LOBBY_CLOSED, ErrorDetails.of("session", id));
             }
+            if (setup instanceof LobbySetup.SavedWorld
+                    && members.stream().anyMatch(m -> m.peer != null && m.country < 0)) {
+                throw new ConflictException(ErrorCode.PLAYERS_UNSEATED, ErrorDetails.of("session", id));
+            }
         } catch (GameException e) {
             peer.send(ServerMessage.Error.of(e));
             return;
         }
-        state = SessionState.GENERATING;
         lobby = null;
+        switch (setup) {
+            case LobbySetup.NewWorld fresh -> {
+                if (!generate(fresh)) {
+                    return;
+                }
+            }
+            case LobbySetup.SavedWorld saved -> {
+                if (!resume(saved)) {
+                    return;
+                }
+            }
+        }
+        state = SessionState.RUNNING;
+        broadcast(MapChunks.split(MapViews.of(world)));
+        startYear();
+    }
+
+    /** @return чи світ згенеровано й файл створено */
+    private boolean generate(LobbySetup.NewWorld fresh) {
+        state = SessionState.GENERATING;
         List<PlayerRecord> records = new ArrayList<>();
         for (int i = 0; i < members.size(); i++) {
             Member member = members.get(i);
@@ -285,20 +456,37 @@ public final class SessionActor {
             records.add(new PlayerRecord(member.number, member.nickname, member.tokenHash, i, member.host));
         }
         try {
-            WorldState initial = NewWorlds.generate(content, seed, members.size(), npcShare);
+            WorldState initial = NewWorlds.generate(content, fresh.seed(), members.size(), fresh.npcShare());
             MapSnapshot snapshot = MapSnapshot.of(initial.map());
-            store = worlds.create(seed, snapshot, StateSnapshot.of(initial, snapshot), records);
+            store = worlds.create(fresh.seed(), worldKey, snapshot, StateSnapshot.of(initial, snapshot), records);
+            claimed = store.file();
             map = snapshot;
             world = initial;
         } catch (GameException e) {
             broadcast(List.of(ServerMessage.Error.of(e)));
             shutdown();
-            return;
+            return false;
         }
-        LOG.info("Сесія {}: світ {} з {} гравцями створено у {}", id, seed, members.size(), store.file());
-        state = SessionState.RUNNING;
-        broadcast(MapChunks.split(MapViews.of(world)));
-        startYear();
+        LOG.info("Сесія {}: світ {} з {} гравцями створено у {}", id, fresh.seed(), members.size(), store.file());
+        return true;
+    }
+
+    /** @return чи гравців записано у файл завантаженого світу */
+    private boolean resume(LobbySetup.SavedWorld saved) {
+        List<PlayerRecord> records = new ArrayList<>();
+        for (Member member : members) {
+            records.add(
+                    new PlayerRecord(member.number, member.nickname, member.tokenHash, member.country, member.host));
+        }
+        try {
+            store.updatePlayers(records);
+        } catch (GameException e) {
+            broadcast(List.of(ServerMessage.Error.of(e)));
+            shutdown();
+            return false;
+        }
+        LOG.info("Сесія {}: світ {} продовжується з року {}", id, saved.name(), world.turn());
+        return true;
     }
 
     private void doRejoin(Peer peer, int number, String token) {
@@ -315,7 +503,10 @@ public final class SessionActor {
             member.peer.send(List.of(), true);
         }
         member.peer = peer;
-        peer.send(new ServerMessage.Joined(id, member.number, token));
+        if (state == SessionState.LOBBY) {
+            listLobby();
+        }
+        peer.send(new ServerMessage.Joined(id, worldKey, member.number, token));
         if (state == SessionState.LOBBY) {
             lobbyChanged();
             return;
@@ -350,13 +541,21 @@ public final class SessionActor {
             return;
         }
         if (state == SessionState.LOBBY) {
-            members.remove(member);
-            if (members.isEmpty()) {
+            // Гравець завантаженого світу лишає своє місце вільним; решта йде з лобі зовсім.
+            if (member.country >= 0) {
+                member.peer = null;
+            } else {
+                members.remove(member);
+            }
+            boolean wasHost = member.host;
+            member.host = false;
+            List<Member> left = connected();
+            if (left.isEmpty()) {
                 shutdown();
                 return;
             }
-            if (member.host) {
-                members.getFirst().host = true;
+            if (wasHost) {
+                left.getFirst().host = true;
             }
             lobbyChanged();
             return;
@@ -418,9 +617,22 @@ public final class SessionActor {
     }
 
     private void lobbyChanged() {
+        listLobby();
+        broadcast(List.of(new ServerMessage.Lobby(id, worldKey, setup, players())));
+    }
+
+    /**
+     * Оновлює лобі в списку сервера. Раніше, ніж гравець дізнається про вхід ({@code Joined}): клієнт, що вже знає
+     * номер сесії, мусить бачити її й у списку.
+     */
+    private void listLobby() {
         Member host = members.stream().filter(m -> m.host).findFirst().orElseThrow();
-        lobby = new LobbyInfo(id, host.nickname, members.size(), npcShare);
-        broadcast(List.of(new ServerMessage.Lobby(id, seed, npcShare, players())));
+        lobby = new LobbyInfo(id, worldKey, host.nickname, connected().size(), setup);
+    }
+
+    /** Гравці на зв'язку в порядку списку. */
+    private List<Member> connected() {
+        return members.stream().filter(m -> m.peer != null).toList();
     }
 
     private void playersChanged() {
@@ -480,6 +692,9 @@ public final class SessionActor {
                 LOG.error("Сесія {}: файл світу не закрито", id, e);
             }
         }
+        if (claimed != null) {
+            worlds.release(claimed);
+        }
         executor.shutdown();
         onClosed.accept(this);
         LOG.debug("Сесію {} закрито", id);
@@ -488,14 +703,14 @@ public final class SessionActor {
     /** Гравець сесії; змінюється лише в потоці сесії. */
     private static final class Member {
         final int number;
-        final String nickname;
-        final String tokenHash;
+        String nickname;
+        String tokenHash;
         /** З'єднання гравця; {@code null} — гравець не на зв'язку. */
         Peer peer;
 
         boolean host;
         boolean ready;
-        /** Номер держави; до початку гри — −1. */
+        /** Номер держави; у лобі нового світу й у гостя лобі завантаженого — −1. */
         int country = -1;
 
         Member(int number, String nickname, String tokenHash) {

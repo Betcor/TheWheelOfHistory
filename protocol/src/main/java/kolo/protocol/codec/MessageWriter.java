@@ -17,8 +17,10 @@ import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.WorldInfo;
 
 /**
  * JSON повідомлень: UTF-8 без пробілів, поле {@code type} першим, решта — у сталому порядку цього класу, відсутнє
@@ -64,6 +66,26 @@ final class MessageWriter {
                     json.writeStringField("type", MessageTypes.READY);
                     json.writeNumberField("turn", ready.turn());
                 }
+                case ClientMessage.ListWorlds list -> json.writeStringField("type", MessageTypes.LIST_WORLDS);
+                case ClientMessage.LoadWorld load -> {
+                    json.writeStringField("type", MessageTypes.LOAD_WORLD);
+                    json.writeStringField("world", load.world());
+                    json.writeStringField("nickname", load.nickname());
+                    json.writeFieldName("seat");
+                    if (load.seat().isPresent()) {
+                        json.writeStartObject();
+                        json.writeNumberField("player", load.seat().get().player());
+                        json.writeStringField("token", load.seat().get().token());
+                        json.writeEndObject();
+                    } else {
+                        json.writeNull();
+                    }
+                }
+                case ClientMessage.AssignSeat assign -> {
+                    json.writeStringField("type", MessageTypes.ASSIGN_SEAT);
+                    json.writeNumberField("guest", assign.guest());
+                    json.writeNumberField("seat", assign.seat());
+                }
             }
             json.writeEndObject();
         });
@@ -105,14 +127,15 @@ final class MessageWriter {
                 case ServerMessage.Joined joined -> {
                     json.writeStringField("type", MessageTypes.JOINED);
                     json.writeNumberField("session", joined.session());
+                    json.writeStringField("world", joined.world());
                     json.writeNumberField("player", joined.player());
                     json.writeStringField("token", joined.token());
                 }
                 case ServerMessage.Lobby lobby -> {
                     json.writeStringField("type", MessageTypes.LOBBY);
                     json.writeNumberField("session", lobby.session());
-                    json.writeNumberField("seed", lobby.seed());
-                    json.writeStringField("npc_share", key(lobby.npcShare()));
+                    json.writeStringField("world", lobby.world());
+                    setup(json, lobby.setup());
                     players(json, lobby.players());
                 }
                 case ServerMessage.Players players -> {
@@ -145,6 +168,14 @@ final class MessageWriter {
                     json.writeNumberField("turn", phase.turn());
                     json.writeStringField("phase", key(phase.phase()));
                 }
+                case ServerMessage.Worlds worlds -> {
+                    json.writeStringField("type", MessageTypes.WORLDS);
+                    json.writeArrayFieldStart("worlds");
+                    for (WorldInfo world : worlds.worlds()) {
+                        world(json, world);
+                    }
+                    json.writeEndArray();
+                }
             }
             json.writeEndObject();
         });
@@ -158,9 +189,42 @@ final class MessageWriter {
     private static void lobby(JsonGenerator json, LobbyInfo lobby) throws IOException {
         json.writeStartObject();
         json.writeNumberField("session", lobby.session());
+        json.writeStringField("world", lobby.world());
         json.writeStringField("host", lobby.host());
         json.writeNumberField("players", lobby.players());
-        json.writeStringField("npc_share", key(lobby.npcShare()));
+        setup(json, lobby.setup());
+        json.writeEndObject();
+    }
+
+    private static void setup(JsonGenerator json, LobbySetup setup) throws IOException {
+        json.writeObjectFieldStart("setup");
+        switch (setup) {
+            case LobbySetup.NewWorld world -> {
+                json.writeStringField("kind", MessageTypes.NEW_WORLD);
+                json.writeNumberField("seed", world.seed());
+                json.writeStringField("npc_share", key(world.npcShare()));
+            }
+            case LobbySetup.SavedWorld world -> {
+                json.writeStringField("kind", MessageTypes.SAVED_WORLD);
+                json.writeStringField("name", world.name());
+                json.writeNumberField("seed", world.seed());
+                json.writeNumberField("turn", world.turn());
+            }
+        }
+        json.writeEndObject();
+    }
+
+    private static void world(JsonGenerator json, WorldInfo world) throws IOException {
+        json.writeStartObject();
+        json.writeStringField("name", world.name());
+        optionalKey(json, "key", world.key().orElse(null));
+        json.writeNumberField("seed", world.seed());
+        json.writeNumberField("turn", world.turn());
+        json.writeArrayFieldStart("players");
+        for (String player : world.players()) {
+            json.writeString(player);
+        }
+        json.writeEndArray();
         json.writeEndObject();
     }
 

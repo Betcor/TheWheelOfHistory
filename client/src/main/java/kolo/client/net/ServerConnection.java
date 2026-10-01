@@ -15,6 +15,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import java.net.SocketAddress;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -23,7 +24,9 @@ import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.WorldInfo;
 
 /**
  * З'єднання клієнта з сервером — вбудованим ({@code LocalAddress}) чи віддаленим (TCP): той самий протокол і ті самі
@@ -127,6 +130,32 @@ public final class ServerConnection implements AutoCloseable {
         return request(
                 new ClientMessage.Rejoin(credentials.session(), credentials.player(), credentials.token()),
                 ServerMessage.Joined.class);
+    }
+
+    /** Повертається на місце гравця {@code seat} у сесії {@code session} (з токеном, збереженим на диску). */
+    public CompletableFuture<ServerMessage.Joined> rejoin(long session, PlayerToken seat) {
+        return request(new ClientMessage.Rejoin(session, seat.player(), seat.token()), ServerMessage.Joined.class);
+    }
+
+    /** Збережені світи в теці сервера. */
+    public CompletableFuture<List<WorldInfo>> worlds() {
+        return request(new ClientMessage.ListWorlds(), ServerMessage.Worlds.class)
+                .thenApply(ServerMessage.Worlds::worlds);
+    }
+
+    /**
+     * Завантажує світ у нове лобі з цим клієнтом-хостом; стан лобі прийде слухачеві.
+     *
+     * @param seat місце в цьому світі, якщо клієнт зберіг його токен; інакше клієнт зайде гостем під нікнеймом
+     */
+    public CompletableFuture<ServerMessage.Joined> loadWorld(
+            String world, String nickname, Optional<PlayerToken> seat) {
+        return request(new ClientMessage.LoadWorld(world, nickname, seat), ServerMessage.Joined.class);
+    }
+
+    /** Хост віддає гостеві вільне місце; помилку отримає слухач цього з'єднання. */
+    public void assignSeat(int guest, int seat) {
+        send(new ClientMessage.AssignSeat(guest, seat));
     }
 
     /** Хост починає гру; карту отримають слухачі всіх гравців, помилку — слухач цього з'єднання. */

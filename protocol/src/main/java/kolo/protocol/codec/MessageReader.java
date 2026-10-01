@@ -28,8 +28,11 @@ import kolo.engine.view.CountryView;
 import kolo.protocol.ProtocolErrors;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
+import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.WorldInfo;
 import kolo.protocol.message.YearPhase;
 
 /** Читання повідомлень, записаних {@link MessageWriter}: структура й значення перевіряються суворо. */
@@ -75,6 +78,18 @@ final class MessageReader {
                 int turn = root.field("turn").intValue();
                 yield root.build(() -> new ClientMessage.Ready(turn));
             }
+            case MessageTypes.LIST_WORLDS -> new ClientMessage.ListWorlds();
+            case MessageTypes.LOAD_WORLD -> {
+                String world = root.field("world").text();
+                String nickname = root.field("nickname").text();
+                Optional<PlayerToken> seat = root.optional("seat").map(MessageReader::seat);
+                yield root.build(() -> new ClientMessage.LoadWorld(world, nickname, seat));
+            }
+            case MessageTypes.ASSIGN_SEAT -> {
+                int guest = root.field("guest").intValue();
+                int seat = root.field("seat").intValue();
+                yield root.build(() -> new ClientMessage.AssignSeat(guest, seat));
+            }
             default -> throw type.malformed("unknown_type");
         };
         root.end();
@@ -97,16 +112,17 @@ final class MessageReader {
             }
             case MessageTypes.JOINED -> {
                 long session = root.field("session").longValue();
+                String world = root.field("world").text();
                 int player = root.field("player").intValue();
                 String token = root.field("token").text();
-                yield root.build(() -> new ServerMessage.Joined(session, player, token));
+                yield root.build(() -> new ServerMessage.Joined(session, world, player, token));
             }
             case MessageTypes.LOBBY -> {
                 long session = root.field("session").longValue();
-                long seed = root.field("seed").longValue();
-                NpcShare share = root.field("npc_share").enumValue(NpcShare.class);
+                String world = root.field("world").text();
+                LobbySetup setup = setup(root.field("setup"));
                 List<PlayerInfo> players = root.field("players").list(MessageReader::player);
-                yield root.build(() -> new ServerMessage.Lobby(session, seed, share, players));
+                yield root.build(() -> new ServerMessage.Lobby(session, world, setup, players));
             }
             case MessageTypes.PLAYERS -> {
                 List<PlayerInfo> players = root.field("players").list(MessageReader::player);
@@ -129,6 +145,10 @@ final class MessageReader {
                 int turn = root.field("turn").intValue();
                 YearPhase phase = root.field("phase").enumValue(YearPhase.class);
                 yield root.build(() -> new ServerMessage.Phase(turn, phase));
+            }
+            case MessageTypes.WORLDS -> {
+                List<WorldInfo> worlds = root.field("worlds").list(MessageReader::world);
+                yield root.build(() -> new ServerMessage.Worlds(worlds));
             }
             default -> throw type.malformed("unknown_type");
         };
@@ -172,11 +192,49 @@ final class MessageReader {
 
     private static LobbyInfo lobby(MessageNode node) {
         long session = node.field("session").longValue();
+        String world = node.field("world").text();
         String host = node.field("host").text();
         int players = node.field("players").intValue();
-        NpcShare share = node.field("npc_share").enumValue(NpcShare.class);
+        LobbySetup setup = setup(node.field("setup"));
         node.end();
-        return node.build(() -> new LobbyInfo(session, host, players, share));
+        return node.build(() -> new LobbyInfo(session, world, host, players, setup));
+    }
+
+    private static LobbySetup setup(MessageNode node) {
+        MessageNode kind = node.field("kind");
+        LobbySetup setup = switch (kind.text()) {
+            case MessageTypes.NEW_WORLD -> {
+                long seed = node.field("seed").longValue();
+                NpcShare share = node.field("npc_share").enumValue(NpcShare.class);
+                yield node.build(() -> new LobbySetup.NewWorld(seed, share));
+            }
+            case MessageTypes.SAVED_WORLD -> {
+                String name = node.field("name").text();
+                long seed = node.field("seed").longValue();
+                int turn = node.field("turn").intValue();
+                yield node.build(() -> new LobbySetup.SavedWorld(name, seed, turn));
+            }
+            default -> throw kind.malformed("unknown_value");
+        };
+        node.end();
+        return setup;
+    }
+
+    private static WorldInfo world(MessageNode node) {
+        String name = node.field("name").text();
+        Optional<String> key = node.optional("key").map(MessageNode::text);
+        long seed = node.field("seed").longValue();
+        int turn = node.field("turn").intValue();
+        List<String> players = node.field("players").texts();
+        node.end();
+        return node.build(() -> new WorldInfo(name, key, seed, turn, players));
+    }
+
+    private static PlayerToken seat(MessageNode node) {
+        int player = node.field("player").intValue();
+        String token = node.field("token").text();
+        node.end();
+        return node.build(() -> new PlayerToken(player, token));
     }
 
     private static PlayerInfo player(MessageNode node) {

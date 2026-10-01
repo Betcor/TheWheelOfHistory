@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.NpcShare;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.server.TestServers;
 import kolo.server.persistence.WorldDirectory;
 import kolo.server.persistence.WorldStore;
@@ -41,13 +42,14 @@ class SessionsTest {
         SessionActor open = sessions.create(TestServers.CONTENT);
         RecordingPeer host = new RecordingPeer();
         open.open(host, "Оля", 4, NpcShare.MANY);
-        host.joined();
+        String world = host.joined().world();
         host.lobby();
 
         assertThat(sessions.find(open.id())).contains(open);
         assertThat(sessions.find(99)).isEmpty();
         // Сесія без відкритого лобі в списку не з'являється.
-        assertThat(sessions.lobbies()).containsExactly(new LobbyInfo(open.id(), "Оля", 1, NpcShare.MANY));
+        assertThat(sessions.lobbies())
+                .containsExactly(new LobbyInfo(open.id(), world, "Оля", 1, new LobbySetup.NewWorld(4, NpcShare.MANY)));
         assertThat(empty.lobby()).isEmpty();
         sessions.closeAll(30, TimeUnit.SECONDS);
         assertThat(sessions.lobbies()).isEmpty();

@@ -12,6 +12,9 @@ public interface Navigator {
 
     void showConnect();
 
+    /** Збережені світи вбудованого сервера. */
+    void showLoad();
+
     /** Лобі поточної сесії. */
     void showLobby();
 

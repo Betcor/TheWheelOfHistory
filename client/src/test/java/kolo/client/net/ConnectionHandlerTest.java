@@ -18,6 +18,7 @@ import kolo.engine.state.NpcShare;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.MapChunks;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
@@ -29,8 +30,9 @@ import org.junit.jupiter.api.Test;
 class ConnectionHandlerTest {
 
     private static final String HASH = "e".repeat(64);
+    private static final String WORLD = "0123456789abcdef0123456789abcdef";
     private static final ClientMessage.CreateLobby CREATE = new ClientMessage.CreateLobby("Оля", 1, NpcShare.FEW);
-    private static final ServerMessage.Joined JOINED = new ServerMessage.Joined(3, 1, "token");
+    private static final ServerMessage.Joined JOINED = new ServerMessage.Joined(3, WORLD, 1, "token");
     private static final List<PlayerInfo> PLAYERS =
             List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.of(0)));
 
@@ -83,7 +85,8 @@ class ConnectionHandlerTest {
     void lobbiesAnswerTheRequest() throws Exception {
         CompletableFuture<ServerMessage.Lobbies> lobbies = new CompletableFuture<>();
         handler.request(channel, new ClientMessage.ListLobbies(), ServerMessage.Lobbies.class, lobbies);
-        ServerMessage.Lobbies reply = new ServerMessage.Lobbies(List.of(new LobbyInfo(3, "Оля", 2, NpcShare.FEW)));
+        ServerMessage.Lobbies reply = new ServerMessage.Lobbies(
+                List.of(new LobbyInfo(3, WORLD, "Оля", 2, new LobbySetup.NewWorld(1, NpcShare.FEW))));
 
         channel.writeInbound(reply);
 
@@ -100,7 +103,10 @@ class ConnectionHandlerTest {
     @Test
     void lobbyAndPlayersGoToTheListener() throws Exception {
         ServerMessage.Lobby lobby = new ServerMessage.Lobby(
-                3, 1, NpcShare.FEW, List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty())));
+                3,
+                WORLD,
+                new LobbySetup.NewWorld(1, NpcShare.FEW),
+                List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty())));
 
         channel.writeInbound(lobby);
         channel.writeInbound(new ServerMessage.Players(PLAYERS));
@@ -146,9 +152,17 @@ class ConnectionHandlerTest {
 
     @Test
     void unexpectedReplyIsAProtocolError() {
-        channel.writeInbound(JOINED);
+        channel.writeInbound(new ServerMessage.Lobbies(List.of()));
 
         assertThat(channel.isOpen()).isFalse();
+    }
+
+    @Test
+    void joinedWithoutARequestIsASeatFromTheHost() throws Exception {
+        channel.writeInbound(JOINED);
+
+        assertThat(channel.isOpen()).isTrue();
+        assertThat(listener.next()).isEqualTo(new RecordingListener.Joined(JOINED));
     }
 
     @Test

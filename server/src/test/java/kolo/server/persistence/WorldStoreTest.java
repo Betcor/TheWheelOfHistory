@@ -35,9 +35,15 @@ class WorldStoreTest {
         Path file = dir.resolve("світ" + WorldStore.EXTENSION);
         try (WorldStore store = TestStores.create(file, INITIAL, MAP)) {
             assertThat(store.file()).isEqualTo(file);
+            assertThat(store.meta().key()).matches("[0-9a-f]{32}");
             assertThat(store.meta())
                     .isEqualTo(new WorldMeta(
-                            "Тестовий світ", STATE.seed(), STATE.contentHash(), MAP.hash(), TestStores.NOW));
+                            "Тестовий світ",
+                            store.meta().key(),
+                            STATE.seed(),
+                            STATE.contentHash(),
+                            MAP.hash(),
+                            TestStores.NOW));
             assertThat(store.map().hash()).isEqualTo(MAP.hash());
             assertThat(store.lastTurn()).isEqualTo(STATE.turn());
             assertThat(store.turns())
