@@ -17,6 +17,28 @@ public final class PlayerLabels {
         return texts.text(key, player.nickname());
     }
 
+    /** Гравець у лобі завантаженого світу: ще й держава, вільне місце чи гість без держави. */
+    public static String savedLobby(Texts texts, PlayerInfo player, boolean me) {
+        String label = lobby(texts, player, me);
+        if (player.country().isEmpty()) {
+            return texts.text("lobby.guest", label);
+        }
+        return texts.text(
+                player.connected() ? "lobby.seat" : "lobby.seat_free",
+                label,
+                player.country().getAsInt() + 1);
+    }
+
+    /** Чи це гість лобі завантаженого світу — на зв'язку, але без держави. */
+    public static boolean guest(PlayerInfo player) {
+        return player.connected() && player.country().isEmpty();
+    }
+
+    /** Чи це вільне місце гравця завантаженого світу. */
+    public static boolean freeSeat(PlayerInfo player) {
+        return !player.connected() && player.country().isPresent();
+    }
+
     /** Гравець на карті: готовий, не на зв'язку чи ще думає над наказами. */
     public static String game(Texts texts, PlayerInfo player) {
         String key = !player.connected() ? "map.player_offline" : player.ready() ? "map.player_ready" : "map.player";

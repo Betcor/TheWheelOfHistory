@@ -14,6 +14,7 @@ import kolo.client.map.MapLayers;
 import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
 import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.LoadScreen;
 import kolo.client.screen.LobbyScreen;
 import kolo.client.screen.MainMenuScreen;
 import kolo.client.screen.MapScreen;
@@ -22,7 +23,7 @@ import kolo.client.screen.ScreenContext;
 import kolo.client.state.SessionModel;
 
 /**
- * JavaFX-застосунок клієнта: головне меню → новий світ або підключення → лобі → карта з роками.
+ * JavaFX-застосунок клієнта: головне меню → новий світ, збережений світ або підключення → лобі → карта з роками.
  *
  * <p>Світ живе на сервері — вбудованому ({@link GameClient}: одиночна гра й LAN-хост) чи віддаленому: клієнт говорить
  * із ним повідомленнями протоколу. Коли гра почалася (чи клієнт повернувся в неї), застосунок готує шари карти у
@@ -78,6 +79,11 @@ public final class KoloApp extends Application implements Navigator {
     @Override
     public void showConnect() {
         show(ConnectScreen.create(context));
+    }
+
+    @Override
+    public void showLoad() {
+        show(LoadScreen.create(context));
     }
 
     @Override

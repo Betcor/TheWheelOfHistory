@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -14,6 +16,7 @@ import java.util.function.Supplier;
 import javafx.application.Platform;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Label;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
@@ -23,12 +26,16 @@ import kolo.client.i18n.Texts;
 import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
 import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.LoadScreen;
 import kolo.client.screen.LobbyScreen;
 import kolo.client.screen.MainMenuScreen;
 import kolo.client.screen.MapScreen;
 import kolo.client.screen.NewWorldScreen;
 import kolo.client.screen.ScreenContext;
 import kolo.client.state.SessionModel;
+import kolo.protocol.message.LobbySetup;
+import kolo.protocol.message.PlayerInfo;
+import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -55,6 +62,9 @@ class MapScreenSmokeTest {
 
         @Override
         public void showConnect() {}
+
+        @Override
+        public void showLoad() {}
 
         @Override
         public void showLobby() {}
@@ -113,6 +123,36 @@ class MapScreenSmokeTest {
             new Scene(NewWorldScreen.create(context()), WIDTH, HEIGHT);
             new Scene(ConnectScreen.create(context()), WIDTH, HEIGHT);
             new Scene(LobbyScreen.create(context()), WIDTH, HEIGHT);
+            new Scene(LoadScreen.create(context()), WIDTH, HEIGHT);
+            return null;
+        });
+    }
+
+    @Test
+    void savedLobbyShowsSeatsToTheHost() throws Exception {
+        String world = "0123456789abcdef0123456789abcdef";
+        // Лобі завантаженого світу, яке бачить гість-хост: місця гравців світу й він сам без держави.
+        session.lobby(new ServerMessage.Lobby(
+                1,
+                world,
+                new LobbySetup.SavedWorld("world-5", 5, 3),
+                List.of(
+                        new PlayerInfo(1, "Оля", false, false, false, OptionalInt.of(0)),
+                        new PlayerInfo(2, "Марко", true, true, false, OptionalInt.empty()))));
+        Parent screen = onFx(() -> {
+            Parent lobby = LobbyScreen.create(context());
+            new Scene(lobby, WIDTH, HEIGHT);
+            lobby.applyCss();
+            lobby.layout();
+            return lobby;
+        });
+
+        assertThat(onFx(() -> screen.lookupAll(".label").stream()
+                        .map(node -> ((Label) node).getText())
+                        .toList()))
+                .contains("Світ «world-5» · seed 5 · продовження з 1973 року");
+        onFx(() -> {
+            session.reset();
             return null;
         });
     }

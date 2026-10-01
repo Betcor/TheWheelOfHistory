@@ -24,6 +24,9 @@ public final class TestMessages {
 
     public static final String HASH = "a".repeat(64);
 
+    /** Ключ світу. */
+    public static final String WORLD = "0123456789abcdef0123456789abcdef";
+
     private static final int SIDE = 10;
 
     private TestMessages() {}

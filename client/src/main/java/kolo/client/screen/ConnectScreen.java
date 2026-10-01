@@ -1,6 +1,7 @@
 package kolo.client.screen;
 
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Optional;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -19,10 +20,12 @@ import kolo.client.net.ServerAddress;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.Nicknames;
+import kolo.protocol.message.WorldInfo;
 
 /**
  * Підключення до гри в локальній мережі чи на окремому сервері (GD §21): адреса, нікнейм, список відкритих лобі й
- * приєднання до обраного.
+ * приєднання до обраного (зі збереженим токеном цього світу — на своє місце), а також світи з теки сервера: обраний
+ * завантажується в нове лобі, якщо на диску є токен місця в ньому.
  */
 public final class ConnectScreen {
 
@@ -42,6 +45,13 @@ public final class ConnectScreen {
         lobbies.setPlaceholder(new Label(texts.text("connect.none")));
         lobbies.setCellFactory(list -> new LobbyCell(texts));
         lobbies.setVisible(false);
+        ListView<WorldInfo> worlds = new ListView<>();
+        worlds.setPrefHeight(140);
+        worlds.setPlaceholder(new Label(texts.text("connect.no_worlds")));
+        worlds.setCellFactory(list -> new WorldCell(texts));
+        worlds.setVisible(false);
+        Label worldsTitle = new Label(texts.text("connect.worlds"));
+        worldsTitle.visibleProperty().bind(worlds.visibleProperty());
 
         Label error = new Label();
         error.getStyleClass().add("danger");
@@ -58,6 +68,9 @@ public final class ConnectScreen {
         Button join = new Button(texts.text("connect.join"));
         join.disableProperty()
                 .bind(lobbies.getSelectionModel().selectedItemProperty().isNull());
+        Button load = new Button(texts.text("connect.load"));
+        load.disableProperty()
+                .bind(worlds.getSelectionModel().selectedItemProperty().isNull());
 
         find.setOnAction(event -> {
             InetSocketAddress target;
@@ -71,11 +84,16 @@ public final class ConnectScreen {
             find.setDisable(true);
             progress.setVisible(true);
             UiFutures.onUi(
-                    context.game().findLobbies(target),
+                    context.game()
+                            .findLobbies(target)
+                            .thenCompose(found ->
+                                    context.game().findWorlds(target).thenApply(saved -> new Found(found, saved))),
                     texts,
                     found -> {
-                        lobbies.getItems().setAll(found);
+                        lobbies.getItems().setAll(found.lobbies());
                         lobbies.setVisible(true);
+                        worlds.getItems().setAll(found.worlds());
+                        worlds.setVisible(true);
                         find.setDisable(false);
                         progress.setVisible(false);
                     },
@@ -97,7 +115,7 @@ public final class ConnectScreen {
             context.session().reset();
             progress.setVisible(true);
             UiFutures.onUi(
-                    context.game().joinLobby(chosen.session(), player.get()),
+                    context.game().joinLobby(chosen, player.get()),
                     texts,
                     joined -> context.navigator().showLobby(),
                     message -> {
@@ -106,17 +124,54 @@ public final class ConnectScreen {
                     });
         });
 
-        HBox buttons = new HBox(10, back, find, join, progress);
+        load.setOnAction(event -> {
+            Optional<String> player = NicknameInput.parse(nickname.getText());
+            if (player.isEmpty()) {
+                error.setText(texts.text("new_world.nickname_invalid", Nicknames.MAX_LENGTH));
+                return;
+            }
+            WorldInfo chosen = worlds.getSelectionModel().getSelectedItem();
+            error.setText("");
+            context.session().reset();
+            progress.setVisible(true);
+            UiFutures.onUi(
+                    context.game().loadWorld(chosen, player.get()),
+                    texts,
+                    joined -> context.navigator().showLobby(),
+                    message -> {
+                        error.setText(message);
+                        progress.setVisible(false);
+                    });
+        });
+
+        HBox buttons = new HBox(10, back, find, join, load, progress);
         buttons.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(texts.text("connect.title"));
         title.getStyleClass().add("title-2");
-        VBox box = new VBox(18, title, form, lobbies, buttons, error);
+        VBox box = new VBox(18, title, form, lobbies, worldsTitle, worlds, buttons, error);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(24));
         box.setMaxWidth(560);
         VBox outer = new VBox(box);
         outer.setAlignment(Pos.CENTER);
         return outer;
+    }
+
+    /** Що знайшлося на сервері. */
+    private record Found(List<LobbyInfo> lobbies, List<WorldInfo> worlds) {}
+
+    private static final class WorldCell extends ListCell<WorldInfo> {
+        private final Texts texts;
+
+        WorldCell(Texts texts) {
+            this.texts = texts;
+        }
+
+        @Override
+        protected void updateItem(WorldInfo item, boolean empty) {
+            super.updateItem(item, empty);
+            setText(empty || item == null ? null : LobbyLabels.world(texts, item));
+        }
     }
 
     private static final class LobbyCell extends ListCell<LobbyInfo> {
@@ -136,7 +191,7 @@ public final class ConnectScreen {
                                     "connect.lobby",
                                     item.host(),
                                     item.players(),
-                                    texts.text("npc_share." + item.npcShare().key())));
+                                    LobbyLabels.setup(texts, item.setup())));
         }
     }
 }

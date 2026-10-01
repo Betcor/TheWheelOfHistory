@@ -9,6 +9,7 @@ import kolo.client.map.TestMaps;
 import kolo.client.net.GameStart;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
@@ -83,6 +84,9 @@ class SessionModelTest {
 
     private static ServerMessage.Lobby lobby() {
         return new ServerMessage.Lobby(
-                1, 2, NpcShare.FEW, List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty())));
+                1,
+                "0123456789abcdef0123456789abcdef",
+                new LobbySetup.NewWorld(2, NpcShare.FEW),
+                List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty())));
     }
 }

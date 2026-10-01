@@ -20,6 +20,7 @@ import kolo.engine.state.NpcShare;
 import kolo.engine.state.WorldLimits;
 import kolo.engine.state.WorldState;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
@@ -41,8 +42,12 @@ class SessionActorTest {
     @TempDir
     Path worlds;
 
+    private static final LobbySetup FEW_11 = new LobbySetup.NewWorld(11, NpcShare.FEW);
+
     private final RecordingPeer host = new RecordingPeer();
     private final AtomicInteger closed = new AtomicInteger();
+    /** Ключ світу з лобі хоста. */
+    private String worldKey;
 
     // ---- Лобі ----
 
@@ -66,13 +71,14 @@ class SessionActorTest {
         assertThat(joined.session()).isEqualTo(7);
         assertThat(joined.player()).isEqualTo(1);
         assertThat(joined.token()).hasSize(64);
+        assertThat(joined.world()).hasSize(32);
         assertThat(host.lobby())
                 .isEqualTo(new ServerMessage.Lobby(
                         7,
-                        11,
-                        NpcShare.FEW,
+                        joined.world(),
+                        FEW_11,
                         List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty()))));
-        assertThat(session.lobby()).contains(new LobbyInfo(7, "Оля", 1, NpcShare.FEW));
+        assertThat(session.lobby()).contains(new LobbyInfo(7, joined.world(), "Оля", 1, FEW_11));
         session.close();
     }
 
@@ -83,13 +89,15 @@ class SessionActorTest {
 
         session.join(guest, "Ігор");
 
-        assertThat(guest.joined().player()).isEqualTo(2);
+        ServerMessage.Joined joined = guest.joined();
+        assertThat(joined.player()).isEqualTo(2);
+        assertThat(joined.world()).isEqualTo(worldKey);
         List<PlayerInfo> players = List.of(
                 new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty()),
                 new PlayerInfo(2, "Ігор", false, true, false, OptionalInt.empty()));
         assertThat(guest.lobby().players()).isEqualTo(players);
         assertThat(host.lobby().players()).isEqualTo(players);
-        assertThat(session.lobby()).contains(new LobbyInfo(7, "Оля", 2, NpcShare.FEW));
+        assertThat(session.lobby()).contains(new LobbyInfo(7, worldKey, "Оля", 2, FEW_11));
         session.close();
     }
 
@@ -138,7 +146,7 @@ class SessionActorTest {
 
         assertThat(guest.lobby().players())
                 .containsExactly(new PlayerInfo(2, "Ігор", true, true, false, OptionalInt.empty()));
-        assertThat(session.lobby()).contains(new LobbyInfo(7, "Ігор", 1, NpcShare.FEW));
+        assertThat(session.lobby()).contains(new LobbyInfo(7, worldKey, "Ігор", 1, FEW_11));
         // Тепер почати гру може новий хост.
         session.start(guest);
         guest.map();
@@ -206,6 +214,8 @@ class SessionActorTest {
 
         try (WorldStore store = WorldStore.open(worlds.resolve("world-11" + WorldStore.EXTENSION))) {
             assertThat(store.meta().name()).isEqualTo("world-11");
+            // Ключ, названий гравцям у лобі, — ключ файлу.
+            assertThat(store.meta().key()).isEqualTo(worldKey);
             assertThat(store.lastTurn()).isZero();
             List<PlayerRecord> players =
                     store.players().stream().map(SavedPlayer::player).toList();
@@ -558,7 +568,7 @@ class SessionActorTest {
     private SessionActor lobby() throws InterruptedException {
         SessionActor session = session(SessionActor.engine(TestServers.CONTENT));
         session.open(host, "Оля", 11, NpcShare.FEW);
-        host.joined();
+        worldKey = host.joined().world();
         host.lobby();
         return session;
     }

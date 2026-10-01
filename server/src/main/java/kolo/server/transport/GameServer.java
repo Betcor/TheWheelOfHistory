@@ -10,6 +10,7 @@ import io.netty.channel.ServerChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.local.LocalAddress;
+import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalIoHandler;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.channel.nio.NioIoHandler;
@@ -152,11 +153,14 @@ public final class GameServer implements AutoCloseable {
                     protected void initChannel(Channel child) {
                         channels.add(child);
                         ProtocolPipeline.server(child.pipeline());
+                        // Клієнт через LocalChannel — у тому самому процесі, що й сервер: це гравець вбудованого
+                        // сервера, і світи з його теки він завантажує й без токена.
+                        boolean trusted = child instanceof LocalChannel;
                         child.pipeline()
                                 .addLast(
                                         "session",
                                         new ConnectionHandler(
-                                                peer -> new ClientSession(content, sessions, peer), worker));
+                                                peer -> new ClientSession(content, sessions, peer, trusted), worker));
                     }
                 })
                 .bind(address)

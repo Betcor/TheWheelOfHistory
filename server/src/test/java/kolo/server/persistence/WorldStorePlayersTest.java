@@ -99,8 +99,9 @@ class WorldStorePlayersTest {
     @Test
     void fileOfTheFirstSchemaGetsThePlayersTable() throws Exception {
         Path file = dir.resolve("old" + WorldStore.EXTENSION);
-        WorldStore.create(file, "Старий", MAP, INITIAL, TestStores.CLOCK, Migrator.bundled(1))
+        WorldStore.create(file, "Старий", MAP, INITIAL, TestStores.CLOCK, Migrator.bundled())
                 .close();
+        TestStores.downgrade(file, 1);
 
         try (WorldStore store = TestStores.open(file)) {
             assertThat(store.players()).isEmpty();

@@ -12,6 +12,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
 import kolo.protocol.message.Handshake;
 import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 import kolo.protocol.message.YearPhase;
@@ -90,9 +91,12 @@ class ServerConnectionTest {
         RecordingListener guestEvents = new RecordingListener();
         try (ServerConnection host = connect(hostEvents);
                 ServerConnection guest = connect(guestEvents)) {
-            long session = await(host.createLobby("Оля", 6, NpcShare.FEW)).session();
+            ServerMessage.Joined created = await(host.createLobby("Оля", 6, NpcShare.FEW));
+            long session = created.session();
 
-            assertThat(await(guest.lobbies())).contains(new LobbyInfo(session, "Оля", 1, NpcShare.FEW));
+            assertThat(await(guest.lobbies()))
+                    .contains(new LobbyInfo(
+                            session, created.world(), "Оля", 1, new LobbySetup.NewWorld(6, NpcShare.FEW)));
             ServerMessage.Joined joined = await(guest.joinLobby(session, "Ігор"));
             assertThat(joined.player()).isEqualTo(2);
             assertThat(guestEvents.next(RecordingListener.Lobby.class).lobby().players())
@@ -154,7 +158,8 @@ class ServerConnectionTest {
                 ServerConnection other = connect(SessionListener.NONE)) {
             ServerMessage.Joined joined = await(host.createLobby("Оля", 9, NpcShare.FEW));
 
-            assertThatThrownBy(() -> await(other.rejoin(new ServerMessage.Joined(joined.session(), 1, "0".repeat(64)))))
+            assertThatThrownBy(() -> await(other.rejoin(
+                            new ServerMessage.Joined(joined.session(), joined.world(), 1, "0".repeat(64)))))
                     .isInstanceOfSatisfying(
                             ServerErrorException.class,
                             e -> assertThat(e.error().code()).isEqualTo(ErrorCode.UNAUTHORIZED));

@@ -15,6 +15,8 @@ public final class RecordingListener implements SessionListener {
     /** Подія сесії. */
     public sealed interface Event {}
 
+    public record Joined(ServerMessage.Joined joined) implements Event {}
+
     public record Lobby(ServerMessage.Lobby lobby) implements Event {}
 
     public record Started(GameStart start) implements Event {}
@@ -28,6 +30,11 @@ public final class RecordingListener implements SessionListener {
     public record Disconnected() implements Event {}
 
     private final BlockingQueue<Event> events = new LinkedBlockingQueue<>();
+
+    @Override
+    public void joined(ServerMessage.Joined joined) {
+        events.add(new Joined(joined));
+    }
 
     @Override
     public void lobby(ServerMessage.Lobby lobby) {

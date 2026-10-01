@@ -3,6 +3,7 @@ package kolo.server.persistence;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,11 +13,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
 import kolo.engine.error.Checks;
 import kolo.engine.error.ErrorCode;
+import kolo.engine.error.ErrorDetails;
 import kolo.engine.error.SaveFileException;
 import kolo.engine.error.SaveVersionException;
 import kolo.engine.error.ValidationException;
@@ -41,6 +44,11 @@ public final class WorldStore implements AutoCloseable {
 
     /** {@code PRAGMA application_id} файлу світу — «KOLO»: чужа база SQLite не сприймається за світ. */
     static final int APPLICATION_ID = 0x4B4F4C4F;
+
+    /** Довжина ключа світу, байтів. */
+    private static final int KEY_BYTES = 16;
+
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final Path file;
     private final Connection connection;
@@ -79,7 +87,17 @@ public final class WorldStore implements AutoCloseable {
      */
     public static WorldStore create(
             Path file, String name, MapSnapshot map, StateSnapshot initial, List<PlayerRecord> players) {
-        return create(file, name, map, initial, players, Clock.systemUTC(), Migrator.bundled());
+        return create(file, name, newKey(), map, initial, players);
+    }
+
+    /**
+     * Те саме із заданим ключем світу: сесія називає його гравцям ще в лобі, до створення файлу.
+     *
+     * @param key ключ світу ({@link #newKey()})
+     */
+    public static WorldStore create(
+            Path file, String name, String key, MapSnapshot map, StateSnapshot initial, List<PlayerRecord> players) {
+        return create(file, name, key, map, initial, players, Clock.systemUTC(), Migrator.bundled());
     }
 
     static WorldStore create(
@@ -95,7 +113,20 @@ public final class WorldStore implements AutoCloseable {
             List<PlayerRecord> players,
             Clock clock,
             Migrator migrator) {
+        return create(file, name, newKey(), map, initial, players, clock, migrator);
+    }
+
+    static WorldStore create(
+            Path file,
+            String name,
+            String key,
+            MapSnapshot map,
+            StateSnapshot initial,
+            List<PlayerRecord> players,
+            Clock clock,
+            Migrator migrator) {
         Checks.notBlank("name", name);
+        Checks.notBlank("key", key);
         WorldState state = initial.state();
         if (state.map() != map.map() && !state.map().equals(map.map())) {
             throw new IllegalArgumentException("initial state is on another map");
@@ -115,7 +146,7 @@ public final class WorldStore implements AutoCloseable {
                 migrator.migrate(connection, temporary, clock);
                 Instant now = clock.instant();
                 connection.setAutoCommit(false);
-                insertMeta(connection, new WorldMeta(name, state.seed(), state.contentHash(), map.hash(), now));
+                insertMeta(connection, new WorldMeta(name, key, state.seed(), state.contentHash(), map.hash(), now));
                 try (PreparedStatement insert =
                         connection.prepareStatement("INSERT INTO world_map (id, map_gz) VALUES (1, ?)")) {
                     insert.setBytes(1, Gzip.compress(map.json()));
@@ -182,6 +213,88 @@ public final class WorldStore implements AutoCloseable {
         }
     }
 
+    /**
+     * Короткий опис файлу світу для списку збережень. Файл лише читається й не мігрується: перелік збережень не мусить
+     * змінювати файли. Файл старішої схеми описується тим, що в ньому вже є.
+     *
+     * @throws SaveVersionException якщо файл створено новішою версією гри
+     * @throws SaveFileException з {@link ErrorCode#SAVE_FILE_ERROR}, якщо файлу немає або SQLite не відкриває його;
+     *     з {@link ErrorCode#SAVE_MALFORMED}, якщо це не файл світу або його вміст пошкоджено
+     */
+    public static WorldSummary summary(Path file) {
+        return summary(file, Migrator.bundled());
+    }
+
+    static WorldSummary summary(Path file, Migrator migrator) {
+        if (!Files.isRegularFile(file)) {
+            throw SaveErrors.file(file, "open", "file_missing");
+        }
+        try (Connection connection = connectForReading(file)) {
+            if (applicationId(connection) != APPLICATION_ID) {
+                throw SaveErrors.notWorldFile(file, null);
+            }
+            int version = schemaVersion(connection);
+            if (version > migrator.latest()) {
+                throw new SaveVersionException(
+                        ErrorDetails.of("part", "file", "version", version, "supported", migrator.latest()));
+            }
+            Optional<String> key = Optional.empty();
+            String select = "SELECT seed, content_hash";
+            if (hasColumn(connection, "world_meta", "world_key")) {
+                select += ", world_key";
+            }
+            long seed;
+            String contentHash;
+            try (Statement statement = connection.createStatement();
+                    ResultSet row = statement.executeQuery(select + " FROM world_meta WHERE id = 1")) {
+                if (!row.next()) {
+                    throw SaveErrors.malformed("file", "world_meta", "missing_row");
+                }
+                seed = row.getLong(1);
+                contentHash = row.getString(2);
+                if (row.getMetaData().getColumnCount() == 3) {
+                    key = Optional.ofNullable(row.getString(3)).filter(value -> !value.isBlank());
+                }
+            }
+            if (contentHash == null) {
+                throw SaveErrors.malformed("file", "world_meta", "missing_content_hash");
+            }
+            int lastTurn = lastTurn(connection);
+            Instant savedAt;
+            try (PreparedStatement savedTurn =
+                    connection.prepareStatement("SELECT saved_at FROM turns WHERE turn = ?")) {
+                savedTurn.setInt(1, lastTurn);
+                try (ResultSet row = savedTurn.executeQuery()) {
+                    row.next();
+                    savedAt = instant(row.getString(1), "turns[" + lastTurn + "]");
+                }
+            }
+            List<String> players = new ArrayList<>();
+            if (hasTable(connection, "players")) {
+                try (Statement statement = connection.createStatement();
+                        ResultSet rows = statement.executeQuery("SELECT nickname FROM players ORDER BY id")) {
+                    while (rows.next()) {
+                        String nickname = rows.getString(1);
+                        if (nickname == null) {
+                            throw SaveErrors.malformed("file", "players", "bad_player");
+                        }
+                        players.add(nickname);
+                    }
+                }
+            }
+            return new WorldSummary(file, key, seed, contentHash, lastTurn, savedAt, players);
+        } catch (SQLException e) {
+            throw SaveErrors.sql(file, "open", e);
+        }
+    }
+
+    /** Новий випадковий ключ світу: 16 байтів {@link SecureRandom} у hex. */
+    public static String newKey() {
+        byte[] bytes = new byte[KEY_BYTES];
+        RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
+    }
+
     public Path file() {
         return file;
     }
@@ -234,6 +347,58 @@ public final class WorldStore implements AutoCloseable {
             throw SaveErrors.sql(file, "save_turn", e);
         }
         lastTurn = state.turn();
+    }
+
+    /**
+     * Переписує гравців світу, що вже є у файлі: нікнейм, хеш токена й хоста (гравцеві віддали вільне місце, світ
+     * продовжує інший хост). Номери й держави не змінюються. Однією транзакцією.
+     *
+     * @throws IllegalArgumentException якщо номер чи держава гравця не такі, як у файлі, або хостів більше одного
+     * @throws SaveFileException з {@link ErrorCode#SAVE_FILE_ERROR}, якщо запис не вдався
+     */
+    public void updatePlayers(List<PlayerRecord> players) {
+        ensureOpen();
+        TreeSet<Integer> numbers = new TreeSet<>();
+        int hosts = 0;
+        for (PlayerRecord player : players) {
+            if (!numbers.add(player.number())) {
+                throw new IllegalArgumentException("players repeat a number: " + players);
+            }
+            hosts += player.host() ? 1 : 0;
+        }
+        if (hosts > 1) {
+            throw new IllegalArgumentException("more than one host: " + players);
+        }
+        try {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement clear = connection.prepareStatement("UPDATE players SET is_host = 0")) {
+                    clear.executeUpdate();
+                }
+                try (PreparedStatement update = connection.prepareStatement("UPDATE players SET nickname = ?,"
+                        + " token_hash = ?, is_host = ? WHERE id = ? AND country = ?")) {
+                    for (PlayerRecord player : players) {
+                        update.setString(1, player.nickname());
+                        update.setString(2, player.tokenHash());
+                        update.setInt(3, player.host() ? 1 : 0);
+                        update.setInt(4, player.number());
+                        update.setInt(5, player.country());
+                        if (update.executeUpdate() != 1) {
+                            throw new IllegalArgumentException(
+                                    "no player " + player.number() + " with country " + player.country());
+                        }
+                    }
+                }
+                connection.commit();
+            } catch (SQLException | RuntimeException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw SaveErrors.sql(file, "save_player", e);
+        }
     }
 
     /** Гравці світу за номером. */
@@ -384,16 +549,21 @@ public final class WorldStore implements AutoCloseable {
     private static WorldMeta readMeta(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement();
                 ResultSet row = statement.executeQuery(
-                        "SELECT name, seed, content_hash, map_hash, created_at FROM world_meta WHERE id = 1")) {
+                        "SELECT name, world_key, seed, content_hash, map_hash, created_at FROM world_meta WHERE id = 1")) {
             if (!row.next()) {
                 throw SaveErrors.malformed("file", "world_meta", "missing_row");
             }
-            return new WorldMeta(
-                    row.getString(1),
-                    row.getLong(2),
-                    row.getString(3),
-                    row.getString(4),
-                    instant(row.getString(5), "world_meta"));
+            try {
+                return new WorldMeta(
+                        row.getString(1),
+                        row.getString(2),
+                        row.getLong(3),
+                        row.getString(4),
+                        row.getString(5),
+                        instant(row.getString(6), "world_meta"));
+            } catch (ValidationException | NullPointerException e) {
+                throw SaveErrors.malformed("file", "world_meta", "bad_meta", e);
+            }
         }
     }
 
@@ -425,6 +595,38 @@ public final class WorldStore implements AutoCloseable {
         }
     }
 
+    private static int schemaVersion(Connection connection) throws SQLException {
+        if (!hasTable(connection, "schema_migrations")) {
+            return 0;
+        }
+        try (Statement statement = connection.createStatement();
+                ResultSet max = statement.executeQuery("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")) {
+            max.next();
+            return max.getInt(1);
+        }
+    }
+
+    private static boolean hasTable(Connection connection, String table) throws SQLException {
+        try (PreparedStatement select =
+                connection.prepareStatement("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")) {
+            select.setString(1, table);
+            try (ResultSet row = select.executeQuery()) {
+                return row.next();
+            }
+        }
+    }
+
+    private static boolean hasColumn(Connection connection, String table, String column) throws SQLException {
+        try (PreparedStatement select =
+                connection.prepareStatement("SELECT 1 FROM pragma_table_info(?) WHERE name = ?")) {
+            select.setString(1, table);
+            select.setString(2, column);
+            try (ResultSet row = select.executeQuery()) {
+                return row.next();
+            }
+        }
+    }
+
     private static int applicationId(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement();
                 ResultSet row = statement.executeQuery("PRAGMA application_id")) {
@@ -448,12 +650,13 @@ public final class WorldStore implements AutoCloseable {
 
     private static void insertMeta(Connection connection, WorldMeta meta) throws SQLException {
         try (PreparedStatement insert = connection.prepareStatement("INSERT INTO world_meta"
-                + " (id, name, seed, content_hash, map_hash, created_at) VALUES (1, ?, ?, ?, ?, ?)")) {
+                + " (id, name, world_key, seed, content_hash, map_hash, created_at) VALUES (1, ?, ?, ?, ?, ?, ?)")) {
             insert.setString(1, meta.name());
-            insert.setLong(2, meta.seed());
-            insert.setString(3, meta.contentHash());
-            insert.setString(4, meta.mapHash());
-            insert.setString(5, meta.createdAt().toString());
+            insert.setString(2, meta.key());
+            insert.setLong(3, meta.seed());
+            insert.setString(4, meta.contentHash());
+            insert.setString(5, meta.mapHash());
+            insert.setString(6, meta.createdAt().toString());
             insert.executeUpdate();
         }
     }
@@ -520,6 +723,24 @@ public final class WorldStore implements AutoCloseable {
         config.enforceForeignKeys(true);
         config.setJournalMode(SQLiteConfig.JournalMode.WAL);
         return config.createConnection("jdbc:sqlite:" + file.toAbsolutePath());
+    }
+
+    /**
+     * Для огляду: файл не створюється, а запити лише читають ({@code query_only}). Не режим «лише читання» SQLite: у
+     * ньому з'єднання з базою WAL лишає поруч порожні {@code -wal} і {@code -shm}, бо не може прибрати їх при закритті.
+     */
+    private static Connection connectForReading(Path file) throws SQLException {
+        SQLiteConfig config = new SQLiteConfig();
+        config.setOpenMode(SQLiteOpenMode.READWRITE);
+        config.resetOpenMode(SQLiteOpenMode.CREATE);
+        Connection connection = config.createConnection("jdbc:sqlite:" + file.toAbsolutePath());
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA query_only = 1");
+        } catch (SQLException e) {
+            closeQuietly(connection);
+            throw e;
+        }
+        return connection;
     }
 
     private void ensureOpen() {

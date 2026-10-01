@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,7 +20,10 @@ import kolo.engine.state.NpcShare;
 import kolo.engine.view.MapView;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
+import kolo.protocol.message.LobbyInfo;
+import kolo.protocol.message.PlayerToken;
 import kolo.protocol.message.ServerMessage;
+import kolo.protocol.message.WorldInfo;
 import kolo.protocol.message.YearPhase;
 import kolo.server.TestClient;
 import kolo.server.TestServers;
@@ -203,6 +208,85 @@ class GameServerTest {
                 back.next(ServerMessage.Players.class);
                 back.expectYearAfterReady(0);
             }
+        }
+    }
+
+    @Test
+    void savedWorldMovesFromTheLanHostToAnotherServer(@TempDir Path other) throws Exception {
+        // LAN: хост через LocalChannel, гість по TCP; рік — і всі пішли.
+        InetSocketAddress lan = server.bindTcp(ANY_LOOPBACK);
+        ServerMessage.Joined olya;
+        ServerMessage.Joined ihor;
+        try (TestClient host = TestClient.welcomed(server.bindLocal(), HASH);
+                TestClient guest = TestClient.welcomed(lan, HASH)) {
+            olya = host.createLobby("Оля", 40, NpcShare.FEW);
+            guest.send(new ClientMessage.JoinLobby(olya.session(), "Ігор"));
+            ihor = guest.next(ServerMessage.Joined.class);
+            awaitLobbyOf(host, 2);
+            guest.next(ServerMessage.Lobby.class);
+            host.send(new ClientMessage.StartGame());
+            host.world();
+            guest.world();
+            host.send(new ClientMessage.Ready(0));
+            guest.send(new ClientMessage.Ready(0));
+            for (TestClient player : List.of(host, guest)) {
+                player.next(ServerMessage.Players.class);
+                player.expectYearAfterReady(0);
+            }
+        }
+        awaitNoSessions();
+        Path file = worlds.resolve("world-40" + WorldStore.EXTENSION);
+        Files.copy(file, other.resolve(file.getFileName()));
+
+        try (GameServer dedicated = GameServer.start(() -> TestServers.CONTENT, new WorldDirectory(other))) {
+            InetSocketAddress address = dedicated.bindTcp(ANY_LOOPBACK);
+            try (TestClient stranger = TestClient.welcomed(address, HASH);
+                    TestClient host = TestClient.welcomed(address, HASH);
+                    TestClient guest = TestClient.welcomed(address, HASH)) {
+                host.send(new ClientMessage.ListWorlds());
+                WorldInfo world = host.next(ServerMessage.Worlds.class).worlds().getFirst();
+                assertThat(world.key()).contains(olya.world());
+                assertThat(world.turn()).isEqualTo(1);
+                // Без токена з мережі світу не відкрити.
+                stranger.send(new ClientMessage.LoadWorld(world.name(), "Чужий", Optional.empty()));
+                assertThat(stranger.next(ServerMessage.Error.class).code()).isEqualTo(ErrorCode.UNAUTHORIZED);
+
+                host.send(new ClientMessage.LoadWorld(
+                        world.name(), "Оля", Optional.of(new PlayerToken(olya.player(), olya.token()))));
+                ServerMessage.Joined hostJoined = host.next(ServerMessage.Joined.class);
+                assertThat(hostJoined.player()).isEqualTo(olya.player());
+                host.next(ServerMessage.Lobby.class);
+                guest.send(new ClientMessage.ListLobbies());
+                LobbyInfo lobby =
+                        guest.next(ServerMessage.Lobbies.class).lobbies().getFirst();
+                assertThat(lobby.world()).isEqualTo(ihor.world());
+                guest.send(new ClientMessage.Rejoin(lobby.session(), ihor.player(), ihor.token()));
+                guest.next(ServerMessage.Joined.class);
+                guest.next(ServerMessage.Lobby.class);
+                host.next(ServerMessage.Lobby.class);
+
+                host.send(new ClientMessage.StartGame());
+
+                for (TestClient player : List.of(host, guest)) {
+                    assertThat(player.map()).isEqualTo(TestServers.map(40, 2, NpcShare.FEW));
+                    player.next(ServerMessage.Players.class);
+                    assertThat(player.phase()).isEqualTo(new ServerMessage.Phase(1, YearPhase.START_OF_YEAR));
+                    assertThat(player.phase()).isEqualTo(new ServerMessage.Phase(1, YearPhase.ORDERS));
+                }
+                host.send(new ClientMessage.Ready(1));
+                guest.send(new ClientMessage.Ready(1));
+                for (TestClient player : List.of(host, guest)) {
+                    player.next(ServerMessage.Players.class);
+                    player.expectYearAfterReady(1);
+                }
+            }
+        }
+        try (WorldStore moved = WorldStore.open(other.resolve(file.getFileName()))) {
+            assertThat(moved.lastTurn()).isEqualTo(2);
+            assertThat(moved.meta().key()).isEqualTo(olya.world());
+        }
+        try (WorldStore original = WorldStore.open(file)) {
+            assertThat(original.lastTurn()).isEqualTo(1);
         }
     }
 
