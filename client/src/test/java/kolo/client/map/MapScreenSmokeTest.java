@@ -27,6 +27,7 @@ import kolo.client.net.GameClient;
 import kolo.client.net.GameStart;
 import kolo.client.net.LanPorts;
 import kolo.client.screen.ConnectScreen;
+import kolo.client.screen.HandoffScreen;
 import kolo.client.screen.LoadScreen;
 import kolo.client.screen.LobbyScreen;
 import kolo.client.screen.MainMenuScreen;
@@ -73,6 +74,9 @@ class MapScreenSmokeTest {
 
         @Override
         public void showMap(MapLayers layers, GameStart start) {}
+
+        @Override
+        public void showHandoff(int player, String nickname) {}
 
         @Override
         public void exit() {}
@@ -126,6 +130,7 @@ class MapScreenSmokeTest {
             new Scene(ConnectScreen.create(context()), WIDTH, HEIGHT);
             new Scene(LobbyScreen.create(context()), WIDTH, HEIGHT);
             new Scene(LoadScreen.create(context()), WIDTH, HEIGHT);
+            new Scene(HandoffScreen.create(context(), 2, "Ігор"), WIDTH, HEIGHT);
             return null;
         });
     }

@@ -1,5 +1,6 @@
 package kolo.client.screen;
 
+import java.util.Optional;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.value.ChangeListener;
@@ -13,6 +14,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import kolo.client.i18n.Texts;
@@ -20,13 +22,15 @@ import kolo.client.net.GameClient;
 import kolo.engine.state.TurnTimer;
 import kolo.engine.state.WorldLimits;
 import kolo.protocol.message.LobbySetup;
+import kolo.protocol.message.Nicknames;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 
 /**
  * Лобі (GD §22.2): параметри світу, гравці, таймер ходу й кнопка «Почати гру» для хоста. У лобі нового світу гравці — в порядку
  * приєднання (у тому ж порядку вони отримають держави). У лобі завантаженого — гравці світу з державами (вільні місця
- * теж) і гості без держави: хост віддає гостеві вільне місце. Коли гра почнеться, карту покаже застосунок — подія
+ * теж) і гості без держави: хост віддає гостеві вільне місце. Хост гри без мережі може додати гравців за цим
+ * комп'ютером (hot-seat, GD §21) — тоді таймера ходу немає. Коли гра почнеться, карту покаже застосунок — подія
  * приходить усім гравцям лобі.
  */
 public final class LobbyScreen {
@@ -92,6 +96,23 @@ public final class LobbyScreen {
 
         Label status = new Label();
         status.setWrapText(true);
+
+        // Hot-seat: хост додає гравців за цим комп'ютером і може прибрати доданого.
+        TextField localNickname = new TextField();
+        localNickname.setPromptText(texts.text("lobby.local_nickname"));
+        Button addLocal = new Button(texts.text("lobby.local_add"));
+        Button removeLocal = new Button(texts.text("lobby.local_remove"));
+        removeLocal
+                .disableProperty()
+                .bind(players.getSelectionModel()
+                        .selectedItemProperty()
+                        .map(p -> !removable(game, p))
+                        .orElse(true));
+        HBox local = new HBox(10, localNickname, addLocal, removeLocal);
+        local.setAlignment(Pos.CENTER_LEFT);
+        Label hotSeat = new Label(texts.text("lobby.hot_seat"));
+        hotSeat.getStyleClass().add("text-muted");
+        hotSeat.setWrapText(true);
         ProgressIndicator progress = new ProgressIndicator();
         progress.setVisible(false);
         progress.setPrefSize(28, 28);
@@ -118,6 +139,13 @@ public final class LobbyScreen {
             status.setText(texts.error(error.code(), error.details()));
         });
 
+        removeLocal.setOnAction(event -> {
+            PlayerInfo chosen = players.getSelectionModel().getSelectedItem();
+            if (chosen != null && removable(game, chosen)) {
+                game.removeLocalPlayer(chosen.number());
+            }
+        });
+
         ChangeListener<ServerMessage.Lobby> update = (property, old, lobby) -> {
             if (lobby == null) {
                 return;
@@ -135,8 +163,15 @@ public final class LobbyScreen {
             timer.getItems().setAll(lobby.timers());
             timer.setValue(lobby.setup().timer());
             showing[0] = false;
-            timing.setVisible(host);
-            timing.setManaged(host);
+            boolean hotSeating = game.hotSeat();
+            // Hot-seat — без таймера ходу: таймер скидає гра клієнта.
+            timing.setVisible(host && !hotSeating);
+            timing.setManaged(host && !hotSeating);
+            boolean localVisible = host && game.canAddLocalPlayers();
+            local.setVisible(localVisible);
+            local.setManaged(localVisible);
+            hotSeat.setVisible(hotSeating);
+            hotSeat.setManaged(hotSeating);
             boolean seatingVisible = host && saved.get();
             seating.setVisible(seatingVisible);
             seating.setManaged(seatingVisible);
@@ -157,9 +192,38 @@ public final class LobbyScreen {
                 context.session().lobby(), null, context.session().lobby().get());
         context.session().lobby().addListener(new WeakChangeListener<>(update));
 
+        addLocal.setOnAction(event -> {
+            Optional<String> nickname = NicknameInput.parse(localNickname.getText());
+            if (nickname.isEmpty()) {
+                status.getStyleClass().add("danger");
+                status.setText(texts.text("new_world.nickname_invalid", Nicknames.MAX_LENGTH));
+                return;
+            }
+            addLocal.setDisable(true);
+            UiFutures.onUi(
+                    game.addLocalPlayer(nickname.get()),
+                    texts,
+                    joined -> {
+                        addLocal.setDisable(false);
+                        localNickname.clear();
+                        status.getStyleClass().remove("danger");
+                        status.setText("");
+                        // Стан лобі міг прийти раніше, ніж гра запам'ятала нового гравця за цим комп'ютером.
+                        update.changed(
+                                context.session().lobby(),
+                                null,
+                                context.session().lobby().get());
+                    },
+                    message -> {
+                        addLocal.setDisable(false);
+                        status.getStyleClass().add("danger");
+                        status.setText(message);
+                    });
+        });
+
         HBox buttons = new HBox(10, leave, start, progress);
         buttons.setAlignment(Pos.CENTER_LEFT);
-        VBox box = new VBox(14, title, settings, lan, timing, count, players, seating, buttons, status);
+        VBox box = new VBox(14, title, settings, lan, timing, count, players, seating, local, hotSeat, buttons, status);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(24));
         box.setMaxWidth(520);
@@ -186,12 +250,18 @@ public final class LobbyScreen {
             super.updateItem(item, empty);
             if (empty || item == null) {
                 setText(null);
-            } else if (saved.get()) {
-                setText(PlayerLabels.savedLobby(texts, item, game.isMe(item)));
             } else {
-                setText(PlayerLabels.lobby(texts, item, game.isMe(item)));
+                boolean me = game.isMe(item);
+                String label =
+                        saved.get() ? PlayerLabels.savedLobby(texts, item, me) : PlayerLabels.lobby(texts, item, me);
+                setText(!me && game.isLocal(item) ? texts.text("lobby.local", label) : label);
             }
         }
+    }
+
+    /** Чи може хост прибрати цього гравця з лобі: він за цим комп'ютером, але не сам хост. */
+    private static boolean removable(GameClient game, PlayerInfo player) {
+        return !game.isMe(player) && game.isLocal(player);
     }
 
     private static final class TimerCell extends ListCell<TurnTimer> {
