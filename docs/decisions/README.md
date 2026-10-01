@@ -55,3 +55,4 @@
 | [0049](0049-vidnovlennia-z-pauzy.md) | Відновлення сесії з паузи хостом | `SessionActor.resume`, `YearPhase.PAUSED`, `MapScreen` |
 | [0050](0050-poshuk-u-lokalnii-merezhi.md) | Пошук гри в локальній мережі (UDP) | `DiscoveryPackets`, `DiscoveryResponder`, `LanSearch`, `GameClient.findLanLobbies` |
 | [0051](0051-hot-seat.md) | Hot-seat: кілька гравців за одним комп'ютером | `GameClient.addLocalPlayer/showPlayer`, `TokenStore`, `HandoffScreen` |
+| [0052](0052-okremyi-server-u-docker.md) | Окремий сервер у Docker | `docker/`, `DedicatedServerMain`, `DockerfileTest` |

@@ -1,0 +1,17 @@
+# Окремий сервер: `docker compose -f docker/compose.yaml up -d` з кореня репозиторію.
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: kolo-server
+    restart: unless-stopped
+    ports:
+      - "19700:19700/tcp"
+    volumes:
+      - worlds:/data
+    # Сервер закриває сесії до 30 с на крок; типових 10 с docker stop може не вистачити.
+    stop_grace_period: 90s
+
+volumes:
+  worlds:

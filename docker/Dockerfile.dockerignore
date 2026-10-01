@@ -1,0 +1,18 @@
+# Контекст збірки — корінь репозиторію; до образу потрапляє лише потрібне для збірки сервера.
+*
+!gradle/
+!gradlew
+!settings.gradle.kts
+!build.gradle.kts
+!gradle.properties
+!build-logic/
+!engine/
+!content/
+!ai/
+!protocol/
+!server/
+!client/
+!tools/
+**/build/
+**/.gradle/
+**/*.koloworld*
