@@ -131,7 +131,7 @@ final class ConnectionHandler extends SimpleChannelInboundHandler<ServerMessage>
             MapView started = map;
             map = null;
             inGame = true;
-            listener.gameStarted(new GameStart(started, phase.turn(), phase.phase()));
+            listener.gameStarted(new GameStart(started, phase));
         } else if (inGame) {
             listener.phase(phase);
         } else {

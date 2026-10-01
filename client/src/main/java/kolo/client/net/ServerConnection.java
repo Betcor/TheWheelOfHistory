@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.Handshake;
@@ -166,6 +167,16 @@ public final class ServerConnection implements AutoCloseable {
     /** «Готово» для року {@code turn}; новий рік прийде слухачеві фазами. */
     public void ready(int turn) {
         send(new ClientMessage.Ready(turn));
+    }
+
+    /** Хост обирає таймер ходу в лобі; новий стан лобі отримають слухачі, помилку — слухач цього з'єднання. */
+    public void setTimer(TurnTimer timer) {
+        send(new ClientMessage.SetTimer(timer));
+    }
+
+    /** Хост завершує рік {@code turn}, не чекаючи «Готово» всіх; новий рік прийде слухачеві фазами. */
+    public void endYear(int turn) {
+        send(new ClientMessage.EndYear(turn));
     }
 
     /** Полишає сесію. */

@@ -1,7 +1,12 @@
 package kolo.client.screen;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.OptionalInt;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.geometry.Insets;
@@ -12,11 +17,13 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ToolBar;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 import kolo.client.i18n.Texts;
 import kolo.client.map.MapCanvas;
 import kolo.client.map.MapLayers;
@@ -33,7 +40,8 @@ import kolo.protocol.message.YearPhase;
 /**
  * Карта світу (GD §22.2): режими карти, поточний рік і кнопка «Готово», панель обраної провінції, гравці (хто вже
  * готовий, хто не на зв'язку) і рядок стану. Поки систем немає, роки «порожні»: рік розв'язується, коли «Готово»
- * натиснули всі гравці на зв'язку. Зв'язок втрачено — кнопка «Перепідключитися» повертає гравця до його держави.
+ * натиснули всі гравці на зв'язку, коли хост натиснув «Завершити рік» або коли вийшов час таймера ходу (тоді видно
+ * відлік). Зв'язок втрачено — кнопка «Перепідключитися» повертає гравця до його держави.
  */
 public final class MapScreen {
 
@@ -76,6 +84,9 @@ public final class MapScreen {
         Label year = new Label(yearText(texts, start.turn()));
         year.getStyleClass().add("title-4");
         Button endYear = new Button(texts.text("map.end_year"));
+        Button finish = new Button(texts.text("map.finish_year"));
+        finish.setTooltip(new Tooltip(texts.text("map.finish_year.tooltip")));
+        Label timeLeft = new Label();
         Button reconnect = new Button(texts.text("map.reconnect"));
         reconnect.setVisible(false);
         reconnect.setManaged(false);
@@ -86,7 +97,9 @@ public final class MapScreen {
                                 "map.world", view.seed(), view.countries().size())),
                         spacer,
                         year,
+                        timeLeft,
                         endYear,
+                        finish,
                         reconnect,
                         new Separator(),
                         fit,
@@ -110,18 +123,51 @@ public final class MapScreen {
         // Поточний рік і чи вже натиснуто «Готово» — лише в потоці JavaFX.
         int[] current = {start.turn()};
         boolean[] sent = {false};
+        boolean[] finished = {false};
         Runnable refreshReady = () -> {
             ServerMessage.Phase phase = session.phase().get();
             boolean orders = phase != null && phase.phase() == YearPhase.ORDERS && phase.turn() == current[0];
             boolean meReady = session.players().get().stream().anyMatch(p -> game.isMe(p) && p.ready());
-            endYear.setDisable(
-                    !orders || sent[0] || meReady || !session.connected().get());
+            boolean connected = session.connected().get();
+            endYear.setDisable(!orders || sent[0] || meReady || !connected);
+            boolean host = session.players().get().stream().anyMatch(p -> game.isMe(p) && p.host());
+            finish.setVisible(host);
+            finish.setManaged(host);
+            finish.setDisable(!orders || finished[0] || !connected);
         };
         endYear.setOnAction(event -> {
             sent[0] = true;
             refreshReady.run();
             game.ready(current[0]);
         });
+        finish.setOnAction(event -> {
+            finished[0] = true;
+            refreshReady.run();
+            game.endYear(current[0]);
+        });
+
+        // Відлік до кінця фази наказів: межа — з моделі, час, що лишився, — щосекунди за годинником клієнта.
+        Clock clock = Clock.systemUTC();
+        Runnable refreshClock = () -> {
+            Instant deadline = session.ordersDeadline().get();
+            ServerMessage.Phase phase = session.phase().get();
+            boolean counting = deadline != null && phase != null && phase.phase() == YearPhase.ORDERS;
+            timeLeft.setVisible(counting);
+            timeLeft.setManaged(counting);
+            if (counting) {
+                timeLeft.setText(TimerLabels.timeLeft(texts, java.time.Duration.between(clock.instant(), deadline)));
+            }
+        };
+        Timeline ticker = new Timeline(new KeyFrame(Duration.seconds(1), event -> refreshClock.run()));
+        ticker.setCycleCount(Animation.INDEFINITE);
+        ChangeListener<Instant> deadlines = (property, old, deadline) -> {
+            refreshClock.run();
+            if (deadline != null) {
+                ticker.play();
+            } else {
+                ticker.stop();
+            }
+        };
 
         ChangeListener<ServerMessage.Phase> phases = (property, old, phase) -> {
             if (phase == null) {
@@ -132,10 +178,12 @@ public final class MapScreen {
             } else if (phase.phase() == YearPhase.ORDERS && phase.turn() > current[0]) {
                 current[0] = phase.turn();
                 sent[0] = false;
+                finished[0] = false;
                 year.setText(yearText(texts, phase.turn()));
                 status.setText(texts.text("map.year_started", WorldState.year(phase.turn())));
             }
             refreshReady.run();
+            refreshClock.run();
         };
         ChangeListener<List<PlayerInfo>> roster = (property, old, list) -> {
             players.getChildren().clear();
@@ -164,13 +212,17 @@ public final class MapScreen {
         session.phase().addListener(new WeakChangeListener<>(phases));
         session.players().addListener(new WeakChangeListener<>(roster));
         session.connected().addListener(new WeakChangeListener<>(link));
+        session.ordersDeadline().addListener(new WeakChangeListener<>(deadlines));
         session.setOnError(error -> {
             sent[0] = false;
+            finished[0] = false;
             status.setText(texts.error(error.code(), error.details()));
             refreshReady.run();
         });
         roster.changed(session.players(), null, session.players().get());
         link.changed(session.connected(), null, session.connected().get());
+        deadlines.changed(
+                session.ordersDeadline(), null, session.ordersDeadline().get());
 
         reconnect.setOnAction(event -> {
             reconnect.setDisable(true);
@@ -199,7 +251,13 @@ public final class MapScreen {
         root.setRight(panel);
         root.setBottom(status);
         // Слабкі слухачі живуть, доки живе екран.
-        root.getProperties().put(MapScreen.class, List.of(phases, roster, link));
+        root.getProperties().put(MapScreen.class, List.of(phases, roster, link, deadlines));
+        // Екран прибрали зі сцени — відлік більше не потрібен.
+        root.sceneProperty().addListener((property, old, scene) -> {
+            if (scene == null) {
+                ticker.stop();
+            }
+        });
         canvas.requestFocus();
         return root;
     }

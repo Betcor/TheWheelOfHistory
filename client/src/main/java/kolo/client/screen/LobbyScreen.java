@@ -17,13 +17,14 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import kolo.client.i18n.Texts;
 import kolo.client.net.GameClient;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.state.WorldLimits;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
 import kolo.protocol.message.ServerMessage;
 
 /**
- * Лобі (GD §22.2): параметри світу, гравці й кнопка «Почати гру» для хоста. У лобі нового світу гравці — в порядку
+ * Лобі (GD §22.2): параметри світу, гравці, таймер ходу й кнопка «Почати гру» для хоста. У лобі нового світу гравці — в порядку
  * приєднання (у тому ж порядку вони отримають держави). У лобі завантаженого — гравці світу з державами (вільні місця
  * теж) і гості без держави: хост віддає гостеві вільне місце. Коли гра почнеться, карту покаже застосунок — подія
  * приходить усім гравцям лобі.
@@ -69,6 +70,24 @@ public final class LobbyScreen {
         HBox seating = new HBox(10, seats, assign);
         seating.setAlignment(Pos.CENTER_LEFT);
 
+        // Хост обирає таймер ходу (GD §6.1); решта бачить його в параметрах світу.
+        ComboBox<TurnTimer> timer = new ComboBox<>();
+        timer.setCellFactory(list -> new TimerCell(texts));
+        timer.setButtonCell(new TimerCell(texts));
+        boolean[] showing = {false};
+        timer.valueProperty().addListener((property, old, chosen) -> {
+            ServerMessage.Lobby lobby = context.session().lobby().get();
+            // Значення, яке показує стан лобі з сервера, — не вибір хоста.
+            if (!showing[0]
+                    && chosen != null
+                    && lobby != null
+                    && !chosen.equals(lobby.setup().timer())) {
+                game.setTimer(chosen);
+            }
+        });
+        HBox timing = new HBox(10, new Label(texts.text("lobby.timer")), timer);
+        timing.setAlignment(Pos.CENTER_LEFT);
+
         Label status = new Label();
         status.setWrapText(true);
         ProgressIndicator progress = new ProgressIndicator();
@@ -110,6 +129,12 @@ public final class LobbyScreen {
             boolean host = lobby.players().stream().anyMatch(p -> p.host() && game.isMe(p));
             start.setVisible(host);
             start.setManaged(host);
+            showing[0] = true;
+            timer.getItems().setAll(lobby.timers());
+            timer.setValue(lobby.setup().timer());
+            showing[0] = false;
+            timing.setVisible(host);
+            timing.setManaged(host);
             boolean seatingVisible = host && saved.get();
             seating.setVisible(seatingVisible);
             seating.setManaged(seatingVisible);
@@ -132,7 +157,7 @@ public final class LobbyScreen {
 
         HBox buttons = new HBox(10, leave, start, progress);
         buttons.setAlignment(Pos.CENTER_LEFT);
-        VBox box = new VBox(14, title, settings, lan, count, players, seating, buttons, status);
+        VBox box = new VBox(14, title, settings, lan, timing, count, players, seating, buttons, status);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(24));
         box.setMaxWidth(520);
@@ -164,6 +189,20 @@ public final class LobbyScreen {
             } else {
                 setText(PlayerLabels.lobby(texts, item, game.isMe(item)));
             }
+        }
+    }
+
+    private static final class TimerCell extends ListCell<TurnTimer> {
+        private final Texts texts;
+
+        TimerCell(Texts texts) {
+            this.texts = texts;
+        }
+
+        @Override
+        protected void updateItem(TurnTimer item, boolean empty) {
+            super.updateItem(item, empty);
+            setText(empty || item == null ? null : TimerLabels.timer(texts, item));
         }
     }
 

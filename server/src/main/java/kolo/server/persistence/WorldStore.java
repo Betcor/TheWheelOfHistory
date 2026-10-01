@@ -9,12 +9,16 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeSet;
 import kolo.engine.error.Checks;
@@ -26,6 +30,7 @@ import kolo.engine.error.ValidationException;
 import kolo.engine.state.ControlType;
 import kolo.engine.state.Country;
 import kolo.engine.state.CountryId;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.state.WorldState;
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteOpenMode;
@@ -314,14 +319,25 @@ public final class WorldStore implements AutoCloseable {
     }
 
     /**
-     * Зберігає стан наприкінці року: рядок року з хешем і снапшот — однією транзакцією.
+     * Зберігає стан наприкінці року, коли «Готово» натиснули всі гравці ({@link #saveTurn(StateSnapshot, Collection)}
+     * без пропусків).
+     */
+    public void saveTurn(StateSnapshot snapshot) {
+        saveTurn(snapshot, List.of());
+    }
+
+    /**
+     * Зберігає стан наприкінці року: рядок року з хешем, снапшот і пропуски гравців — однією транзакцією. Гравці з
+     * {@code missed} не натиснули «Готово» (за них діяв автопілот, GD §6.3) — їхній лічильник пропусків поспіль
+     * зростає; в інших — обнуляється.
      *
-     * @throws IllegalArgumentException якщо стан іншого світу або рік не пізніший за останній збережений — помилка
-     *     виклику, а не даних
+     * @param missed номери гравців, за яких цього року діяв автопілот
+     * @throws IllegalArgumentException якщо стан іншого світу, рік не пізніший за останній збережений або такого гравця
+     *     немає — помилка виклику, а не даних
      * @throws SaveFileException з {@link ErrorCode#SAVE_FILE_ERROR}, якщо запис не вдався; файл лишається на
      *     попередньому році
      */
-    public void saveTurn(StateSnapshot snapshot) {
+    public void saveTurn(StateSnapshot snapshot, Collection<Integer> missed) {
         ensureOpen();
         WorldState state = snapshot.state();
         if (state.seed() != meta.seed()
@@ -336,6 +352,7 @@ public final class WorldStore implements AutoCloseable {
             connection.setAutoCommit(false);
             try {
                 insertTurn(connection, snapshot, clock.instant());
+                countMissed(connection, new TreeSet<>(missed));
                 connection.commit();
             } catch (SQLException | RuntimeException e) {
                 connection.rollback();
@@ -401,13 +418,92 @@ public final class WorldStore implements AutoCloseable {
         }
     }
 
+    /** Таймер ходу світу й межа фази наказів, якщо вона збережена. */
+    public SavedTimer timer() {
+        ensureOpen();
+        try (Statement statement = connection.createStatement();
+                ResultSet row = statement.executeQuery(
+                        "SELECT mode, seconds, deadline_turn, deadline_at FROM turn_timer WHERE id = 1")) {
+            if (!row.next()) {
+                throw SaveErrors.malformed("file", "turn_timer", "missing_row");
+            }
+            String key = row.getString(1);
+            TurnTimer.Mode mode = Arrays.stream(TurnTimer.Mode.values())
+                    .filter(m -> m.key().equals(key))
+                    .findFirst()
+                    .orElseThrow(() -> SaveErrors.malformed("file", "turn_timer", "bad_timer"));
+            TurnTimer timer;
+            try {
+                timer = new TurnTimer(mode, row.getInt(2));
+            } catch (ValidationException e) {
+                throw SaveErrors.malformed("file", "turn_timer", "bad_timer", e);
+            }
+            int turn = row.getInt(3);
+            Optional<SavedTimer.Deadline> deadline = row.wasNull()
+                    ? Optional.empty()
+                    : Optional.of(new SavedTimer.Deadline(turn, instant(row.getString(4), "turn_timer")));
+            return new SavedTimer(timer, deadline);
+        } catch (SQLException e) {
+            throw SaveErrors.sql(file, "load", e);
+        }
+    }
+
+    /**
+     * Записує таймер ходу; збережена межа фази наказів скидається — з новим таймером рік рахує час заново.
+     *
+     * @throws SaveFileException з {@link ErrorCode#SAVE_FILE_ERROR}, якщо запис не вдався
+     */
+    public void saveTimer(TurnTimer timer) {
+        Objects.requireNonNull(timer, "timer");
+        updateTimer(
+                "UPDATE turn_timer SET mode = ?, seconds = ?, deadline_turn = NULL, deadline_at = NULL WHERE id = 1",
+                update -> {
+                    update.setString(1, timer.mode().key());
+                    update.setInt(2, timer.seconds());
+                });
+    }
+
+    /**
+     * Записує межу фази наказів року; порожньо — межі немає.
+     *
+     * @throws SaveFileException з {@link ErrorCode#SAVE_FILE_ERROR}, якщо запис не вдався
+     */
+    public void saveDeadline(Optional<SavedTimer.Deadline> deadline) {
+        Objects.requireNonNull(deadline, "deadline");
+        updateTimer("UPDATE turn_timer SET deadline_turn = ?, deadline_at = ? WHERE id = 1", update -> {
+            if (deadline.isPresent()) {
+                update.setInt(1, deadline.get().turn());
+                update.setString(2, deadline.get().at().toString());
+            } else {
+                update.setNull(1, Types.INTEGER);
+                update.setNull(2, Types.VARCHAR);
+            }
+        });
+    }
+
+    private void updateTimer(String sql, SqlParameters parameters) {
+        ensureOpen();
+        try (PreparedStatement update = connection.prepareStatement(sql)) {
+            parameters.set(update);
+            if (update.executeUpdate() != 1) {
+                throw SaveErrors.malformed("file", "turn_timer", "missing_row");
+            }
+        } catch (SQLException e) {
+            throw SaveErrors.sql(file, "save_timer", e);
+        }
+    }
+
+    private interface SqlParameters {
+        void set(PreparedStatement statement) throws SQLException;
+    }
+
     /** Гравці світу за номером. */
     public List<SavedPlayer> players() {
         ensureOpen();
         List<SavedPlayer> players = new ArrayList<>();
         try (Statement statement = connection.createStatement();
                 ResultSet rows = statement.executeQuery("SELECT id, nickname, token_hash, country, is_host,"
-                        + " last_seen_at FROM players ORDER BY id")) {
+                        + " last_seen_at, missed_turns FROM players ORDER BY id")) {
             while (rows.next()) {
                 int number = rows.getInt(1);
                 String location = "players[" + number + "]";
@@ -418,7 +514,7 @@ public final class WorldStore implements AutoCloseable {
                 } catch (ValidationException | NullPointerException e) {
                     throw SaveErrors.malformed("file", location, "bad_player", e);
                 }
-                players.add(new SavedPlayer(player, instant(rows.getString(6), location)));
+                players.add(new SavedPlayer(player, instant(rows.getString(6), location), rows.getInt(7)));
             }
         } catch (SQLException e) {
             throw SaveErrors.sql(file, "load", e);
@@ -690,6 +786,27 @@ public final class WorldStore implements AutoCloseable {
             insert.setInt(5, player.host() ? 1 : 0);
             insert.setString(6, now.toString());
             insert.executeUpdate();
+        }
+    }
+
+    /** Пропуски гравців за рік: у {@code missed} лічильник зростає, в інших — обнуляється. */
+    private static void countMissed(Connection connection, TreeSet<Integer> missed) throws SQLException {
+        try (PreparedStatement increment =
+                connection.prepareStatement("UPDATE players SET missed_turns = missed_turns + 1 WHERE id = ?")) {
+            for (int player : missed) {
+                increment.setInt(1, player);
+                if (increment.executeUpdate() != 1) {
+                    throw new IllegalArgumentException("no player " + player);
+                }
+            }
+        }
+        String others = missed.isEmpty() ? "" : " WHERE id NOT IN (" + "?, ".repeat(missed.size() - 1) + "?)";
+        try (PreparedStatement reset = connection.prepareStatement("UPDATE players SET missed_turns = 0" + others)) {
+            int index = 1;
+            for (int player : missed) {
+                reset.setInt(index++, player);
+            }
+            reset.executeUpdate();
         }
     }
 

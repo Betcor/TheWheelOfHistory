@@ -10,16 +10,22 @@ public final class LobbyLabels {
 
     private LobbyLabels() {}
 
-    /** Що за світ у лобі: новий — seed і частка NPC, завантажений — ім'я, seed і рік. */
+    /** Що за світ у лобі: новий — seed і частка NPC, завантажений — ім'я, seed і рік; обидва — з таймером ходу. */
     public static String setup(Texts texts, LobbySetup setup) {
         return switch (setup) {
             case LobbySetup.NewWorld world ->
                 texts.text(
                         "lobby.settings",
                         world.seed(),
-                        texts.text("npc_share." + world.npcShare().key()));
+                        texts.text("npc_share." + world.npcShare().key()),
+                        TimerLabels.timer(texts, world.timer()));
             case LobbySetup.SavedWorld world ->
-                texts.text("lobby.saved_settings", world.name(), world.seed(), WorldState.year(world.turn()));
+                texts.text(
+                        "lobby.saved_settings",
+                        world.name(),
+                        world.seed(),
+                        WorldState.year(world.turn()),
+                        TimerLabels.timer(texts, world.timer()));
         };
     }
 

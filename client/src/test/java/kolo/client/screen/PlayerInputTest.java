@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import kolo.client.i18n.Texts;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.Nicknames;
 import kolo.protocol.message.PlayerInfo;
@@ -55,10 +56,11 @@ class PlayerInputTest {
 
     @Test
     void worldLabelsNameTheSetupAndTheYear() {
-        assertThat(LobbyLabels.setup(TEXTS, new LobbySetup.NewWorld(42, NpcShare.FEW)))
-                .isEqualTo("Seed 42 · NPC-держав: " + TEXTS.text("npc_share.few"));
-        assertThat(LobbyLabels.setup(TEXTS, new LobbySetup.SavedWorld("world-42", 42, 5)))
-                .isEqualTo("Світ «world-42» · seed 42 · продовження з 1975 року");
+        assertThat(LobbyLabels.setup(TEXTS, new LobbySetup.NewWorld(42, NpcShare.FEW, TurnTimer.MANUAL)))
+                .isEqualTo("Seed 42 · NPC-держав: " + TEXTS.text("npc_share.few") + " · таймер: ручний");
+        assertThat(LobbyLabels.setup(
+                        TEXTS, new LobbySetup.SavedWorld("world-42", 42, 5, new TurnTimer(TurnTimer.Mode.LIVE, 180))))
+                .isEqualTo("Світ «world-42» · seed 42 · продовження з 1975 року · таймер: живий, 3 хв на хід");
         assertThat(LobbyLabels.world(TEXTS, new WorldInfo("world-42", Optional.empty(), 42, 5, List.of("Оля", "Ігор"))))
                 .isEqualTo("world-42 — 1975 рік · гравці: Оля, Ігор");
         assertThat(LobbyLabels.world(TEXTS, new WorldInfo("old", Optional.empty(), 1, 0, List.of())))

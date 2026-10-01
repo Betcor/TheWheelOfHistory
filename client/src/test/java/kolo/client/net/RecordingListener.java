@@ -85,14 +85,14 @@ public final class RecordingListener implements SessionListener {
         }
     }
 
-    /** Пропускає події, доки не прийде прийом наказів року {@code turn}. */
-    public void awaitOrders(int turn) throws InterruptedException {
+    /** Пропускає події, доки не прийде прийом наказів року {@code turn}; його й повертає. */
+    public ServerMessage.Phase awaitOrders(int turn) throws InterruptedException {
         while (true) {
             Event event = next();
             if (event instanceof Phase(ServerMessage.Phase phase)
                     && phase.turn() == turn
                     && phase.phase() == kolo.protocol.message.YearPhase.ORDERS) {
-                return;
+                return phase;
             }
         }
     }

@@ -118,6 +118,7 @@ import kolo.engine.content.TerrainTagDef;
 import kolo.engine.content.TrainingLevelDef;
 import kolo.engine.content.TraitDef;
 import kolo.engine.content.TraitId;
+import kolo.engine.content.TurnTimersDef;
 import kolo.engine.content.WheelBalanceDef;
 import kolo.engine.content.WorldBalanceDef;
 import kolo.engine.content.WorldClimateDef;
@@ -1361,10 +1362,27 @@ public final class ContentLoader {
                         required("power_budget.advantage_pct", powerYaml.advantagePct()),
                         required("power_budget.max_advantage", powerYaml.maxAdvantage())));
 
+        ContentYaml.TurnTimers timersYaml = section("turn_timers", yaml.turnTimers());
+        List<Integer> live = seconds("turn_timers.live_minutes", timersYaml.liveMinutes(), 60);
+        List<Integer> async = seconds("turn_timers.async_hours", timersYaml.asyncHours(), 60 * 60);
+        TurnTimersDef timers = at(BALANCE, "turn_timers", () -> new TurnTimersDef(live, async));
+
         return at(
                 BALANCE,
                 "",
-                () -> BalanceDef.of(wheel, streaks, corridors, generation, religion, world, resources, power));
+                () -> BalanceDef.of(wheel, streaks, corridors, generation, religion, world, resources, power, timers));
+    }
+
+    /** Тривалості в секундах з хвилин чи годин; завеликі впираються в {@link Integer#MAX_VALUE} і не пройдуть межі. */
+    private static List<Integer> seconds(String field, List<Integer> values, int unit) {
+        List<Integer> seconds = new ArrayList<>(values.size());
+        for (int i = 0; i < values.size(); i++) {
+            String location = field + "[" + i + "]";
+            Integer raw = values.get(i);
+            int value = at(BALANCE, location, () -> required(location, raw));
+            seconds.add((int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, (long) value * unit)));
+        }
+        return seconds;
     }
 
     private static MapContent map(ContentYaml.MapFile yaml) {

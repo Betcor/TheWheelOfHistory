@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.TreeMap;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.CellKind;
@@ -23,6 +24,7 @@ import kolo.engine.state.NounPhrase;
 import kolo.engine.state.NpcShare;
 import kolo.engine.state.Relief;
 import kolo.engine.state.Terrain;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 import kolo.protocol.ProtocolErrors;
@@ -90,6 +92,14 @@ final class MessageReader {
                 int seat = root.field("seat").intValue();
                 yield root.build(() -> new ClientMessage.AssignSeat(guest, seat));
             }
+            case MessageTypes.SET_TIMER -> {
+                TurnTimer timer = timer(root.field("timer"));
+                yield root.build(() -> new ClientMessage.SetTimer(timer));
+            }
+            case MessageTypes.END_YEAR -> {
+                int turn = root.field("turn").intValue();
+                yield root.build(() -> new ClientMessage.EndYear(turn));
+            }
             default -> throw type.malformed("unknown_type");
         };
         root.end();
@@ -122,7 +132,8 @@ final class MessageReader {
                 String world = root.field("world").text();
                 LobbySetup setup = setup(root.field("setup"));
                 List<PlayerInfo> players = root.field("players").list(MessageReader::player);
-                yield root.build(() -> new ServerMessage.Lobby(session, world, setup, players));
+                List<TurnTimer> timers = root.field("timers").list(MessageReader::timer);
+                yield root.build(() -> new ServerMessage.Lobby(session, world, setup, players, timers));
             }
             case MessageTypes.PLAYERS -> {
                 List<PlayerInfo> players = root.field("players").list(MessageReader::player);
@@ -144,7 +155,10 @@ final class MessageReader {
             case MessageTypes.PHASE -> {
                 int turn = root.field("turn").intValue();
                 YearPhase phase = root.field("phase").enumValue(YearPhase.class);
-                yield root.build(() -> new ServerMessage.Phase(turn, phase));
+                Optional<MessageNode> left = root.optional("time_left_millis");
+                OptionalLong timeLeft =
+                        left.isPresent() ? OptionalLong.of(left.get().longValue()) : OptionalLong.empty();
+                yield root.build(() -> new ServerMessage.Phase(turn, phase, timeLeft));
             }
             case MessageTypes.WORLDS -> {
                 List<WorldInfo> worlds = root.field("worlds").list(MessageReader::world);
@@ -206,18 +220,27 @@ final class MessageReader {
             case MessageTypes.NEW_WORLD -> {
                 long seed = node.field("seed").longValue();
                 NpcShare share = node.field("npc_share").enumValue(NpcShare.class);
-                yield node.build(() -> new LobbySetup.NewWorld(seed, share));
+                TurnTimer timer = timer(node.field("timer"));
+                yield node.build(() -> new LobbySetup.NewWorld(seed, share, timer));
             }
             case MessageTypes.SAVED_WORLD -> {
                 String name = node.field("name").text();
                 long seed = node.field("seed").longValue();
                 int turn = node.field("turn").intValue();
-                yield node.build(() -> new LobbySetup.SavedWorld(name, seed, turn));
+                TurnTimer timer = timer(node.field("timer"));
+                yield node.build(() -> new LobbySetup.SavedWorld(name, seed, turn, timer));
             }
             default -> throw kind.malformed("unknown_value");
         };
         node.end();
         return setup;
+    }
+
+    private static TurnTimer timer(MessageNode node) {
+        TurnTimer.Mode mode = node.field("mode").enumValue(TurnTimer.Mode.class);
+        int seconds = node.field("seconds").intValue();
+        node.end();
+        return node.build(() -> new TurnTimer(mode, seconds));
     }
 
     private static WorldInfo world(MessageNode node) {

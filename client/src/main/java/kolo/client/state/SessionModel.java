@@ -1,5 +1,7 @@
 package kolo.client.state;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -20,21 +22,32 @@ import kolo.protocol.message.ServerMessage;
  * мережі й переходять у потік UI через виконавця {@code ui} (у грі — {@code Platform::runLater}): властивості
  * змінюються лише там.
  *
+ * <p>Межа фази наказів (таймер ходу) приходить відліком — скільки лишилося; модель перетворює його на мить за
+ * годинником клієнта в момент отримання, тож екран рахує час, що лишився, сам.
+ *
  * <p>Події, які не є станом (почалася гра, прийшла помилка), — обробникам, які ставить поточний екран.
  */
 public final class SessionModel implements SessionListener {
 
     private final Executor ui;
+    private final Clock clock;
     private final ObjectProperty<ServerMessage.Lobby> lobby = new SimpleObjectProperty<>();
     private final ObjectProperty<List<PlayerInfo>> players = new SimpleObjectProperty<>(List.of());
     private final ObjectProperty<ServerMessage.Phase> phase = new SimpleObjectProperty<>();
+    private final ObjectProperty<Instant> ordersDeadline = new SimpleObjectProperty<>();
     private final BooleanProperty connected = new SimpleBooleanProperty(true);
     private Consumer<GameStart> onGameStarted = start -> {};
     private Consumer<ServerMessage.Error> onError = error -> {};
 
     /** @param ui виконавець потоку UI */
     public SessionModel(Executor ui) {
+        this(ui, Clock.systemUTC());
+    }
+
+    /** @param clock годинник клієнта, за яким рахується межа фази наказів */
+    public SessionModel(Executor ui, Clock clock) {
         this.ui = Objects.requireNonNull(ui, "ui");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /** Стан лобі; {@code null} — клієнт не в лобі. */
@@ -50,6 +63,11 @@ public final class SessionModel implements SessionListener {
     /** Поточна фаза року; {@code null} — гра ще не почалася. */
     public ReadOnlyObjectProperty<ServerMessage.Phase> phase() {
         return phase;
+    }
+
+    /** Коли закінчиться фаза наказів поточного року за годинником клієнта; {@code null} — межі немає. */
+    public ReadOnlyObjectProperty<Instant> ordersDeadline() {
+        return ordersDeadline;
     }
 
     /** Чи є зв'язок із сервером. */
@@ -72,6 +90,7 @@ public final class SessionModel implements SessionListener {
         lobby.set(null);
         players.set(List.of());
         phase.set(null);
+        ordersDeadline.set(null);
         connected.set(true);
     }
 
@@ -87,10 +106,11 @@ public final class SessionModel implements SessionListener {
 
     @Override
     public void gameStarted(GameStart start) {
+        Instant deadline = deadline(start.phase());
         ui.execute(() -> {
             connected.set(true);
             lobby.set(null);
-            phase.set(new ServerMessage.Phase(start.turn(), start.phase()));
+            setPhase(start.phase(), deadline);
             onGameStarted.accept(start);
         });
     }
@@ -102,7 +122,8 @@ public final class SessionModel implements SessionListener {
 
     @Override
     public void phase(ServerMessage.Phase update) {
-        ui.execute(() -> phase.set(update));
+        Instant deadline = deadline(update);
+        ui.execute(() -> setPhase(update, deadline));
     }
 
     @Override
@@ -113,5 +134,18 @@ public final class SessionModel implements SessionListener {
     @Override
     public void disconnected() {
         ui.execute(() -> connected.set(false));
+    }
+
+    /** Межа — від миті отримання фази, а не від миті, коли до неї дійшов потік UI. */
+    private Instant deadline(ServerMessage.Phase update) {
+        return update.timeLeftMillis().isPresent()
+                ? clock.instant().plusMillis(update.timeLeftMillis().getAsLong())
+                : null;
+    }
+
+    private void setPhase(ServerMessage.Phase update, Instant deadline) {
+        // Спершу межа: слухачі фази вже бачать межу нової фази.
+        ordersDeadline.set(deadline);
+        phase.set(update);
     }
 }

@@ -27,6 +27,7 @@ import kolo.protocol.message.WorldInfo;
 import kolo.protocol.message.YearPhase;
 import kolo.server.TestClient;
 import kolo.server.TestServers;
+import kolo.server.persistence.SavedPlayer;
 import kolo.server.persistence.WorldDirectory;
 import kolo.server.persistence.WorldStore;
 import kolo.server.session.SessionActor;
@@ -156,7 +157,7 @@ class GameServerTest {
             for (TestClient player : players) {
                 assertThat(player.world()).isEqualTo(map);
             }
-            for (int turn = 0; turn < 5; turn++) {
+            for (int turn = 0; turn < 4; turn++) {
                 for (TestClient player : players) {
                     player.send(new ClientMessage.Ready(turn));
                 }
@@ -167,11 +168,16 @@ class GameServerTest {
                     player.expectYearAfterReady(turn);
                 }
             }
+            // П'ятий рік хост завершує сам: за всіх, хто не натиснув «Готово», діє автопілот.
+            host.send(new ClientMessage.EndYear(4));
+            for (TestClient player : players) {
+                player.expectYearAfterReady(4);
+            }
         }
         awaitNoSessions();
         try (WorldStore store = WorldStore.open(worlds.resolve("world-30" + WorldStore.EXTENSION))) {
             assertThat(store.lastTurn()).isEqualTo(5);
-            assertThat(store.players()).hasSize(3);
+            assertThat(store.players()).extracting(SavedPlayer::missedTurns).containsExactly(1, 1, 1);
         }
     }
 

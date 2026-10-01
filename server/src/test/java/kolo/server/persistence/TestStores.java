@@ -26,10 +26,14 @@ final class TestStores {
     }
 
     /**
-     * Файл світу старішої версії гри: новий файл без таблиць і стовпців пізніших міграцій. Версія 2 — без ключа світу,
-     * версія 1 — ще й без гравців.
+     * Файл світу старішої версії гри: новий файл без таблиць і стовпців пізніших міграцій. Версія 3 — без таймера ходу
+     * й пропусків гравців, версія 2 — ще й без ключа світу, версія 1 — ще й без гравців.
      */
     static void downgrade(Path file, int version) {
+        if (version < 4) {
+            sql(file, "DROP TABLE turn_timer");
+            sql(file, "ALTER TABLE players DROP COLUMN missed_turns");
+        }
         if (version < 3) {
             sql(file, "ALTER TABLE world_meta DROP COLUMN world_key");
         }

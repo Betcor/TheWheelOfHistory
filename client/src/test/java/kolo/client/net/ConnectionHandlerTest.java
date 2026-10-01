@@ -15,6 +15,7 @@ import kolo.engine.error.ErrorCode;
 import kolo.engine.error.ProtocolException;
 import kolo.engine.error.VersionMismatchException;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.Protocol;
 import kolo.protocol.message.ClientMessage;
 import kolo.protocol.message.LobbyInfo;
@@ -86,7 +87,7 @@ class ConnectionHandlerTest {
         CompletableFuture<ServerMessage.Lobbies> lobbies = new CompletableFuture<>();
         handler.request(channel, new ClientMessage.ListLobbies(), ServerMessage.Lobbies.class, lobbies);
         ServerMessage.Lobbies reply = new ServerMessage.Lobbies(
-                List.of(new LobbyInfo(3, WORLD, "Оля", 2, new LobbySetup.NewWorld(1, NpcShare.FEW))));
+                List.of(new LobbyInfo(3, WORLD, "Оля", 2, new LobbySetup.NewWorld(1, NpcShare.FEW, TurnTimer.MANUAL))));
 
         channel.writeInbound(reply);
 
@@ -105,8 +106,9 @@ class ConnectionHandlerTest {
         ServerMessage.Lobby lobby = new ServerMessage.Lobby(
                 3,
                 WORLD,
-                new LobbySetup.NewWorld(1, NpcShare.FEW),
-                List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty())));
+                new LobbySetup.NewWorld(1, NpcShare.FEW, TurnTimer.MANUAL),
+                List.of(new PlayerInfo(1, "Оля", true, true, false, OptionalInt.empty())),
+                List.of(TurnTimer.MANUAL));
 
         channel.writeInbound(lobby);
         channel.writeInbound(new ServerMessage.Players(PLAYERS));
@@ -128,7 +130,8 @@ class ConnectionHandlerTest {
         channel.writeInbound(new ServerMessage.Phase(0, YearPhase.ORDERS));
 
         assertThat(listener.next())
-                .isEqualTo(new RecordingListener.Started(new GameStart(TestMaps.MAP, 0, YearPhase.START_OF_YEAR)));
+                .isEqualTo(new RecordingListener.Started(
+                        new GameStart(TestMaps.MAP, new ServerMessage.Phase(0, YearPhase.START_OF_YEAR))));
         assertThat(listener.next())
                 .isEqualTo(new RecordingListener.Phase(new ServerMessage.Phase(0, YearPhase.ORDERS)));
     }

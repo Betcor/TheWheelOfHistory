@@ -1,8 +1,10 @@
 package kolo.server;
 
+import java.util.List;
 import kolo.content.loader.ContentLoader;
 import kolo.engine.content.ContentPack;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.view.MapView;
 import kolo.engine.view.MapViews;
 import kolo.server.session.NewWorlds;
@@ -11,6 +13,9 @@ import kolo.server.session.NewWorlds;
 public final class TestServers {
 
     public static final ContentPack CONTENT = ContentLoader.loadBundled();
+
+    /** Таймери ходу вбудованого контенту, з яких обирає хост. */
+    public static final List<TurnTimer> TIMERS = CONTENT.balance().timers().choices();
 
     private TestServers() {}
 

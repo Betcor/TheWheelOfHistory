@@ -13,6 +13,7 @@ import java.util.OptionalInt;
 import kolo.engine.state.GridPoint;
 import kolo.engine.state.LocalizedName;
 import kolo.engine.state.NounPhrase;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.view.CellView;
 import kolo.engine.view.CountryView;
 import kolo.protocol.message.ClientMessage;
@@ -86,6 +87,15 @@ final class MessageWriter {
                     json.writeNumberField("guest", assign.guest());
                     json.writeNumberField("seat", assign.seat());
                 }
+                case ClientMessage.SetTimer set -> {
+                    json.writeStringField("type", MessageTypes.SET_TIMER);
+                    json.writeFieldName("timer");
+                    timer(json, set.timer());
+                }
+                case ClientMessage.EndYear end -> {
+                    json.writeStringField("type", MessageTypes.END_YEAR);
+                    json.writeNumberField("turn", end.turn());
+                }
             }
             json.writeEndObject();
         });
@@ -137,6 +147,11 @@ final class MessageWriter {
                     json.writeStringField("world", lobby.world());
                     setup(json, lobby.setup());
                     players(json, lobby.players());
+                    json.writeArrayFieldStart("timers");
+                    for (TurnTimer timer : lobby.timers()) {
+                        timer(json, timer);
+                    }
+                    json.writeEndArray();
                 }
                 case ServerMessage.Players players -> {
                     json.writeStringField("type", MessageTypes.PLAYERS);
@@ -167,6 +182,12 @@ final class MessageWriter {
                     json.writeStringField("type", MessageTypes.PHASE);
                     json.writeNumberField("turn", phase.turn());
                     json.writeStringField("phase", key(phase.phase()));
+                    json.writeFieldName("time_left_millis");
+                    if (phase.timeLeftMillis().isPresent()) {
+                        json.writeNumber(phase.timeLeftMillis().getAsLong());
+                    } else {
+                        json.writeNull();
+                    }
                 }
                 case ServerMessage.Worlds worlds -> {
                     json.writeStringField("type", MessageTypes.WORLDS);
@@ -211,6 +232,15 @@ final class MessageWriter {
                 json.writeNumberField("turn", world.turn());
             }
         }
+        json.writeFieldName("timer");
+        timer(json, setup.timer());
+        json.writeEndObject();
+    }
+
+    private static void timer(JsonGenerator json, TurnTimer timer) throws IOException {
+        json.writeStartObject();
+        json.writeStringField("mode", key(timer.mode()));
+        json.writeNumberField("seconds", timer.seconds());
         json.writeEndObject();
     }
 

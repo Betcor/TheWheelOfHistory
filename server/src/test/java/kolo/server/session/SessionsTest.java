@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.LobbySetup;
 import kolo.server.TestServers;
@@ -49,7 +50,8 @@ class SessionsTest {
         assertThat(sessions.find(99)).isEmpty();
         // Сесія без відкритого лобі в списку не з'являється.
         assertThat(sessions.lobbies())
-                .containsExactly(new LobbyInfo(open.id(), world, "Оля", 1, new LobbySetup.NewWorld(4, NpcShare.MANY)));
+                .containsExactly(new LobbyInfo(
+                        open.id(), world, "Оля", 1, new LobbySetup.NewWorld(4, NpcShare.MANY, TurnTimer.MANUAL)));
         assertThat(empty.lobby()).isEmpty();
         sessions.closeAll(30, TimeUnit.SECONDS);
         assertThat(sessions.lobbies()).isEmpty();

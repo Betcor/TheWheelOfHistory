@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.view.MapView;
 import kolo.protocol.codec.ProtocolPipeline;
 import kolo.protocol.message.ClientMessage;
@@ -110,8 +111,9 @@ class ProtocolSmokeTest {
                     ctx.writeAndFlush(new ServerMessage.Lobby(
                             1,
                             TestMessages.WORLD,
-                            new LobbySetup.NewWorld(create.seed(), create.npcShare()),
-                            List.of(new PlayerInfo(1, create.nickname(), true, true, false, OptionalInt.empty()))));
+                            new LobbySetup.NewWorld(create.seed(), create.npcShare(), TurnTimer.MANUAL),
+                            List.of(new PlayerInfo(1, create.nickname(), true, true, false, OptionalInt.empty())),
+                            List.of(TurnTimer.MANUAL)));
                 }
                 case ClientMessage.StartGame start -> {
                     for (ServerMessage part : MapChunks.split(MAP, 300)) {

@@ -75,6 +75,10 @@ final class RecordingPeer implements Peer {
         return map.orElseThrow();
     }
 
+    ServerMessage.Phase phase() throws InterruptedException {
+        return next(ServerMessage.Phase.class);
+    }
+
     void expectPhase(int turn, YearPhase phase) throws InterruptedException {
         ServerMessage message = next();
         if (!message.equals(new ServerMessage.Phase(turn, phase))) {

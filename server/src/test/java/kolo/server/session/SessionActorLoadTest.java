@@ -12,6 +12,7 @@ import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 import kolo.engine.error.ErrorCode;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.protocol.message.LobbyInfo;
 import kolo.protocol.message.LobbySetup;
 import kolo.protocol.message.PlayerInfo;
@@ -36,7 +37,7 @@ import org.junit.jupiter.api.io.TempDir;
 class SessionActorLoadTest {
 
     private static final String WORLD = "world-11";
-    private static final LobbySetup SAVED = new LobbySetup.SavedWorld(WORLD, 11, 2);
+    private static final LobbySetup SAVED = new LobbySetup.SavedWorld(WORLD, 11, 2, TurnTimer.MANUAL);
 
     @TempDir
     Path dir;
@@ -94,7 +95,8 @@ class SessionActorLoadTest {
                         SAVED,
                         List.of(
                                 new PlayerInfo(1, "Оля", true, true, false, OptionalInt.of(0)),
-                                new PlayerInfo(2, "Ігор", false, false, false, OptionalInt.of(1)))));
+                                new PlayerInfo(2, "Ігор", false, false, false, OptionalInt.of(1))),
+                        TestServers.TIMERS));
         assertThat(session.lobby()).contains(new LobbyInfo(session.id(), olya.world(), "Оля", 1, SAVED));
 
         session.start(host);
@@ -334,7 +336,8 @@ class SessionActorLoadTest {
                 worlds,
                 new PlayerTokens(),
                 SessionActor.engine(TestServers.CONTENT),
-                s -> {});
+                s -> {},
+                new ManualClock());
     }
 
     /** Лобі збереженого світу, у якому хост «Оля» сів на своє місце. */

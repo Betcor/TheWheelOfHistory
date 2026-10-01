@@ -289,7 +289,8 @@ final class TestChain {
                         TestReligions.BALANCE,
                         TestMaps.BALANCE,
                         TestResources.BALANCE,
-                        TestPower.BUDGET));
+                        TestPower.BUDGET,
+                        TestPower.TIMERS));
     }
 
     /** {@link TestMaps#CONTENT} з рівнями площі й населення якості {@code quality}. */

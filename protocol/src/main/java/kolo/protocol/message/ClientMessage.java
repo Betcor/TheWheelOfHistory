@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 import kolo.engine.error.Checks;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 
 /**
  * Повідомлення клієнта серверу.
@@ -23,7 +24,9 @@ public sealed interface ClientMessage
                 ClientMessage.Ready,
                 ClientMessage.ListWorlds,
                 ClientMessage.LoadWorld,
-                ClientMessage.AssignSeat {
+                ClientMessage.AssignSeat,
+                ClientMessage.SetTimer,
+                ClientMessage.EndYear {
 
     /** Найдовший токен гравця, символів. */
     int MAX_TOKEN_LENGTH = 128;
@@ -110,8 +113,9 @@ public sealed interface ClientMessage
     record Leave() implements ClientMessage {}
 
     /**
-     * Гравець закінчив накази року й натиснув «Готово». Коли готові всі гравці сесії на зв'язку, сервер розв'язує рік.
-     * Не той рік або не фаза наказів — {@link ServerMessage.Error} з {@code PHASE_CLOSED}.
+     * Гравець закінчив накази року й натиснув «Готово». Коли готові всі гравці сесії на зв'язку, сервер розв'язує рік
+     * (з таймером — і коли вийшов час, {@link ServerMessage.Phase#timeLeftMillis()}). Не той рік або не фаза наказів —
+     * {@link ServerMessage.Error} з {@code PHASE_CLOSED}.
      *
      * @param turn рік, накази якого закінчено (хід, не календарний рік)
      */
@@ -163,6 +167,31 @@ public sealed interface ClientMessage
         public AssignSeat {
             Checks.inRange("guest", guest, 1, Integer.MAX_VALUE);
             Checks.inRange("seat", seat, 1, Integer.MAX_VALUE);
+        }
+    }
+
+    /**
+     * Хост обирає таймер ходу в лобі (GD §6.1) — один із {@link ServerMessage.Lobby#timers()}. Усі в лобі отримують
+     * {@link ServerMessage.Lobby} з новим {@link LobbySetup#timer()}. Не хост — {@code FORBIDDEN}, гру вже почато —
+     * {@code LOBBY_CLOSED}, такого варіанта немає — {@code VALUE_OUT_OF_RANGE}.
+     */
+    record SetTimer(TurnTimer timer) implements ClientMessage {
+
+        public SetTimer {
+            Objects.requireNonNull(timer, "timer");
+        }
+    }
+
+    /**
+     * Хост завершує рік, не чекаючи «Готово» всіх (GD §6.1): рік розв'язується одразу, за гравців без «Готово» діє
+     * автопілот (GD §6.3). Не хост — {@code FORBIDDEN}, не той рік або не фаза наказів — {@code PHASE_CLOSED}.
+     *
+     * @param turn рік, який завершити (хід, не календарний рік)
+     */
+    record EndYear(int turn) implements ClientMessage {
+
+        public EndYear {
+            Checks.inRange("turn", turn, 0, Integer.MAX_VALUE);
         }
     }
 }

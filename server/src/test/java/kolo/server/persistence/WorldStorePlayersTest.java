@@ -38,8 +38,8 @@ class WorldStorePlayersTest {
         try (WorldStore store = TestStores.open(file)) {
             assertThat(store.players())
                     .containsExactly(
-                            new SavedPlayer(PLAYERS.get(0), TestStores.NOW),
-                            new SavedPlayer(PLAYERS.get(1), TestStores.NOW));
+                            new SavedPlayer(PLAYERS.get(0), TestStores.NOW, 0),
+                            new SavedPlayer(PLAYERS.get(1), TestStores.NOW, 0));
         }
     }
 

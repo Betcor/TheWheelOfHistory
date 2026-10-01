@@ -1,11 +1,14 @@
 package kolo.server.session;
 
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -22,7 +25,9 @@ import kolo.engine.error.NotFoundException;
 import kolo.engine.error.PhaseClosedException;
 import kolo.engine.error.SaveFileException;
 import kolo.engine.error.UnauthorizedException;
+import kolo.engine.error.ValidationException;
 import kolo.engine.state.NpcShare;
+import kolo.engine.state.TurnTimer;
 import kolo.engine.state.WorldLimits;
 import kolo.engine.state.WorldState;
 import kolo.engine.turn.TurnPipeline;
@@ -39,6 +44,7 @@ import kolo.server.auth.PlayerTokens;
 import kolo.server.persistence.MapSnapshot;
 import kolo.server.persistence.PlayerRecord;
 import kolo.server.persistence.SavedPlayer;
+import kolo.server.persistence.SavedTimer;
 import kolo.server.persistence.StateSnapshot;
 import kolo.server.persistence.WorldDirectory;
 import kolo.server.persistence.WorldMeta;
@@ -55,9 +61,15 @@ import org.slf4j.LoggerFactory;
  * номер і токен. Хост починає гру: гравці — усі, хто в лобі, у порядку приєднання, {@code n}-й отримує державу {@code
  * n}; сесія генерує світ і створює файл світу з гравцями ({@code GENERATING}), надсилає карту й живе роками ({@code
  * RUNNING}). Рік — фази {@link YearPhase}: {@code START_OF_YEAR → ORDERS}; коли «Готово» натиснули всі гравці на
- * зв'язку — {@code RESOLVING} (рушій розв'язує рік, рік пишеться у файл однією транзакцією) → {@code REPORT} →
- * наступний рік. Якщо рік не вдалося розв'язати чи зберегти — {@code PAUSED}: стан і файл лишаються на попередньому
- * році, гравці отримують помилку.
+ * зв'язку, хост завершив рік ({@link #endYear}) або вийшов час таймера ходу — {@code RESOLVING} (рушій розв'язує рік,
+ * рік пишеться у файл однією транзакцією) → {@code REPORT} → наступний рік. Якщо рік не вдалося розв'язати чи зберегти
+ * — {@code PAUSED}: стан і файл лишаються на попередньому році, гравці отримують помилку.
+ *
+ * <p>Таймер ходу (GD §6.1) хост обирає в лобі ({@link #setTimer}) з варіантів контенту; він зберігається у файлі світу.
+ * З таймером фаза наказів має межу: гравці отримують, скільки часу лишилося, а межа року пишеться у файл — завантажений
+ * світ продовжує рік з тією самою межею (якщо хост не змінив таймер), а не отримує часу заново. За гравців, що не
+ * натиснули «Готово» до розв'язання року, діє автопілот (GD §6.3; поки наказів немає — нічого не робить), а у файлі
+ * зростає їхній лічильник пропусків поспіль.
  *
  * <p>З лобі гравець іде зовсім (пішов хост — хостом стає наступний за порядком); з гри — лише від'єднується: держава
  * лишається його, а з токеном він повертається ({@link #rejoin}). Коли на зв'язку не лишилося нікого, сесія
@@ -78,6 +90,7 @@ public final class SessionActor {
     private final PlayerTokens tokens;
     private final UnaryOperator<WorldState> years;
     private final Consumer<SessionActor> onClosed;
+    private final SessionClock clock;
     private final ExecutorService executor;
     private volatile SessionState state = SessionState.LOBBY;
     private volatile LobbyInfo lobby;
@@ -95,10 +108,19 @@ public final class SessionActor {
     private Path claimed;
 
     private ServerMessage.Error pauseError;
+    /** Таймер, збережений у файлі завантаженого світу; новий світ — ручний. */
+    private TurnTimer savedTimer = TurnTimer.MANUAL;
+    /** Межа фази наказів поточного року з файлу: завантажений світ продовжує рік з нею. */
+    private Instant savedDeadline;
+    /** Межа фази наказів поточного року; {@code null} — без таймера або не фаза наказів. */
+    private Instant deadline;
+
+    private SessionClock.Alarm alarm;
 
     /**
      * @param years розв'язання року: стан на початку року → новий стан наприкінці; у грі — {@link TurnPipeline}
      * @param onClosed викликається в потоці сесії, коли її закрито
+     * @param clock час для таймера ходу
      */
     SessionActor(
             long id,
@@ -106,13 +128,15 @@ public final class SessionActor {
             WorldDirectory worlds,
             PlayerTokens tokens,
             UnaryOperator<WorldState> years,
-            Consumer<SessionActor> onClosed) {
+            Consumer<SessionActor> onClosed,
+            SessionClock clock) {
         this.id = id;
         this.content = Objects.requireNonNull(content, "content");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.tokens = Objects.requireNonNull(tokens, "tokens");
         this.years = Objects.requireNonNull(years, "years");
         this.onClosed = Objects.requireNonNull(onClosed, "onClosed");
+        this.clock = Objects.requireNonNull(clock, "clock");
         this.executor = Executors.newSingleThreadExecutor(task -> {
             Thread thread = new Thread(task, "kolo-session-" + id);
             thread.setDaemon(true);
@@ -216,6 +240,25 @@ public final class SessionActor {
         post(() -> doReady(player, turn));
     }
 
+    /**
+     * Хост обирає таймер ходу в лобі. Не хост — {@code FORBIDDEN}, гру вже почато — {@code LOBBY_CLOSED}, такого
+     * варіанта в контенті немає — {@code VALUE_OUT_OF_RANGE}; помилка — лише хостові.
+     */
+    public void setTimer(Peer host, TurnTimer timer) {
+        Objects.requireNonNull(host, "host");
+        Objects.requireNonNull(timer, "timer");
+        post(() -> doSetTimer(host, timer));
+    }
+
+    /**
+     * Хост завершує рік {@code turn}, не чекаючи «Готово» всіх. Не хост — {@code FORBIDDEN}, не той рік чи не фаза
+     * наказів — {@code PHASE_CLOSED}; помилка — лише хостові.
+     */
+    public void endYear(Peer host, int turn) {
+        Objects.requireNonNull(host, "host");
+        post(() -> doEndYear(host, turn));
+    }
+
     /** Гравець полишив сесію (вийшов, закрив з'єднання чи перейшов в іншу сесію). */
     public void leave(Peer player) {
         Objects.requireNonNull(player, "player");
@@ -272,7 +315,7 @@ public final class SessionActor {
             throw new IllegalStateException("лобі сесії " + id + " уже відкрито");
         }
         worldKey = WorldStore.newKey();
-        setup = new LobbySetup.NewWorld(seed, npcShare);
+        setup = new LobbySetup.NewWorld(seed, npcShare, TurnTimer.MANUAL);
         add(host, nickname, true);
         LOG.info("Сесія {}: лобі відкрито, хост «{}»", id, nickname);
         lobbyChanged();
@@ -326,6 +369,9 @@ public final class SessionActor {
             }
             world = store.loadLatest().state();
             map = store.map();
+            SavedTimer timer = store.timer();
+            savedTimer = timer.timer();
+            savedDeadline = timer.deadlineOf(world.turn()).orElse(null);
             for (SavedPlayer saved : store.players()) {
                 PlayerRecord record = saved.player();
                 Member member = new Member(record.number(), record.nickname(), record.tokenHash());
@@ -343,7 +389,7 @@ public final class SessionActor {
             return;
         }
         worldKey = store.meta().key();
-        setup = new LobbySetup.SavedWorld(name, store.meta().seed(), world.turn());
+        setup = new LobbySetup.SavedWorld(name, store.meta().seed(), world.turn(), savedTimer);
         if (seated != null) {
             seated.peer = peer;
             seated.host = true;
@@ -411,6 +457,32 @@ public final class SessionActor {
         lobbyChanged();
     }
 
+    private void doSetTimer(Peer peer, TurnTimer timer) {
+        Member host = member(peer);
+        try {
+            if (host == null || !host.host) {
+                throw new ForbiddenException(ErrorDetails.of("action", "set_timer"));
+            }
+            if (state != SessionState.LOBBY) {
+                throw new ConflictException(ErrorCode.LOBBY_CLOSED, ErrorDetails.of("session", id));
+            }
+            if (!content.balance().timers().allows(timer)) {
+                throw new ValidationException(
+                        ErrorCode.VALUE_OUT_OF_RANGE,
+                        ErrorDetails.of("field", "timer", "mode", timer.mode().key(), "value", timer.seconds()));
+            }
+        } catch (GameException e) {
+            peer.send(ServerMessage.Error.of(e));
+            return;
+        }
+        if (!timer.equals(setup.timer())) {
+            setup = setup.withTimer(timer);
+            // Інший таймер — і час року рахується заново.
+            savedDeadline = null;
+            lobbyChanged();
+        }
+    }
+
     private void doStart(Peer peer) {
         Member starter = member(peer);
         try {
@@ -460,6 +532,7 @@ public final class SessionActor {
             MapSnapshot snapshot = MapSnapshot.of(initial.map());
             store = worlds.create(fresh.seed(), worldKey, snapshot, StateSnapshot.of(initial, snapshot), records);
             claimed = store.file();
+            saveTimer();
             map = snapshot;
             world = initial;
         } catch (GameException e) {
@@ -480,6 +553,7 @@ public final class SessionActor {
         }
         try {
             store.updatePlayers(records);
+            saveTimer();
         } catch (GameException e) {
             broadcast(List.of(ServerMessage.Error.of(e)));
             shutdown();
@@ -487,6 +561,14 @@ public final class SessionActor {
         }
         LOG.info("Сесія {}: світ {} продовжується з року {}", id, saved.name(), world.turn());
         return true;
+    }
+
+    /** Таймер лобі — у файл, якщо він не той, що вже там. */
+    private void saveTimer() {
+        if (!setup.timer().equals(savedTimer)) {
+            store.saveTimer(setup.timer());
+            savedTimer = setup.timer();
+        }
     }
 
     private void doRejoin(Peer peer, int number, String token) {
@@ -512,7 +594,7 @@ public final class SessionActor {
             return;
         }
         List<ServerMessage> messages = new ArrayList<>(MapChunks.split(MapViews.of(world)));
-        messages.add(new ServerMessage.Phase(world.turn(), phase));
+        messages.add(phaseMessage(world.turn(), phase));
         if (state == SessionState.PAUSED) {
             messages.add(pauseError);
         }
@@ -533,6 +615,35 @@ public final class SessionActor {
         if (!resolveIfAllReady()) {
             playersChanged();
         }
+    }
+
+    private void doEndYear(Peer peer, int turn) {
+        Member member = member(peer);
+        try {
+            if (member == null || !member.host) {
+                throw new ForbiddenException(ErrorDetails.of("action", "end_year"));
+            }
+            if (!acceptsOrders(turn)) {
+                throw new PhaseClosedException(ErrorDetails.of("turn", turn));
+            }
+        } catch (GameException e) {
+            peer.send(ServerMessage.Error.of(e));
+            return;
+        }
+        LOG.info("Сесія {}: хост завершив рік {}", id, turn);
+        resolveYear();
+    }
+
+    /** Вийшов час фази наказів року {@code turn}; якщо рік уже розв'язано — нічого. */
+    private void deadlineReached(int turn) {
+        if (acceptsOrders(turn)) {
+            LOG.info("Сесія {}: час року {} вийшов", id, turn);
+            resolveYear();
+        }
+    }
+
+    private boolean acceptsOrders(int turn) {
+        return state == SessionState.RUNNING && phase == YearPhase.ORDERS && turn == world.turn();
     }
 
     private void doLeave(Peer peer) {
@@ -585,11 +696,20 @@ public final class SessionActor {
 
     private void resolveYear() {
         int turn = world.turn();
+        stopTimer();
+        // Хто не натиснув «Готово» (зокрема не на зв'язку), — за того діє автопілот (GD §6.3).
+        List<Integer> missed = members.stream()
+                .filter(m -> m.country >= 0 && !m.ready)
+                .map(m -> m.number)
+                .toList();
+        if (!missed.isEmpty()) {
+            LOG.info("Сесія {}: рік {} — автопілот за гравців {}", id, turn, missed);
+        }
         phase(turn, YearPhase.RESOLVING);
         WorldState next;
         try {
             next = years.apply(world);
-            store.saveTurn(StateSnapshot.of(next, map));
+            store.saveTurn(StateSnapshot.of(next, map), missed);
         } catch (GameException e) {
             // Рушій порушив інваріант або рік не записано: файл лишився на попередньому році, стан теж.
             LOG.error("Сесія {}: рік {} не розв'язано, сесію призупинено", id, turn, e);
@@ -606,19 +726,56 @@ public final class SessionActor {
     }
 
     private void startYear() {
+        startTimer();
         playersChanged();
         phase(world.turn(), YearPhase.START_OF_YEAR);
         phase(world.turn(), YearPhase.ORDERS);
     }
 
+    /** Межа фази наказів року, якщо таймер є: з файлу (продовження року) або від цієї миті. */
+    private void startTimer() {
+        TurnTimer timer = setup.timer();
+        if (!timer.timed()) {
+            return;
+        }
+        int turn = world.turn();
+        Instant now = clock.now();
+        deadline = savedDeadline != null ? savedDeadline : now.plusSeconds(timer.seconds());
+        savedDeadline = null;
+        try {
+            store.saveDeadline(Optional.of(new SavedTimer.Deadline(turn, deadline)));
+        } catch (GameException e) {
+            // Без межі у файлі рік після перезапуску лише отримає час заново: через це гру не зупиняємо.
+            LOG.warn("Сесія {}: не записано межу року {}", id, turn, e);
+        }
+        alarm = clock.schedule(Duration.between(now, deadline), () -> post(() -> deadlineReached(turn)));
+    }
+
+    private void stopTimer() {
+        if (alarm != null) {
+            alarm.cancel();
+            alarm = null;
+        }
+        deadline = null;
+    }
+
     private void phase(int turn, YearPhase next) {
         phase = next;
-        broadcast(List.of(new ServerMessage.Phase(turn, next)));
+        broadcast(List.of(phaseMessage(turn, next)));
+    }
+
+    /** Фаза для гравців; фаза наказів із таймером — зі скільки часу лишилося. */
+    private ServerMessage.Phase phaseMessage(int turn, YearPhase current) {
+        if (current != YearPhase.ORDERS || deadline == null) {
+            return new ServerMessage.Phase(turn, current);
+        }
+        long left = Math.max(0, Duration.between(clock.now(), deadline).toMillis());
+        return new ServerMessage.Phase(turn, current, OptionalLong.of(left));
     }
 
     private void lobbyChanged() {
         listLobby();
-        broadcast(List.of(new ServerMessage.Lobby(id, worldKey, setup, players())));
+        broadcast(List.of(new ServerMessage.Lobby(id, worldKey, setup, players(), timers())));
     }
 
     /**
@@ -628,6 +785,15 @@ public final class SessionActor {
     private void listLobby() {
         Member host = members.stream().filter(m -> m.host).findFirst().orElseThrow();
         lobby = new LobbyInfo(id, worldKey, host.nickname, connected().size(), setup);
+    }
+
+    /** Таймери, з яких обирає хост; таймер файлу, якого в контенті вже немає, теж лишається серед них. */
+    private List<TurnTimer> timers() {
+        List<TurnTimer> choices = new ArrayList<>(content.balance().timers().choices());
+        if (!choices.contains(setup.timer())) {
+            choices.add(setup.timer());
+        }
+        return choices;
     }
 
     /** Гравці на зв'язку в порядку списку. */
@@ -685,6 +851,7 @@ public final class SessionActor {
         }
         state = SessionState.CLOSED;
         lobby = null;
+        stopTimer();
         if (store != null) {
             try {
                 store.close();
