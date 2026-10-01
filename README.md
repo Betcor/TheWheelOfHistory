@@ -24,6 +24,8 @@
 ./gradlew :client:run     # запуск клієнта
 ```
 
+Окремий сервер у Docker — [docker/README.md](docker/README.md).
+
 ## Ліцензія
 
 [GPL-3.0](LICENSE)

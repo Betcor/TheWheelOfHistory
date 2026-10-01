@@ -17,4 +17,13 @@ dependencies {
 
 application {
     mainClass = "kolo.server.DedicatedServerMain"
+    // sqlite-jdbc завантажує нативну бібліотеку; без дозволу JVM попереджає, а згодом блокуватиме.
+    applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
+}
+
+tasks.named<Test>("test") {
+    // DockerfileTest читає образ окремого сервера: зміна в docker/ — привід перезапустити тести.
+    inputs.dir(rootProject.layout.projectDirectory.dir("docker"))
+        .withPropertyName("docker")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
