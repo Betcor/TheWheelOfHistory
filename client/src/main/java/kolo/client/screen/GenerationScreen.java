@@ -18,6 +18,8 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.ToolBar;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -45,7 +47,8 @@ import kolo.protocol.message.PlayerInfo;
 
 /**
  * Генерація держави гравця (GD §4.12): вісім етапів-екранів, ключові колеса — з анімацією, службові — одразу
- * результатом, з шансами за кліком; наприкінці — картка держави й «Готово». Колеса лише показують результат з картки,
+ * результатом, з шансами за кліком; наприкінці — картка держави й «Готово». Крок із колесами, що крутяться, чекає
+ * клацання ЛКМ по екрану коліс; колеса кроку запускає одне клацання. Колеса лише показують результат з картки,
  * яку надіслав сервер. Перший рік починається, коли «Готово» натиснули всі гравці (ADR 0053).
  */
 public final class GenerationScreen {
@@ -68,6 +71,7 @@ public final class GenerationScreen {
     private AnimationMode mode = AnimationMode.KEY;
 
     private final Label stageTitle = new Label();
+    private final Label clickHint = new Label();
     private final BorderPane root = new BorderPane();
     private final Button skip;
     private final Button next;
@@ -78,6 +82,8 @@ public final class GenerationScreen {
     private final Map<RollRecord, Shown> shown = new LinkedHashMap<>();
     /** Скільки коліс кроку ще крутиться. */
     private int spinning;
+    /** Колеса кроку, що чекають клацання; порожньо — нічого не чекає. */
+    private List<WheelView> waiting = List.of();
 
     private PauseTransition pause;
     private boolean alive = true;
@@ -109,6 +115,8 @@ public final class GenerationScreen {
         Label title = new Label(texts.text("generation.title"));
         title.getStyleClass().add("title-3");
         stageTitle.getStyleClass().add("title-4");
+        clickHint.setText(texts.text("generation.click_to_spin"));
+        clickHint.getStyleClass().addAll("title-4", "text-muted");
         ChoiceBox<AnimationMode> modes = new ChoiceBox<>();
         modes.getItems().setAll(AnimationMode.values());
         modes.setValue(mode);
@@ -199,20 +207,24 @@ public final class GenerationScreen {
                 progress.plan().stages().size(),
                 texts.text("generation.stage." + stage.kind().key())));
         FlowPane wheels = new FlowPane(18, 18);
-        wheels.setPadding(new Insets(18));
         wheels.setAlignment(Pos.TOP_CENTER);
         for (RollRecord roll : stage.rolls()) {
             Shown item = roll(roll);
             shown.put(roll, item);
             wheels.getChildren().add(item.node());
         }
-        root.setCenter(scroll(wheels));
+        VBox content = new VBox(12, clickHint, wheels);
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setPadding(new Insets(18));
+        ScrollPane pane = scroll(content);
+        pane.addEventHandler(MouseEvent.MOUSE_CLICKED, this::clicked);
+        root.setCenter(pane);
         next.setDisable(true);
         skip.setDisable(false);
         runStep();
     }
 
-    /** Наступний крок етапу: колеса крутяться разом, службові — одразу результатом. */
+    /** Наступний крок етапу: колеса крутяться разом після клацання, службові — одразу результатом. */
     private void runStep() {
         if (!alive) {
             return;
@@ -235,16 +247,42 @@ public final class GenerationScreen {
             runStep();
             return;
         }
+        // Колеса кроку чекають клацання гравця (GD §4.12).
+        waiting = List.copyOf(spins);
+        clickHint.setVisible(true);
+    }
+
+    /** Клацання ЛКМ по екрану коліс запускає колеса кроку, що чекають; клацання по «Шансах» — ні. */
+    private void clicked(MouseEvent event) {
+        if (waiting.isEmpty()
+                || event.getButton() != MouseButton.PRIMARY
+                || !event.isStillSincePress()
+                || insideChances(event.getPickResult().getIntersectedNode())) {
+            return;
+        }
+        event.consume();
+        List<WheelView> spins = waiting;
+        waiting = List.of();
+        clickHint.setVisible(false);
         spinning = spins.size();
         for (WheelView wheel : spins) {
             wheel.spin(SPIN, () -> {
                 if (--spinning == 0 && alive) {
                     pause = new PauseTransition(PAUSE);
-                    pause.setOnFinished(event -> runStep());
+                    pause.setOnFinished(finished -> runStep());
                     pause.play();
                 }
             });
         }
+    }
+
+    private static boolean insideChances(Node node) {
+        for (Node current = node; current != null; current = current.getParent()) {
+            if (current instanceof TitledPane) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void stageShown() {
@@ -359,6 +397,8 @@ public final class GenerationScreen {
             pause = null;
         }
         spinning = 0;
+        waiting = List.of();
+        clickHint.setVisible(false);
         shown.values().forEach(Shown::stop);
     }
 

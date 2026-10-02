@@ -14,6 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javafx.application.Platform;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -21,6 +22,8 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import kolo.client.TestWorlds;
@@ -188,8 +191,19 @@ class MapScreenSmokeTest {
             return generation;
         });
 
-        // Перший етап — «Земля»: ключові колеса крутяться, «Пропустити» одразу показує їхній результат.
-        assertThat(labels(screen)).anyMatch(text -> text.contains(texts.text("generation.stage.land")));
+        // Перший етап — «Земля»: ключові колеса чекають клацання ЛКМ, клацання їх крутить, «Пропустити» одразу
+        // показує їхній результат.
+        assertThat(labels(screen))
+                .anyMatch(text -> text.contains(texts.text("generation.stage.land")))
+                .contains(texts.text("generation.click_to_spin"));
+        assertThat(onFx(() -> wheels(screen).stream().noneMatch(WheelView::spinning)))
+                .isTrue();
+        onFx(() -> {
+            ((BorderPane) screen).getCenter().fireEvent(leftClick());
+            return null;
+        });
+        assertThat(onFx(() -> wheels(screen).stream().anyMatch(WheelView::spinning)))
+                .isTrue();
         onFx(() -> {
             button(screen, texts.text("generation.skip")).fire();
             return null;
@@ -221,6 +235,37 @@ class MapScreenSmokeTest {
             screen.getScene().setRoot(new javafx.scene.layout.Pane());
             return null;
         });
+    }
+
+    private static List<WheelView> wheels(Parent screen) {
+        return screen.lookupAll(".label").stream()
+                .map(Node::getParent)
+                .filter(WheelView.class::isInstance)
+                .map(WheelView.class::cast)
+                .distinct()
+                .toList();
+    }
+
+    private static MouseEvent leftClick() {
+        return new MouseEvent(
+                MouseEvent.MOUSE_CLICKED,
+                10,
+                10,
+                10,
+                10,
+                MouseButton.PRIMARY,
+                1,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                null);
     }
 
     private static List<String> labels(Parent screen) throws Exception {
